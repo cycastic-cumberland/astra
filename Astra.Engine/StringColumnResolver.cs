@@ -8,29 +8,31 @@ public sealed class StringColumnResolver(int offset, bool shouldBeHashed) : ICol
     private readonly AutoSerial<string> _serial = new();
     public DataType Type => DataType.Single;
     public int Occupying => sizeof(ulong);
+    public int HashSize => Hash128.Size;
     public int Offset => offset;
 
     public void Initialize<T>(T row) where T : struct, IDataRow
     {
         EnrollId(_serial.Save(""), row);
     }
-
+    
     public void Initialize<T>(Stream reader, Stream hashStream, T row) where T : struct, IDataRow
     {
-        // var str = reader.ReadString();
         var size = reader.ReadInt();
-        Span<byte> strBytes = stackalloc byte[size];
-        reader.ReadExactly(strBytes);
-        EnrollId(_serial.Save(Encoding.UTF8.GetString(strBytes)), row);
-        if (shouldBeHashed) 
-            hashStream.Write(strBytes);
+        using var strBytes = BytesCluster.Rent(size);
+        reader.ReadExactly(strBytes.Writer);
+        EnrollId(_serial.Save(Encoding.UTF8.GetString(strBytes.Reader)), row);
+        if (shouldBeHashed)
+        {
+            hashStream.WriteValue(Hash128.HashXx128(strBytes.Reader));
+        }
     }
-
+    
     public void BeginHash<T>(Stream writer, T row) where T : struct, IImmutableDataRow
     {
         // A bit different from Serialize, as in no length is written
         if (shouldBeHashed)
-            writer.Write(MemoryMarshal.AsBytes(Dump(row).AsSpan()));
+            writer.WriteValue(Hash128.HashXx128(MemoryMarshal.AsBytes(Dump(row).AsSpan())));
     }
 
     public void Destroy<T>(T row) where T : struct, IImmutableDataRow
@@ -62,14 +64,15 @@ public sealed class StringColumnResolver(int offset, bool shouldBeHashed) : ICol
 
     private ulong DumpId<T>(T row) where T : struct, IImmutableDataRow
     {
-        Span<byte> buffer = stackalloc byte[Occupying];
-        row.Read[offset..(offset + Occupying)].CopyTo(buffer);
-        return BitConverter.ToUInt64(buffer);
+        return BitConverter.ToUInt64(row.Read[offset..(offset + Occupying)]);
     }
 
     private void EnrollId<T>(ulong id, T row) where T : struct, IDataRow
     {
-        BitConverter.GetBytes(id).CopyTo(row.Write[offset..(offset + Occupying)]);
+        unsafe
+        {
+            new ReadOnlySpan<byte>(&id, sizeof(ulong)).CopyTo(row.Write[offset..(offset + Occupying)]);
+        }
     }
 
     public string Dump<TR>(TR row) where TR : struct, IImmutableDataRow

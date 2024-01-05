@@ -12,5 +12,4 @@ public struct AstraConnectionSettings
     [JsonProperty("schema")]
     public SchemaSpecifications Schema { get; set; }
 
-    public Task<SimpleAstraClient> CreateSimpleClient() => SimpleAstraClient.Create(this);
 }

@@ -4,6 +4,7 @@ public sealed class IntegerColumnResolver(int offset, bool shouldBeHashed) : ICo
 {
     public DataType Type => DataType.DWord;
     public int Occupying => sizeof(int);
+    public int HashSize => sizeof(int);
     public int Offset => offset;
 
     public void Initialize<T>(T row) where T : struct, IDataRow
@@ -24,9 +25,7 @@ public sealed class IntegerColumnResolver(int offset, bool shouldBeHashed) : ICo
 
     public int Dump<TR>(TR row) where TR : struct, IImmutableDataRow
     {
-        Span<byte> buffer = stackalloc byte[Occupying];
-        row.Read[offset..(offset + Occupying)].CopyTo(buffer);
-        return BitConverter.ToInt32(buffer);
+        return BitConverter.ToInt32(row.Read[offset..(offset + Occupying)]);
     }
 
     public void Enroll<TR>(int value, TR row) where TR : struct, IDataRow
@@ -36,16 +35,12 @@ public sealed class IntegerColumnResolver(int offset, bool shouldBeHashed) : ICo
 
     public void Serialize<T>(Stream writer, T row) where T : struct, IImmutableDataRow
     {
-        Span<byte> buffer = stackalloc byte[sizeof(int)];
-        row.Read[offset..(offset + Occupying)].CopyTo(buffer);
-        writer.Write(buffer);
+        writer.Write(row.Read[offset..(offset + Occupying)]);
     }
 
     public void Deserialize<T>(Stream reader, T row) where T : struct, IDataRow
     {
-        Span<byte> bytes = stackalloc byte[sizeof(int)];
-        reader.ReadExactly(bytes);
-        bytes.CopyTo(row.Write[offset..(offset + Occupying)]);
+        reader.ReadExactly(row.Write[offset..(offset + Occupying)]);
     }
 
     public Task SerializeAsync<T>(Stream writer, T row) where T : struct, IImmutableDataRow

@@ -7,34 +7,19 @@ namespace Astra.Engine;
 public readonly struct Hash256 : IEquatable<Hash256>
 {
     public const int Size = 32;
-    // Utilize YMM registers
     private readonly Vector256<ulong> _vector;
-
-    private Hash256(Vector256<ulong> vector)
+    
+    private static unsafe Hash256 CreateUnsafe(ReadOnlySpan<byte> array)
     {
-        _vector = vector;
-    }
-
-    public static Hash256 Create(byte[] array)
-    {
-        var originalLength = array.Length;
-        if (originalLength != 32) throw new ArgumentException(nameof(array));
-        var vector = new Vector256<ulong>();
-        unsafe
-        {
-            var vPtr = &vector;
-            fixed (void* aPtr = &array[0])
-            {
-                Buffer.MemoryCopy(aPtr, vPtr, Size, Size);
-            }
-        }
-
-        return new(vector);
+        if (array.Length != Size) throw new ArgumentException(nameof(array));
+        void* ptr = stackalloc byte[Size];
+        array.CopyTo(new Span<byte>(ptr, Size));
+        return *(Hash256*)ptr;
     }
 
     public static Hash256 HashSha256(string str) => HashSha256(MemoryMarshal.AsBytes(str.AsSpan()));
     
-    public static Hash256 HashSha256(ReadOnlySpan<byte> array) => Create(SHA256.HashData(array));
+    public static Hash256 HashSha256(ReadOnlySpan<byte> array) => CreateUnsafe(SHA256.HashData(array));
 
     public bool Equals(Hash256 other)
     {

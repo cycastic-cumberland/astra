@@ -6,6 +6,7 @@ public sealed class BytesColumnResolver(int offset, bool shouldBeHashed) :
     private readonly AutoSerial<(BytesCluster cluster, Hash128 hash)> _serial = new();
     public DataType Type => DataType.Bytes;
     public int Occupying => sizeof(ulong);
+    public int HashSize => Hash128.Size;
     public int Offset => offset;
     
     public void Initialize<T>(T row) where T : struct, IDataRow
@@ -19,7 +20,9 @@ public sealed class BytesColumnResolver(int offset, bool shouldBeHashed) :
         var hash = Hash128.HashXx128(array.Reader);
         EnrollId(_serial.Save((array, hash)), row);
         if (shouldBeHashed)
-            hashStream.Write(array.Reader);
+        {
+            hashStream.WriteValue(hash);
+        }
     }
 
     public void BeginHash<T>(Stream writer, T row) where T : struct, IImmutableDataRow
@@ -92,13 +95,14 @@ public sealed class BytesColumnResolver(int offset, bool shouldBeHashed) :
     
     private ulong DumpId<T>(T row) where T : struct, IImmutableDataRow
     {
-        Span<byte> buffer = stackalloc byte[Occupying];
-        row.Read[offset..(offset + Occupying)].CopyTo(buffer);
-        return BitConverter.ToUInt64(buffer);
+        return BitConverter.ToUInt64(row.Read[offset..(offset + Occupying)]);
     }
 
     private void EnrollId<T>(ulong id, T row) where T : struct, IDataRow
     {
-        BitConverter.GetBytes(id).CopyTo(row.Write[offset..(offset + Occupying)]);
+        unsafe
+        {
+            new ReadOnlySpan<byte>(&id, sizeof(ulong)).CopyTo(row.Write[offset..(offset + Occupying)]);
+        }
     }
 }

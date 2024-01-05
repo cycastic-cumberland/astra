@@ -1,6 +1,5 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Runtime.Intrinsics;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -9,28 +8,30 @@ namespace Astra.Engine;
 public readonly struct Hash128 : IEquatable<Hash128>
 {
     public const int Size = 16;
-    // Utilize XMM registers
-    private readonly Vector128<ulong> _vector;
-
-    private Hash128(Vector128<ulong> vector) => _vector = vector;
+    
+    private readonly UInt128 _vector;
+    
+    private Hash128(UInt128 vector) => _vector = vector;
 
     public static Hash128 Create(ReadOnlySpan<byte> array)
     {
-        var originalLength = array.Length;
-        if (originalLength != 16) throw new ArgumentException(nameof(array));
-        return new(MemoryMarshal.Read<Vector128<ulong>>(array));
+        if (array.Length != 16) throw new ArgumentException(nameof(array));
+        unsafe
+        {
+            fixed (void* ptr = &array[0])
+            {
+                // Type punning magic
+                return new(*(UInt128*)ptr);
+            }
+        }
     }
     
     public static Hash128 Create(UInt128 i128)
     {
-        unsafe
-        {
-            void* ptr = &i128;
-            return new(MemoryMarshal.Read<Vector128<ulong>>(new ReadOnlySpan<byte>(ptr, Size)));
-        }
+        return new(i128);
     }
 
-    public static Hash128 Empty => new(Vector128<ulong>.Zero);
+    public static readonly Hash128 Empty = new(UInt128.Zero);
     
     public static Hash128 HashMd5(ReadOnlySpan<byte> array) => Create(MD5.HashData(array));
 
@@ -46,6 +47,7 @@ public readonly struct Hash128 : IEquatable<Hash128>
 
     public static Hash128 HashXx128(ReadOnlySpan<byte> array) => Create(System.IO.Hashing.XxHash128.HashToUInt128(array));
     
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(Hash128 other)
     {
         return _vector.Equals(other._vector);
@@ -71,7 +73,7 @@ public readonly struct Hash128 : IEquatable<Hash128>
         return !(left == right);
     }
 
-    public override string ToString()
+    public string ToStringUpperCase()
     {
         unsafe
         {
@@ -82,4 +84,19 @@ public readonly struct Hash128 : IEquatable<Hash128>
             }
         }
     }
+    
+    public string ToStringLowerCase()
+    {
+        unsafe
+        {
+            fixed (Hash128* self = &this)
+            {
+                var span = new ReadOnlySpan<byte>(&self->_vector, Size);
+                return span.ToHexStringLower();
+            }
+        }
+    }
+
+    public override string ToString() => ToStringUpperCase();
+    public string ToString(bool upperCase) => upperCase ? ToStringUpperCase() : ToStringLowerCase();
 }

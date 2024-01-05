@@ -8,7 +8,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Astra.Server", "Astra.Serve
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Astra.Tests", "Astra.Tests\Astra.Tests.csproj", "{8B379398-868D-42AE-8F3A-5CBBD61695DB}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DontIncludeThisInVCS", "DontIncludeThisInVCS\DontIncludeThisInVCS.csproj", "{A5480F31-8EA7-43A3-B1D0-88121FF99D1B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Astra.Benchmark", "Astra.Benchmark\Astra.Benchmark.csproj", "{3A17B86D-AB71-454D-A7CB-F479DA3462F8}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -32,9 +32,9 @@ Global
 		{8B379398-868D-42AE-8F3A-5CBBD61695DB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8B379398-868D-42AE-8F3A-5CBBD61695DB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8B379398-868D-42AE-8F3A-5CBBD61695DB}.Release|Any CPU.Build.0 = Release|Any CPU
-		{A5480F31-8EA7-43A3-B1D0-88121FF99D1B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{A5480F31-8EA7-43A3-B1D0-88121FF99D1B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{A5480F31-8EA7-43A3-B1D0-88121FF99D1B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{A5480F31-8EA7-43A3-B1D0-88121FF99D1B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3A17B86D-AB71-454D-A7CB-F479DA3462F8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3A17B86D-AB71-454D-A7CB-F479DA3462F8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3A17B86D-AB71-454D-A7CB-F479DA3462F8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3A17B86D-AB71-454D-A7CB-F479DA3462F8}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

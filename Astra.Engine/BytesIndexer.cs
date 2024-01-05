@@ -73,27 +73,30 @@ public sealed class BytesIndexer(BytesColumnResolver resolver) :
         }
     }
 
-    public readonly struct WriteHandler(BytesIndexer indexer) :
+    public struct WriteHandler(BytesIndexer indexer) :
         IIndexer<ReadHandler, WriteHandler>.IIndexerWriteHandler,
         IPointIndexer<ReadHandler, WriteHandler>.IPointIndexerWriteHandler,
         IPointIndexer<BytesCluster, ReadHandler, WriteHandler>.IPointIndexerWriteHandler
     {
         private Storage Repository => indexer._storage;
         private readonly RWLock.WriteLockInstance _writeLock = indexer._storage.Lock.Write();
+        private bool _finished;
         
         public void Dispose()
         {
+            if (_finished) return;
+            _finished = true;
             _writeLock.Dispose();
         }
         
         public void Commit()
         {
-            
+            Dispose();
         }
 
         public void Rollback()
         {
-            throw new NotImplementedException();
+            Dispose();
         }
 
         public HashSet<ImmutableDataRow>? CollectExact(Stream predicateStream)

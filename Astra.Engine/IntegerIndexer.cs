@@ -80,20 +80,23 @@ public sealed class IntegerIndexer(IntegerColumnResolver resolver) :
     {
         private Storage Repository => indexer._storage;
         private readonly RWLock.WriteLockInstance _writeLock = indexer._storage.Lock.Write();
-
+        private bool _finished;
+        
         public void Dispose()
         {
-            Rollback();
+            if (_finished) return;
+            _finished = true;
             _writeLock.Dispose();
         }
         
         public void Commit()
         {
+            Dispose();
         }
 
         public void Rollback()
         {
-            
+            Dispose();
         }
 
         public HashSet<ImmutableDataRow>? CollectExact(Stream predicateStream)

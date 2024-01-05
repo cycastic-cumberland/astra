@@ -1,10 +1,10 @@
 # Astra
 
-Astra is a lightweight, embeddable, tabular database for simple and effective caching of structured data.
+Astra is a lightweight, tabular database for fast and effective caching of structured data.
 
 ## Requirement
 
-Astra require .NET 8 to run in embedded mode. Also it is not CLS-compliant.
+Requires .NET 8 for both client and server (there is no good reason for this, I just don't know how to install .NET 6 on Arch Linux)
 
 ## Getting Started
 
@@ -14,9 +14,5 @@ To use Astra in TCP server mode, clone this repo and build `Astra.Server`
 
 - [x] Embeddable engine
 - [x] TCP server
-- [ ] Multiple tables
-- [ ] Actually functional and performance client
-- [ ] Sub-microsecond insertion?
+- [x] Working client
 
-
-(I'm currently busy w/ exams rn so maybe I'll complete this README later)

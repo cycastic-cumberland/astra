@@ -1,6 +1,5 @@
 using System.Collections;
 using Microsoft.Extensions.Logging;
-using Microsoft.IO;
 
 namespace Astra.Engine;
 
@@ -35,7 +34,7 @@ public sealed class DataIndexRegistry : IDisposable
         public void Read(int index, Action<IIndexer.IIndexerReadHandler> action);
         public T Read<T>(int index, Func<IIndexer.IIndexerReadHandler, T> action);
     }
-    public struct IndexersWriteLock(IIndexer.IIndexerWriteHandler[] handlers) : ITransaction, IEnumerable<IIndexer.IIndexerWriteHandler>, IIndexersLock
+    public struct IndexersWriteLock(IIndexer.IIndexerWriteHandler[] handlers, ILogger<IndexersWriteLock> logger) : ITransaction, IEnumerable<IIndexer.IIndexerWriteHandler>, IIndexersLock
     {
         private bool _finalized = false;
         public void Dispose()
@@ -48,11 +47,12 @@ public sealed class DataIndexRegistry : IDisposable
                 {
                     handler.Dispose();
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
-                    // TODO: Logging
+                    logger.LogError(e, "Exception occured while releasing writer lock");
                 }
             }
+            logger.LogDebug("Indexers' state released");
         }
         public IEnumerator<IIndexer.IIndexerWriteHandler> GetEnumerator()
         {
@@ -74,11 +74,12 @@ public sealed class DataIndexRegistry : IDisposable
                 {
                     handler.Commit();
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
-                    // TODO: Logging
+                    logger.LogError(e, "Exception occured while commiting writer lock");
                 }
             }
+            logger.LogDebug("Indexers' state committed");
         }
 
         public void Rollback()
@@ -91,11 +92,12 @@ public sealed class DataIndexRegistry : IDisposable
                 {
                     handler.Rollback();
                 }
-                catch (Exception)
+                catch (Exception e)
                 {
-                    // TODO: Logging
+                    logger.LogError(e, "Exception occured while rolling back writer lock");
                 }
             }
+            logger.LogDebug("Indexers' state rolled back");
         }
 
         public int Count { get; } = handlers.Length;
@@ -109,7 +111,7 @@ public sealed class DataIndexRegistry : IDisposable
             => action(handlers[index]);
     }
 
-    private readonly struct AutoReadLock(DataIndexRegistry registry) : IIndexersLock
+    private readonly struct AutoReadLock(DataIndexRegistry registry, ILogger<AutoReadLock> logger) : IIndexersLock
     {
         public void Dispose()
         {
@@ -131,7 +133,10 @@ public sealed class DataIndexRegistry : IDisposable
     
     private readonly ILoggerFactory? _loggerFactory;
     private readonly ILogger<DataIndexRegistry> _logger;
+    private readonly ILogger<IndexersWriteLock> _writeLogger;
+    private readonly ILogger<AutoReadLock> _readLogger;
     private readonly int _rowSize;
+    private readonly int _hashSize;
     private readonly AbstractRegistryDump _dump;
     private readonly AutoIndexer _autoIndexer = new();
     private readonly List<IIndexer> _indexers = new();
@@ -158,26 +163,26 @@ public sealed class DataIndexRegistry : IDisposable
             {
 
             });
-            _logger = _loggerFactory.CreateLogger<DataIndexRegistry>();
+            loggerFactory = _loggerFactory;
         }
-        else
-        {
-            _logger = loggerFactory.CreateLogger<DataIndexRegistry>();
-        }
+        _logger = loggerFactory.CreateLogger<DataIndexRegistry>();
+        _writeLogger = loggerFactory.CreateLogger<IndexersWriteLock>();
+        _readLogger = loggerFactory.CreateLogger<AutoReadLock>();
         _dump = dump ?? AbstractRegistryDump.Empty;
         _resolvers = new IColumnResolver[schema.Columns.Length];
         var i = 0;
         var offset = 0;
+        var hashSize = 0;
         foreach (var column in schema.Columns)
         {
             var indexed = false;
             var shouldBeHashed = column.ShouldBeHashed ?? column.Indexed;
+            string dataType;
             switch (column.DataType)
             {
                 case DataType.DWordMask:
                 {
-                    _logger.LogDebug("Column {}: found type: {}, indexed: {}, should be hashed: {}",
-                        i, nameof(DataType.DWord), column.Indexed, shouldBeHashed);
+                    dataType = nameof(DataType.DWord);
                     var resolver = new IntegerColumnResolver(offset, shouldBeHashed);
                     offset += resolver.Occupying;
                     _resolvers[i] = resolver;
@@ -190,7 +195,7 @@ public sealed class DataIndexRegistry : IDisposable
                 }
                 case DataType.StringMask:
                 {
-                    _logger.LogDebug("Column {}: found type: {}, indexed: {}", i, nameof(DataType.String), column.Indexed);
+                    dataType = nameof(DataType.String);
                     var resolver = new StringColumnResolver(offset, shouldBeHashed);
                     _destructibleColumnResolvers.Add(resolver);
                     offset += resolver.Occupying;
@@ -204,7 +209,7 @@ public sealed class DataIndexRegistry : IDisposable
                 }
                 case DataType.BytesMask:
                 {
-                    _logger.LogDebug("Column {}: found type: {}, indexed: {}", i, nameof(DataType.Bytes), column.Indexed);
+                    dataType = nameof(DataType.Bytes);
                     var resolver = new BytesColumnResolver(offset, shouldBeHashed);
                     _destructibleColumnResolvers.Add(resolver);
                     offset += resolver.Occupying;
@@ -220,6 +225,13 @@ public sealed class DataIndexRegistry : IDisposable
                     throw new DataTypeNotSupportedException();
             }
 
+            if (shouldBeHashed)
+            {
+                hashSize += _resolvers[i].HashSize;
+            }
+            _logger.LogDebug("Column {}: found type: {}, indexed: {}, should be hashed: {}",
+                i, dataType, column.Indexed, shouldBeHashed);
+
             if (indexed && !column.Indexed)
             {
                 _logger.LogWarning("Schema requires column {} to be indexed, but data type does not support indexing",
@@ -228,6 +240,9 @@ public sealed class DataIndexRegistry : IDisposable
             i++;
         }
         _rowSize = offset;
+        _hashSize = hashSize;
+        _logger.LogInformation("Row length: {} byte(s)", _rowSize);
+        _logger.LogInformation("Hash stream length: {} byte(s)", _hashSize);
     }
     
     private IndexersWriteLock AcquireWriteLock()
@@ -239,7 +254,7 @@ public sealed class DataIndexRegistry : IDisposable
             handlers[i++] = indexer.Write();
         }
 
-        return new(handlers);
+        return new(handlers, _writeLogger);
     }
     
     public void Dispose()
@@ -274,7 +289,7 @@ public sealed class DataIndexRegistry : IDisposable
 
     public HashSet<ImmutableDataRow>? Aggregate(Stream predicateStream)
     {
-        return predicateStream.Aggregate(new AutoReadLock(this));
+        return predicateStream.Aggregate(new AutoReadLock(this, _readLogger));
     }
 
     public int DeleteRows(Stream predicateStream)
@@ -340,14 +355,14 @@ public sealed class DataIndexRegistry : IDisposable
     /// </remarks>
     private bool InsertOne(Stream reader, AutoIndexer.WriteHandler autoIndexerLock, IndexersWriteLock writeLock)
     {
-        var row = DataRow.Create(reader, _resolvers, _rowSize);
+        var row = DataRow.Create(reader, _resolvers, _rowSize, _hashSize);
         var immutableDataRow = row.Consume(_resolvers);
     
         try
         {
             if (autoIndexerLock.Contains(immutableDataRow))
             {
-                _logger.LogWarning("Row with hash '{}' existed", immutableDataRow.Hash);
+                _logger.LogDebug("Row with hash '{}' existed", immutableDataRow.Hash);
                 immutableDataRow.SelectiveDispose(_destructibleColumnResolvers);
                 return false;
             }
@@ -356,7 +371,7 @@ public sealed class DataIndexRegistry : IDisposable
             {
                 handler.Add(immutableDataRow);
             }
-            _logger.LogInformation("Row inserted: {}", immutableDataRow.Hash);
+            _logger.LogDebug("Row inserted: {}", immutableDataRow.Hash);
         }
         catch (Exception e)
         {

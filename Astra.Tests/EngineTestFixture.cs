@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Net;
 using System.Net.Sockets;
 using Astra.Engine;
 using Astra.Server;
@@ -33,7 +32,7 @@ public class EngineTestFixture
             Indexed = true,
         }
     };
-    [SetUp]
+    [OneTimeSetUp]
     public void Setup()
     {
         _loggerFactory = LoggerFactory.Create(builder =>
@@ -46,7 +45,7 @@ public class EngineTestFixture
         }, _loggerFactory);
     }
 
-    [TearDown]
+    [OneTimeTearDown]
     public void TearDown()
     {
         _registry.Dispose();
@@ -130,7 +129,7 @@ public class EngineTestFixture
     // }
 
     [Test]
-    public void InsertionTest()
+    public void LocalInsertionTest()
     {
         var inStream = MemoryStreamPool.Allocate();
         using var outStream = MemoryStreamPool.Allocate();

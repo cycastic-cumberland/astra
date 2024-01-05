@@ -14,32 +14,32 @@ public static class StreamReadAddons
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static unsafe T ReadUnmanagedStruct<T>(this Stream reader, int size) where T : unmanaged
+    {
+        void* ptr = stackalloc byte[size];
+        reader.ReadExactly(new Span<byte>(ptr, size));
+        // Type punning magic
+        return *(T*)ptr;
+    }
+    
     public static int ReadInt(this Stream reader)
     {
-        Span<byte> arr = stackalloc byte[sizeof(int)];
-        reader.ReadExactly(arr);
-        return BitConverter.ToInt32(arr);
+        return ReadUnmanagedStruct<int>(reader, sizeof(int));
     }
     
     public static uint ReadUInt(this Stream reader)
     {
-        Span<byte> arr = stackalloc byte[sizeof(uint)];
-        reader.ReadExactly(arr);
-        return BitConverter.ToUInt32(arr);
+        return ReadUnmanagedStruct<uint>(reader, sizeof(uint));
     }
     
     public static double ReadDouble(this Stream reader)
     {
-        Span<byte> arr = stackalloc byte[sizeof(double)];
-        reader.ReadExactly(arr);
-        return BitConverter.ToDouble(arr);
+        return ReadUnmanagedStruct<double>(reader, sizeof(double));
     }
     
     public static long ReadLong(this Stream reader)
     {
-        Span<byte> arr = stackalloc byte[sizeof(long)];
-        reader.ReadExactly(arr);
-        return BitConverter.ToInt64(arr);
+        return ReadUnmanagedStruct<long>(reader, sizeof(long));
     }
     
     public static async Task<long> ReadLongAsync(this Stream reader, CancellationToken token = default)
@@ -51,17 +51,15 @@ public static class StreamReadAddons
     
     public static ulong ReadULong(this Stream reader)
     {
-        Span<byte> arr = stackalloc byte[sizeof(ulong)];
-        reader.ReadExactly(arr);
-        return BitConverter.ToUInt64(arr);
+        return ReadUnmanagedStruct<ulong>(reader, sizeof(ulong));
     }
 
     public static string ReadString(this Stream reader)
     {
         var strLen = ReadInt(reader);
-        Span<byte> strArr = stackalloc byte[strLen];
-        reader.ReadExactly(strArr);
-        var str = Encoding.UTF8.GetString(strArr);
+        using var strBytes = BytesCluster.Rent(strLen);
+        reader.ReadExactly(strBytes.Writer);
+        var str = Encoding.UTF8.GetString(strBytes.Reader);
         return str;
     }
 
@@ -74,24 +72,6 @@ public static class StreamReadAddons
         var span = TimeSpan.FromTicks(ticks);
         var dt = epoch + span;
         return dt;
-    }
-
-    public static T ReadGeneric<T>(this Stream reader) where T : struct
-    {
-        var ret = new T();
-        var size = Marshal.SizeOf(ret);
-        Span<byte> bytesArr = stackalloc byte[size];
-        reader.ReadExactly(bytesArr);
-        ret = MemoryMarshal.Read<T>(bytesArr);
-
-        return ret;
-    }
-    
-    public static T? ReadNullable<T>(this Stream reader) where T : struct
-    {
-        var notNull = reader.ReadBoolean();
-        if (!notNull) return null;
-        return ReadGeneric<T>(reader);
     }
 
     public static byte[] ReadSequence(this Stream reader)

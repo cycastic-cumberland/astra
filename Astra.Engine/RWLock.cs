@@ -1,44 +1,47 @@
+using System.Runtime.CompilerServices;
+
 namespace Astra.Engine;
 
-public readonly struct RWLock(int timeout)
-{
-    private readonly ReaderWriterLock _lock = new();
 
-    public static RWLock Create(int timeout = int.MaxValue) => new(timeout);
+// Some how ReaderWriterLockSlim does not work with benchmark
+public readonly struct RWLock(ReaderWriterLockSlim rwLock)
+{
+    public static RWLock Create() => new(new());
     
     public readonly struct ReadLockInstance : IDisposable
     {
-        private readonly ReaderWriterLock _rwLock;
+        private readonly ReaderWriterLockSlim _rwLock;
 
-        public ReadLockInstance(ReaderWriterLock rwLock, int timeout)
+        public ReadLockInstance(ReaderWriterLockSlim rwLock)
         {
             _rwLock = rwLock;
-            _rwLock.AcquireReaderLock(timeout);
+            _rwLock.EnterReadLock();
         }
 
         public void Dispose()
         {
-            _rwLock.ReleaseReaderLock();
+            _rwLock.ExitReadLock();
         }
     }
     public readonly struct WriteLockInstance : IDisposable
     {
-        private readonly ReaderWriterLock _rwLock;
+        private readonly ReaderWriterLockSlim _rwLock;
 
-        public WriteLockInstance(ReaderWriterLock rwLock, int timeout)
+        
+        public WriteLockInstance(ReaderWriterLockSlim rwLock)
         {
             _rwLock = rwLock;
-            _rwLock.AcquireWriterLock(timeout);
+            _rwLock.EnterWriteLock();
         }
 
         public void Dispose()
         {
-            _rwLock.ReleaseWriterLock();
+            _rwLock.ExitWriteLock();
         }
     }
 
-    public ReadLockInstance Read() => new(_lock, timeout);
-    public WriteLockInstance Write() => new(_lock, timeout);
+    public ReadLockInstance Read() => new(rwLock);
+    public WriteLockInstance Write() => new(rwLock);
 
     public T Read<T>(Func<T> func)
     {

@@ -76,7 +76,7 @@ public readonly struct ImmutableDataRow(BytesCluster raw, Hash128 hash) : IImmut
 public struct DataRow : IDataRow
 {
     private readonly BytesCluster _raw;
-    private MemoryStream? _hashStream;
+    private BytesClusterStream? _hashStream;
     private bool _disposed;
 
     public bool Disposed => _disposed;
@@ -99,14 +99,14 @@ public struct DataRow : IDataRow
         }
     }
     
-    public DataRow Clone<T>(T resolvers) where T : IEnumerable<IColumnResolver>
-    {
-        using var stream = MemoryStreamPool.Allocate();
-        Save(stream, resolvers);
-        stream.Position = 0;
-        var ret = Create(stream, resolvers, _raw.Count);
-        return ret;
-    }
+    // public DataRow Clone<T>(T resolvers) where T : IEnumerable<IColumnResolver>
+    // {
+    //     using var stream = MemoryStreamPool.Allocate();
+    //     Save(stream, resolvers);
+    //     stream.Position = 0;
+    //     var ret = Create(stream, resolvers, _raw.Count);
+    //     return ret;
+    // }
 
     public ImmutableDataRow Consume<T>(T resolvers) where T : IEnumerable<IColumnResolver>
     {
@@ -116,14 +116,14 @@ public struct DataRow : IDataRow
         {
             try
             {
-                var sBuffer = _hashStream.GetBuffer();
+                var sBuffer = _hashStream.AsSpan();
                 var ret = new ImmutableDataRow(_raw, Hash128
 #if USE_MURMUR3_SO
                     .HashMurmur3
 #else
                     .HashXx128
 #endif
-                        (new ReadOnlySpan<byte>(sBuffer, 0, (int)_hashStream.Length)));
+                        (sBuffer));
                 _hashStream.Dispose();
                 _hashStream = null;
                 return ret;
@@ -143,7 +143,7 @@ public struct DataRow : IDataRow
         return new(_raw, Hash128.HashMd5(new ReadOnlySpan<byte>(buffer, 0, (int)stream.Length)));
     }
 
-    private DataRow(BytesCluster raw, MemoryStream? hashStream = null)
+    private DataRow(BytesCluster raw, BytesClusterStream? hashStream = null)
     {
         _raw = raw;
         _hashStream = hashStream;
@@ -161,9 +161,9 @@ public struct DataRow : IDataRow
         return row;
     }
 
-    public static DataRow Create<T>(Stream reader, T resolvers, int rawSize) where T : IEnumerable<IColumnResolver>
+    public static DataRow Create<T>(Stream reader, T resolvers, int rawSize, int hashSize) where T : IEnumerable<IColumnResolver>
     {
-        var hashStream = MemoryStreamPool.Allocate();
+        var hashStream = BytesCluster.Rent(hashSize).Promote();
         try
         {
             var row = new DataRow(BytesCluster.Rent(rawSize), hashStream);

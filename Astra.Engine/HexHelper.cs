@@ -6,6 +6,7 @@ internal static class HexHelper
     private const string HexDigitsLower = "0123456789abcdef";
     public static string ToHexStringUpper(this ReadOnlySpan<byte> span)
     {
+        // Use stack memory to store the buffer, which is faster but increase the chance of stack overflow
         Span<char> target = stackalloc char[span.Length * 2];
         var i = 0;
         foreach (var b in span)
@@ -15,7 +16,7 @@ internal static class HexHelper
             target[i + 1] = HexDigitsUpper[b & 0x0F];
             i += 2;
         }
-        return target.ToString();
+        return new string(target);
     }
     public static string ToHexStringLower(this ReadOnlySpan<byte> span)
     {
@@ -27,11 +28,16 @@ internal static class HexHelper
             target[i + 1] = HexDigitsLower[b & 0x0F];
             i += 2;
         }
-        return target.ToString();
+        return new string(target);
     }
     // Turn a byte span into a hex string - with minimal heap allocation
     public static string ToHexString(this ReadOnlySpan<byte> span, bool upperCase = true)
     {
         return upperCase ? span.ToHexStringUpper() : span.ToHexStringLower();
+    }
+
+    public static string ToHexString(this byte[] array, bool upperCase = true)
+    {
+        return new ReadOnlySpan<byte>(array).ToHexString(upperCase);
     }
 }

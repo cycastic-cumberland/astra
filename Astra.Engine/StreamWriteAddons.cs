@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
@@ -10,11 +11,20 @@ public static class StreamWriteAddons
         Span<byte> buffer = stackalloc byte[1] { unchecked((byte)(value ? 1 : 0)) };
         writer.Write(buffer);
     }
-    
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static unsafe void WriteValueInternal(this Stream writer, void* ptr, int size)
+    {
+        writer.Write(new ReadOnlySpan<byte>(ptr, size));
+    }
     
     public static void WriteValue(this Stream writer, int value)
     {
-        writer.Write(BitConverter.GetBytes(value));
+        // writer.Write(BitConverter.GetBytes(value));
+        unsafe
+        {
+            writer.WriteValueInternal(&value, sizeof(int));
+        }
     }
     
     public static async Task WriteValueAsync(this Stream writer, int value, CancellationToken token = default)
@@ -24,7 +34,11 @@ public static class StreamWriteAddons
     
     public static void WriteValue(this Stream writer, uint value)
     {
-        writer.Write(BitConverter.GetBytes(value));
+        // writer.Write(BitConverter.GetBytes(value));
+        unsafe
+        {
+            writer.WriteValueInternal(&value, sizeof(uint));
+        }
     }
     
     public static async Task WriteValueAsync(this Stream writer, uint value, CancellationToken token = default)
@@ -34,12 +48,20 @@ public static class StreamWriteAddons
     
     public static void WriteValue(this Stream writer, double value)
     {
-        writer.Write(BitConverter.GetBytes(value));
+        // writer.Write(BitConverter.GetBytes(value));
+        unsafe
+        {
+            writer.WriteValueInternal(&value, sizeof(double));
+        }
     }
     
     public static void WriteValue(this Stream writer, long value)
     {
-        writer.Write(BitConverter.GetBytes(value));
+        // writer.Write(BitConverter.GetBytes(value));
+        unsafe
+        {
+            writer.WriteValueInternal(&value, sizeof(long));
+        }
     }
     
     public static async Task WriteValueAsync(this Stream writer, long value, CancellationToken token = default)
@@ -49,7 +71,10 @@ public static class StreamWriteAddons
     
     public static void WriteValue(this Stream writer, ulong value)
     {
-        writer.Write(BitConverter.GetBytes(value));
+        unsafe
+        {
+            writer.WriteValueInternal(&value, sizeof(ulong));
+        }
     }
 
     public static void WriteValue(this Stream writer, string value)
@@ -118,8 +143,7 @@ public static class StreamWriteAddons
     {
         unsafe
         {
-            void* ptr = &hash;
-            writer.Write(new ReadOnlySpan<byte>(ptr, Hash128.Size));
+            writer.WriteValueInternal(&hash, Hash128.Size);
         }
     }
 }

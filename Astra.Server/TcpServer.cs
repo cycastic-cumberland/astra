@@ -12,6 +12,7 @@ public class TcpServer : IDisposable
 {
     public const int DefaultPort = 8488;
     private const string ConfigPathEnvEntry = "ASTRA_CONFIG_PATH";
+    private static readonly byte[] FaultedResponse = { 1 };
 
     private static readonly IReadOnlyDictionary<string, LogLevel> StringToLog = new Dictionary<string, LogLevel>
     {
@@ -174,7 +175,7 @@ public class TcpServer : IDisposable
             {
                 // "Faulted" response
                 await writeStream.WriteValueAsync(1L, token: cancellationToken);
-                await writeStream.WriteAsync(new byte[] { 1 }, cancellationToken);
+                await writeStream.WriteAsync(FaultedResponse, cancellationToken);
                 _logger.LogError(e, "Error occured while resolving request");
             }
             finally
@@ -237,9 +238,9 @@ public class TcpServer : IDisposable
             try
             {
                 var client = await _listener.AcceptTcpClientAsync(_cancellationTokenSource.Token);
-    #pragma warning disable CS4014
+#pragma warning disable CS4014
                 Task.Run(() => ResolveClientWrappedAsync(client), _cancellationTokenSource.Token);
-    #pragma warning restore CS4014
+#pragma warning restore CS4014
             }
             catch (OperationCanceledException)
             {
