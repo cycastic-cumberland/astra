@@ -37,6 +37,9 @@ public class SimpleAstraClient : IAstraClient
         }
     }
 
+    private const long HeaderSize = sizeof(uint) + sizeof(uint); // commandCount + commandType
+    private const long InsertHeaderSize = HeaderSize + sizeof(int); // commandCount + commandType + rowCount
+
     private readonly RecyclableMemoryStream _inStream = MemoryStreamPool.Allocate();
     private readonly BytesClusterStream _outStream = BytesClusterStream.Rent(64);
     private InternalClient? _client;
@@ -48,19 +51,20 @@ public class SimpleAstraClient : IAstraClient
         _inStream.Dispose();
     }
 
-    public AstraConnectionSettings? ConnectionSettings { get; set; } = null;
+    public AstraConnectionSettings? ConnectionSettings { get; private set; }
     public bool IsConnected => _client?.IsConnected ?? false;
     
     public async Task ConnectAsync(AstraConnectionSettings settings, CancellationToken cancellationToken = default)
     {
         _client?.Dispose();
         _client = null;
+        ConnectionSettings = settings;
         var networkClient = new TcpClient(settings.Address, settings.Port);
         var networkStream = networkClient.GetStream();
         while (networkClient.Available < sizeof(int))
         {
 #if DEBUG
-            await Task.Delay(100);
+            await Task.Delay(100, cancellationToken);
 #endif
         }
         using var checkEndianness = BytesCluster.Rent(sizeof(int));
@@ -70,72 +74,18 @@ public class SimpleAstraClient : IAstraClient
             throw new EndianModeNotSupportedException($"Endianness not supported: {(isLittleEndian ? "little endian" : "big endian")}");
         _client = new(networkClient, networkStream);
     }
-
-    public async Task<int> UnorderedInsertClassType<T>(T value, CancellationToken cancellationToken = default) where T : class, IAstraSerializable
+    public Task<int> InsertSerializableAsync<T>(T value, CancellationToken cancellationToken = default) where T : IAstraSerializable
     {
-        const long headerSize = sizeof(uint) + sizeof(uint) + sizeof(int); // 1U + Command.UnsortedInsert + rowCount
-        var (client, clientStream) = _client ?? throw new NotConnectedException();
-        _inStream.Position = 0;
-        _outStream.Position = 0;
-        value.SerializeStream(_inStream);
-        await clientStream.WriteValueAsync(headerSize + _inStream.Position, cancellationToken);
-        await clientStream.WriteValueAsync(1U, cancellationToken); // 1 command
-        await clientStream.WriteValueAsync(Command.UnsortedInsert, cancellationToken); // Command type (insert)
-        await clientStream.WriteValueAsync(1, cancellationToken); // 1 row
-        await clientStream.WriteAsync(new ReadOnlyMemory<byte>(_inStream.GetBuffer(),
-            0, (int)_inStream.Position), cancellationToken);
-        while (client.Available < sizeof(long))
-        {
-#if DEBUG
-                await Task.Delay(100, cancellationToken);
-#endif
-        }
-
-        var outStreamSize = await clientStream.ReadLongAsync(cancellationToken);
-        var cluster = BytesCluster.Rent((int)outStreamSize);
-        while (client.Available < outStreamSize) await Task.Delay(100, cancellationToken);
-        _ = await clientStream.ReadAsync(cluster.WriterMemory, cancellationToken);
-        await using var outStream = cluster.Promote();
-        var faulted = (byte)outStream.ReadByte();
-        if (faulted != 0) throw new FaultedRequestException();
-        var inserted = outStream.ReadInt();
-        return inserted;
+        return InsertSerializableAsync(new[] { value }, cancellationToken);
     }
 
-    public async Task<int> UnorderedInsertValueType<T>(T value, CancellationToken cancellationToken = default) where T : struct, IAstraSerializable
+    public Task<int> InsertSerializableValueAsync<T>(T value, CancellationToken cancellationToken = default) where T : struct, IAstraSerializable
     {
-        const long headerSize = sizeof(uint) + sizeof(uint) + sizeof(int); // 1U + Command.UnsortedInsert + rowCount
-        var (client, clientStream) = _client ?? throw new NotConnectedException();
-        _inStream.Position = 0;
-        _outStream.Position = 0;
-        value.SerializeStream(_inStream);
-        await clientStream.WriteValueAsync(headerSize + _inStream.Position, cancellationToken);
-        await clientStream.WriteValueAsync(1U, cancellationToken); // 1 command
-        await clientStream.WriteValueAsync(Command.UnsortedInsert, cancellationToken); // Command type (insert)
-        await clientStream.WriteValueAsync(1, cancellationToken); // 1 row
-        await clientStream.WriteAsync(new ReadOnlyMemory<byte>(_inStream.GetBuffer(),
-            0, (int)_inStream.Position), cancellationToken);
-        while (client.Available < sizeof(long))
-        {
-#if DEBUG
-                await Task.Delay(100, cancellationToken);
-#endif
-        }
-
-        var outStreamSize = await clientStream.ReadLongAsync(cancellationToken);
-        var cluster = BytesCluster.Rent((int)outStreamSize);
-        while (client.Available < outStreamSize) await Task.Delay(100, cancellationToken);
-        _ = await clientStream.ReadAsync(cluster.WriterMemory, cancellationToken);
-        await using var outStream = cluster.Promote();
-        var faulted = (byte)outStream.ReadByte();
-        if (faulted != 0) throw new FaultedRequestException();
-        var inserted = outStream.ReadInt();
-        return inserted;
+        return InsertSerializableValueAsync(new[] { value }, cancellationToken);
     }
 
-    public async Task<int> UnorderedBulkInsertClassType<T>(IEnumerable<T> values, CancellationToken cancellationToken = default) where T : class, IAstraSerializable
+    public async Task<int> InsertSerializableAsync<T>(IEnumerable<T> values, CancellationToken cancellationToken = default) where T : IAstraSerializable
     {
-        const long headerSize = sizeof(uint) + sizeof(uint) + sizeof(int); // 1U + Command.UnsortedInsert + rowCount
         var (client, clientStream) = _client ?? throw new NotConnectedException();
         _inStream.Position = 0;
         _outStream.Position = 0;
@@ -145,7 +95,7 @@ public class SimpleAstraClient : IAstraClient
             value.SerializeStream(_inStream);
             count++;
         }
-        await clientStream.WriteValueAsync(headerSize + _inStream.Position, cancellationToken);
+        await clientStream.WriteValueAsync(InsertHeaderSize + _inStream.Position, cancellationToken);
         await clientStream.WriteValueAsync(1U, cancellationToken); // 1 command
         await clientStream.WriteValueAsync(Command.UnsortedInsert, cancellationToken); // Command type (insert)
         await clientStream.WriteValueAsync(count, cancellationToken); // `count` rows
@@ -159,29 +109,26 @@ public class SimpleAstraClient : IAstraClient
         }
 
         var outStreamSize = await clientStream.ReadLongAsync(cancellationToken);
-        var cluster = BytesCluster.Rent((int)outStreamSize);
         while (client.Available < outStreamSize) await Task.Delay(100, cancellationToken);
-        _ = await clientStream.ReadAsync(cluster.WriterMemory, cancellationToken);
-        await using var outStream = cluster.Promote();
-        var faulted = (byte)outStream.ReadByte();
+        _ = await clientStream.ReadAsync(_outStream.AsMemory()[..(int)outStreamSize], cancellationToken);
+        _outStream.Position = 0;
+        var faulted = (byte)_outStream.ReadByte();
         if (faulted != 0) throw new FaultedRequestException();
-        var inserted = outStream.ReadInt();
+        var inserted = _outStream.ReadInt();
         return inserted;
     }
 
-    public async Task<int> UnorderedBulkInsertValueType<T>(IEnumerable<T> values, CancellationToken cancellationToken = default) where T : struct, IAstraSerializable
+    public async Task<int> InsertSerializableValueAsync<T>(IEnumerable<T> values, CancellationToken cancellationToken = default) where T : struct, IAstraSerializable
     {
-        const long headerSize = sizeof(uint) + sizeof(uint) + sizeof(int); // 1U + Command.UnsortedInsert + rowCount
         var (client, clientStream) = _client ?? throw new NotConnectedException();
         _inStream.Position = 0;
-        _outStream.Position = 0;
         var count = 0;
         foreach (var value in values)
         {
             value.SerializeStream(_inStream);
             count++;
         }
-        await clientStream.WriteValueAsync(headerSize + _inStream.Position, cancellationToken);
+        await clientStream.WriteValueAsync(InsertHeaderSize + _inStream.Position, cancellationToken);
         await clientStream.WriteValueAsync(1U, cancellationToken); // 1 command
         await clientStream.WriteValueAsync(Command.UnsortedInsert, cancellationToken); // Command type (insert)
         await clientStream.WriteValueAsync(count, cancellationToken); // `count` rows
@@ -195,13 +142,12 @@ public class SimpleAstraClient : IAstraClient
         }
 
         var outStreamSize = await clientStream.ReadLongAsync(cancellationToken);
-        var cluster = BytesCluster.Rent((int)outStreamSize);
         while (client.Available < outStreamSize) await Task.Delay(100, cancellationToken);
-        _ = await clientStream.ReadAsync(cluster.WriterMemory, cancellationToken);
-        await using var outStream = cluster.Promote();
-        var faulted = (byte)outStream.ReadByte();
+        _ = await clientStream.ReadAsync(_outStream.AsMemory()[..(int)outStreamSize], cancellationToken);
+        _outStream.Position = 0;
+        var faulted = (byte)_outStream.ReadByte();
         if (faulted != 0) throw new FaultedRequestException();
-        var inserted = outStream.ReadInt();
+        var inserted = _outStream.ReadInt();
         return inserted;
     }
 }

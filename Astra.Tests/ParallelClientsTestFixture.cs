@@ -70,7 +70,7 @@ public class ParallelClientsTestFixture
     {
         using var simpleAstraClient = new SimpleAstraClient();
         await simpleAstraClient.ConnectAsync(_connectionSettings);
-        var inserted = await simpleAstraClient.UnorderedBulkInsertValueType(new SimpleSerializableStruct[]
+        var inserted = await simpleAstraClient.InsertSerializableValueAsync(new SimpleSerializableStruct[]
         {
             new()
             {
@@ -98,7 +98,7 @@ public class ParallelClientsTestFixture
     {
         using var simpleAstraClient = new SimpleAstraClient();
         await simpleAstraClient.ConnectAsync(_connectionSettings);
-        var inserted = await simpleAstraClient.UnorderedBulkInsertClassType(new SimpleSerializableClass[]
+        var inserted = await simpleAstraClient.InsertSerializableAsync(new SimpleSerializableClass[]
         {
             new()
             {

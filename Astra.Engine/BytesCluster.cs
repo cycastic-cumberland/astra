@@ -146,6 +146,7 @@ public class BytesClusterStream : Stream
     }
 
     public Span<byte> AsSpan() => _cluster.Writer;
+    public Memory<byte> AsMemory() => _cluster.WriterMemory;
 
     public override bool CanRead => true;
     public override bool CanSeek => true;
