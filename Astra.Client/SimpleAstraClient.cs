@@ -7,9 +7,9 @@ namespace Astra.Client;
 
 public class SimpleAstraClient : IAstraClient
 {
-    private class EndianModeNotSupportedException(string? msg = null) : NotSupportedException(msg);
-    private class NotConnectedException(string? msg = null) : Exception(msg);
-    private class FaultedRequestException(string? msg = null) : Exception(msg);
+    public class EndianModeNotSupportedException(string? msg = null) : NotSupportedException(msg);
+    public class NotConnectedException(string? msg = null) : Exception(msg);
+    public class FaultedRequestException(string? msg = null) : Exception(msg);
     private readonly struct InternalClient(TcpClient client, NetworkStream clientStream) : IDisposable
     {
         public TcpClient Client
@@ -88,7 +88,6 @@ public class SimpleAstraClient : IAstraClient
     {
         var (client, clientStream) = _client ?? throw new NotConnectedException();
         _inStream.Position = 0;
-        _outStream.Position = 0;
         var count = 0;
         foreach (var value in values)
         {
@@ -109,7 +108,12 @@ public class SimpleAstraClient : IAstraClient
         }
 
         var outStreamSize = await clientStream.ReadLongAsync(cancellationToken);
-        while (client.Available < outStreamSize) await Task.Delay(100, cancellationToken);
+        while (client.Available < outStreamSize)
+        {
+#if DEBUG
+                await Task.Delay(100, cancellationToken);
+#endif
+        }
         _ = await clientStream.ReadAsync(_outStream.AsMemory()[..(int)outStreamSize], cancellationToken);
         _outStream.Position = 0;
         var faulted = (byte)_outStream.ReadByte();
@@ -142,7 +146,12 @@ public class SimpleAstraClient : IAstraClient
         }
 
         var outStreamSize = await clientStream.ReadLongAsync(cancellationToken);
-        while (client.Available < outStreamSize) await Task.Delay(100, cancellationToken);
+        while (client.Available < outStreamSize)
+        {
+#if DEBUG
+                await Task.Delay(100, cancellationToken);
+#endif
+        }
         _ = await clientStream.ReadAsync(_outStream.AsMemory()[..(int)outStreamSize], cancellationToken);
         _outStream.Position = 0;
         var faulted = (byte)_outStream.ReadByte();

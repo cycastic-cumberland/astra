@@ -86,12 +86,12 @@ public class ParallelClientsTestFixture
             },
             new()
             {
-                Value1 = _num,
+                Value1 = ++_num,
                 Value2 = "test1",
                 Value3 = "test2",
             },
         });
-        Assert.That(inserted, Is.EqualTo(2));
+        Assert.That(inserted, Is.EqualTo(3));
     }
     
     private async Task SimpleClassTypeInsertionTestAsync()
@@ -114,27 +114,30 @@ public class ParallelClientsTestFixture
             },
             new()
             {
-                Value1 = _num,
+                Value1 = ++_num,
                 Value2 = "test1",
                 Value3 = "test2",
             },
         });
-        Assert.That(inserted, Is.EqualTo(2));
+        Assert.That(inserted, Is.EqualTo(3));
     }
 
     [Test]
+    [Parallelizable]
     public Task ValueTypeBulkInsertionOne()
     {
         return SimpleValueTypeInsertionTestAsync();
     }
     
     [Test]
+    [Parallelizable]
     public Task ValueTypeBulkInsertionTwo()
     {
         return SimpleValueTypeInsertionTestAsync();
     }
     
     [Test]
+    [Parallelizable]
     public Task ValueTypeBulkInsertionThree()
     {
         return SimpleValueTypeInsertionTestAsync();

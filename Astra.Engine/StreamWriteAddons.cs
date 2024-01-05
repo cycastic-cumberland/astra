@@ -27,9 +27,9 @@ public static class StreamWriteAddons
         }
     }
     
-    public static async Task WriteValueAsync(this Stream writer, int value, CancellationToken token = default)
+    public static ValueTask WriteValueAsync(this Stream writer, int value, CancellationToken token = default)
     {
-        await writer.WriteAsync(BitConverter.GetBytes(value), token);
+        return writer.WriteAsync(BitConverter.GetBytes(value), token);
     }
     
     public static void WriteValue(this Stream writer, uint value)
@@ -41,9 +41,9 @@ public static class StreamWriteAddons
         }
     }
     
-    public static async Task WriteValueAsync(this Stream writer, uint value, CancellationToken token = default)
+    public static ValueTask WriteValueAsync(this Stream writer, uint value, CancellationToken token = default)
     {
-        await writer.WriteAsync(BitConverter.GetBytes(value), token);
+        return writer.WriteAsync(BitConverter.GetBytes(value), token);
     }
     
     public static void WriteValue(this Stream writer, double value)
@@ -64,9 +64,9 @@ public static class StreamWriteAddons
         }
     }
     
-    public static async Task WriteValueAsync(this Stream writer, long value, CancellationToken token = default)
+    public static ValueTask WriteValueAsync(this Stream writer, long value, CancellationToken token = default)
     {
-        await writer.WriteAsync(BitConverter.GetBytes(value), token);
+        return writer.WriteAsync(BitConverter.GetBytes(value), token);
     }
     
     public static void WriteValue(this Stream writer, ulong value)
@@ -85,7 +85,7 @@ public static class StreamWriteAddons
         writer.Write(strArr);
     }
     
-    public static async Task WriteValueAsync(this Stream writer, string value, CancellationToken token = default)
+    public static async ValueTask WriteValueAsync(this Stream writer, string value, CancellationToken token = default)
     {
         if (value == null!) throw new ArgumentException(nameof(value));
         var strArr = Encoding.UTF8.GetBytes(value);

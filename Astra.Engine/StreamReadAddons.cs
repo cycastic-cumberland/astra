@@ -42,7 +42,7 @@ public static class StreamReadAddons
         return ReadUnmanagedStruct<long>(reader, sizeof(long));
     }
     
-    public static async Task<long> ReadLongAsync(this Stream reader, CancellationToken token = default)
+    public static async ValueTask<long> ReadLongAsync(this Stream reader, CancellationToken token = default)
     {
         var bytes = new byte[sizeof(long)];
         await reader.ReadExactlyAsync(bytes, token);
@@ -98,7 +98,7 @@ public static class StreamReadAddons
         }
     }
     
-    public static async Task<BytesCluster> ReadClusterAsync(this Stream reader)
+    public static async ValueTask<BytesCluster> ReadClusterAsync(this Stream reader)
     {
         var length = await reader.ReadLongAsync();
         var array = BytesCluster.Rent((int)length);
