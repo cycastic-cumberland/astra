@@ -9,6 +9,26 @@ namespace Astra.Tests;
 [TestFixture]
 public class EngineTestFixture
 {
+    private struct TinySerializableStruct : IAstraSerializable
+    {
+        public int Value1 { get; set; }
+        public string Value2 { get; set; }
+        public string Value3 { get; set; }
+        
+        public void SerializeStream<TStream>(TStream writer) where TStream : Stream
+        {
+            writer.WriteValue(Value1);
+            writer.WriteValue(Value2);
+            writer.WriteValue(Value3);
+        }
+
+        public void DeserializeStream<TStream>(TStream reader) where TStream : Stream
+        {
+            Value1 = reader.ReadInt();
+            Value2 = reader.ReadString();
+            Value3 = reader.ReadString();
+        }
+    }
     private ILoggerFactory _loggerFactory = null!;
     private DataIndexRegistry _registry = null!;
 
@@ -91,7 +111,7 @@ public class EngineTestFixture
     //     {
     //         using var inStream = MemoryStreamPool.Allocate();
     //         using var outStream = MemoryStreamPool.Allocate();
-    //         inStream.WriteValue(1); // 1 Command
+    //         inStream.WriteValue(Command.CreateWriteHeader(1U)); // 1 Command
     //         inStream.WriteValue(Command.UnsortedInsert); // That command is insert
     //         
     //         inStream.WriteValue(bulkInsertRowsCount); // Insert this much rows
@@ -129,101 +149,54 @@ public class EngineTestFixture
     // }
 
     [Test]
-    public void LocalInsertionTest()
+    public void LocalRegistryTest()
     {
-        var inStream = MemoryStreamPool.Allocate();
-        using var outStream = MemoryStreamPool.Allocate();
-        inStream.WriteValue(1U); // 1 Command
-        inStream.WriteValue(Command.UnsortedInsert); // That command is insert
-        
-        inStream.WriteValue(3); // Insert three rows
-        
-        inStream.WriteValue(11);
-        inStream.WriteValue("test3");
-        inStream.WriteValue("test4");
-        inStream.WriteValue(12);
-        inStream.WriteValue("test3");
-        inStream.WriteValue("test4");
-        inStream.WriteValue(11); // Duplicated!
-        inStream.WriteValue("test3");
-        inStream.WriteValue("test4");
-    
-        inStream.Position = 0;
-        var stopwatch = new Stopwatch();
-        stopwatch.Start();
-        _registry.ConsumeStream(inStream, outStream);
-        stopwatch.Stop();
-        Console.WriteLine("Inserted 3 rows in {0} us", stopwatch.Elapsed.TotalMicroseconds);
-    
-        outStream.Position = 0;
-        var faulted = unchecked((byte)outStream.ReadByte());
-        Assert.That(faulted, Is.Zero);
-        var inserted = outStream.ReadInt();
-        Assert.That(inserted, Is.EqualTo(2));
-    }
-    
-    [Test]
-    [Parallelizable]
-    public async Task SimpleNetworkInsertionTest()
-    {
-        var server = new TcpServer(new()
+        var inserted = _registry.BulkInsert(new TinySerializableStruct[]
         {
-            LogLevel = "Debug",
-            Schema = new()
+            new()
             {
-                Columns = _columns
-            }
+                Value1 = 1,
+                Value2 = "test1",
+                Value3 = "test2",
+            },
+            new()
+            {
+                Value1 = 2,
+                Value2 = "test3",
+                Value3 = "test4",
+            },
+            new()
+            {
+                Value1 = 2,
+                Value2 = "test6",
+                Value3 = "test4",
+            },
         });
-        try
+        Assert.That(inserted, Is.EqualTo(2));
+        using var predicateStream = MemoryStreamPool.Allocate();
+        predicateStream.WriteValue(PredicateType.UnaryMask); // type
+        predicateStream.WriteValue(0); // indexer offset
+        predicateStream.WriteValue(Operation.Equal); // operation type
+        predicateStream.WriteValue(DataType.DWordMask); // data type
+        predicateStream.WriteValue(2); // Value to compare against
+        predicateStream.Position = 0;
+        var deserialized = _registry.Aggregate<TinySerializableStruct>(predicateStream);
+        var pass = true;
+        foreach (var row in deserialized)
         {
-#pragma warning disable CS4014
-            Task.Run(() => server.RunAsync());
-#pragma warning restore CS4014
-            await Task.Delay(100);
+            if (!pass) Assert.Fail();
+            Assert.Multiple(() =>
             {
-                using var client = new TcpClient("127.0.0.1", TcpServer.DefaultPort);
-                var networkStream = client.GetStream();
-                while (client.Available < sizeof(int)) await Task.Delay(100);
-                {
-                    using var checkEndianness = BytesCluster.Rent(sizeof(int));
-                    _ = await networkStream.ReadAsync(checkEndianness.WriterMemory);
-                    var isLittleEndian = checkEndianness.Reader[0] == 1;
-                    Assert.That(isLittleEndian, Is.EqualTo(BitConverter.IsLittleEndian));
-                }
-                await using var inStream = MemoryStreamPool.Allocate();
-                inStream.WriteValue(1U); // 1 Command
-                inStream.WriteValue(Command.UnsortedInsert); // That command is insert
-            
-                inStream.WriteValue(3); // Insert three rows
-            
-                inStream.WriteValue(11);
-                inStream.WriteValue("test3");
-                inStream.WriteValue("test4");
-                inStream.WriteValue(12);
-                inStream.WriteValue("test3");
-                inStream.WriteValue("test4");
-                inStream.WriteValue(11); // Duplicated!
-                inStream.WriteValue("test3");
-                inStream.WriteValue("test4");
-                await networkStream.WriteValueAsync(inStream.Length);
-                await networkStream.WriteAsync(new ReadOnlyMemory<byte>(inStream.GetBuffer(), 0, (int)inStream.Length));
-                while (client.Available < sizeof(long)) await Task.Delay(100);
-                var outStreamSize = await networkStream.ReadLongAsync();
-                var cluster = BytesCluster.Rent((int)outStreamSize);
-                while (client.Available < outStreamSize) await Task.Delay(100);
-                var read = await networkStream.ReadAsync(cluster.WriterMemory);
-                Assert.That(read, Is.EqualTo(outStreamSize));
-                await using var outStream = cluster.Promote();
-                var faulted = (byte)outStream.ReadByte();
-                Assert.That(faulted, Is.Zero);
-                var inserted = outStream.ReadInt();
-                Assert.That(inserted, Is.EqualTo(2));
-                await Task.Delay(100);
-            }
+                Assert.That(row.Value1, Is.EqualTo(2));
+                Assert.That(row.Value2, Is.EqualTo("test3"));
+                Assert.That(row.Value3, Is.EqualTo("test4"));
+            });
+            pass = false;
         }
-        finally
-        {
-            server.Kill();
-        }
+
+        predicateStream.Position = 0;
+        var deleted = _registry.Delete(predicateStream);
+        Assert.That(deleted, Is.EqualTo(1));
+        Assert.That(_registry.RowsCount, Is.EqualTo(1));
     }
 }

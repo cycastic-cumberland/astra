@@ -25,7 +25,13 @@ public class ParallelClientsTestFixture
             Name = "col3",
             DataType = DataType.StringMask,
             Indexed = true,
-        }
+        },
+        new()
+        {
+            Name = "col4",
+            DataType = DataType.BytesMask,
+            Indexed = true,
+        },
     };
     private AstraConnectionSettings _connectionSettings;
     
@@ -70,58 +76,33 @@ public class ParallelClientsTestFixture
     {
         using var simpleAstraClient = new SimpleAstraClient();
         await simpleAstraClient.ConnectAsync(_connectionSettings);
-        var inserted = await simpleAstraClient.InsertSerializableValueAsync(new SimpleSerializableStruct[]
+        var inserted = await simpleAstraClient.BulkInsertSerializableAsync(new SimpleSerializableStruct[]
         {
             new()
             {
-                Value1 = ++_num,
+                Value1 = Interlocked.Increment(ref _num),
                 Value2 = "test1",
                 Value3 = "test2",
+                Value4 = new byte[] { 1, 2, 3, 4 }
             },
             new()
             {
-                Value1 = ++_num,
+                Value1 = Interlocked.Increment(ref _num),
                 Value2 = "test1",
                 Value3 = "test2",
+                Value4 = new byte[] { 1, 2, 3, 4 }
             },
             new()
             {
-                Value1 = ++_num,
+                Value1 = Interlocked.Increment(ref _num),
                 Value2 = "test1",
                 Value3 = "test2",
+                Value4 = new byte[] { 1, 2, 3, 4 }
             },
         });
         Assert.That(inserted, Is.EqualTo(3));
     }
     
-    private async Task SimpleClassTypeInsertionTestAsync()
-    {
-        using var simpleAstraClient = new SimpleAstraClient();
-        await simpleAstraClient.ConnectAsync(_connectionSettings);
-        var inserted = await simpleAstraClient.InsertSerializableAsync(new SimpleSerializableClass[]
-        {
-            new()
-            {
-                Value1 = ++_num,
-                Value2 = "test1",
-                Value3 = "test2",
-            },
-            new()
-            {
-                Value1 = ++_num,
-                Value2 = "test1",
-                Value3 = "test2",
-            },
-            new()
-            {
-                Value1 = ++_num,
-                Value2 = "test1",
-                Value3 = "test2",
-            },
-        });
-        Assert.That(inserted, Is.EqualTo(3));
-    }
-
     [Test]
     [Parallelizable]
     public Task ValueTypeBulkInsertionOne()
@@ -141,26 +122,5 @@ public class ParallelClientsTestFixture
     public Task ValueTypeBulkInsertionThree()
     {
         return SimpleValueTypeInsertionTestAsync();
-    }
-    
-    [Test]
-    [Parallelizable]
-    public Task ClassTypeBulkInsertionOne()
-    {
-        return SimpleClassTypeInsertionTestAsync();
-    }
-    
-    [Test]
-    [Parallelizable]
-    public Task ClassTypeBulkInsertionTwo()
-    {
-        return SimpleClassTypeInsertionTestAsync();
-    }
-    
-    [Test]
-    [Parallelizable]
-    public Task ClassTypeBulkInsertionThree()
-    {
-        return SimpleClassTypeInsertionTestAsync();
     }
 }

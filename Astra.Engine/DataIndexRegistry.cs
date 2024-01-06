@@ -1,7 +1,15 @@
 using System.Collections;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
+using Microsoft.IO;
 
 namespace Astra.Engine;
+
+using SynthesizersRead = (IIndexer.IIndexerReadHandler? handler, IColumnResolver resolver);
+using SynthesizersWrite = (IIndexer.IIndexerWriteHandler? handler, IColumnResolver resolver);
+
+public class WriteOperationsNotAllowed(string? msg = null) : Exception(msg);
+
 
 public abstract class AbstractRegistryDump
 {
@@ -31,21 +39,25 @@ public sealed class DataIndexRegistry : IDisposable
 {
     public interface IIndexersLock : IDisposable
     {
-        public void Read(int index, Action<IIndexer.IIndexerReadHandler> action);
-        public T Read<T>(int index, Func<IIndexer.IIndexerReadHandler, T> action);
+        public int Count { get; }
+        public void Read(int index, Action<SynthesizersRead> action);
+        public void Read<TIn>(int index, TIn payload, Action<SynthesizersRead, TIn> action);
+        public T Read<T>(int index, Func<SynthesizersRead, T> action);
+        public T Read<T, TIn>(int index, TIn payload, Func<SynthesizersRead, TIn, T> action);
     }
-    public struct IndexersWriteLock(IIndexer.IIndexerWriteHandler[] handlers, ILogger<IndexersWriteLock> logger) : ITransaction, IEnumerable<IIndexer.IIndexerWriteHandler>, IIndexersLock
+    public struct IndexersWriteLock(SynthesizersWrite[] synthesizers, ILogger<IndexersWriteLock> logger) 
+        : ITransaction, IIndexersLock, IReadOnlyCollection<SynthesizersWrite>
     {
         private bool _finalized = false;
         public void Dispose()
         {
             if (_finalized) return;
             _finalized = true;
-            foreach (var handler in handlers)
+            foreach (var synthesizer in synthesizers)
             {
                 try
                 {
-                    handler.Dispose();
+                    synthesizer.handler?.Dispose();
                 }
                 catch (Exception e)
                 {
@@ -54,25 +66,16 @@ public sealed class DataIndexRegistry : IDisposable
             }
             logger.LogDebug("Indexers' state released");
         }
-        public IEnumerator<IIndexer.IIndexerWriteHandler> GetEnumerator()
-        {
-            return ((IEnumerable<IIndexer.IIndexerWriteHandler>)handlers).GetEnumerator();
-        }
-
-        IEnumerator IEnumerable.GetEnumerator()
-        {
-            return GetEnumerator();
-        }
 
         public void Commit()
         {
             if (_finalized) return;
             _finalized = true;
-            foreach (var handler in handlers)
+            foreach (var synthesizer in synthesizers)
             {
                 try
                 {
-                    handler.Commit();
+                    synthesizer.handler?.Commit();
                 }
                 catch (Exception e)
                 {
@@ -86,11 +89,11 @@ public sealed class DataIndexRegistry : IDisposable
         {
             if (_finalized) return;
             _finalized = true;
-            foreach (var handler in handlers)
+            foreach (var synthesizer in synthesizers)
             {
                 try
                 {
-                    handler.Rollback();
+                    synthesizer.handler?.Rollback();
                 }
                 catch (Exception e)
                 {
@@ -100,34 +103,89 @@ public sealed class DataIndexRegistry : IDisposable
             logger.LogDebug("Indexers' state rolled back");
         }
 
-        public int Count { get; } = handlers.Length;
+        public int Count { get; } = synthesizers.Length;
 
-        public IIndexer.IIndexerReadHandler this[int index] => handlers[index];
+        public void Read(int index, Action<SynthesizersRead> action)
+            => action(synthesizers[index]);
 
-        public void Read(int index, Action<IIndexer.IIndexerReadHandler> action)
-            => action(handlers[index]);
+        public void Read<TIn>(int index, TIn payload, Action<SynthesizersRead, TIn> action)
+            => action(synthesizers[index], payload);
+        
+        public T Read<T>(int index, Func<SynthesizersRead, T> action)
+            => action(synthesizers[index]);
 
-        public T Read<T>(int index, Func<IIndexer.IIndexerReadHandler, T> action)
-            => action(handlers[index]);
+        public T Read<T, TIn>(int index, TIn payload, Func<SynthesizersRead, TIn, T> action)
+            => action(synthesizers[index], payload);
+
+        public IEnumerator<SynthesizersWrite> GetEnumerator()
+        {
+            return ((IEnumerable<SynthesizersWrite>)synthesizers).GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
     }
 
     private readonly struct AutoReadLock(DataIndexRegistry registry, ILogger<AutoReadLock> logger) : IIndexersLock
     {
+        public int Count => registry._synthesizers.Length;
         public void Dispose()
         {
             
         }
 
-        public void Read(int index, Action<IIndexer.IIndexerReadHandler> action)
+        public void Read(int index, Action<SynthesizersRead> action)
         {
-            using var indexerLock = registry._indexers[index].Read();
-            action(indexerLock);
+            var handler = registry._synthesizers[index].Read();
+            try
+            {
+                action(handler);
+            }
+            finally
+            {
+                handler.handler?.Dispose();
+            }
         }
 
-        public T Read<T>(int index, Func<IIndexer.IIndexerReadHandler, T> action)
+        public void Read<TIn>(int index, TIn payload, Action<SynthesizersRead, TIn> action)
         {
-            using var indexerLock = registry._indexers[index].Read();
-            return action(indexerLock);
+            var handler = registry._synthesizers[index].Read();
+            try
+            {
+                action(handler, payload);
+            }
+            finally
+            {
+                handler.handler?.Dispose();
+            }
+        }
+
+        public T Read<T>(int index, Func<SynthesizersRead, T> action)
+        {
+            var handler = registry._synthesizers[index].Read();
+            try
+            {
+                return action(handler);
+            }
+            finally
+            {
+                handler.handler?.Dispose();
+            }
+        }
+
+        public T Read<T, TIn>(int index, TIn payload, Func<SynthesizersRead, TIn, T> action)
+        {
+            var handler = registry._synthesizers[index].Read();
+            try
+            {
+                return action(handler, payload);
+            }
+            finally
+            {
+                handler.handler?.Dispose();
+            }
         }
     }
     
@@ -139,12 +197,11 @@ public sealed class DataIndexRegistry : IDisposable
     private readonly int _hashSize;
     private readonly AbstractRegistryDump _dump;
     private readonly AutoIndexer _autoIndexer = new();
-    private readonly List<IIndexer> _indexers = new();
-    private readonly IColumnResolver[] _resolvers;
+    private readonly ColumnSynthesizer[] _synthesizers;
     private readonly List<IDestructibleColumnResolver> _destructibleColumnResolvers = new();
 
-    public int ColumnCount => _resolvers.Length;
-    public int IndexedColumnCount => _indexers.Count;
+    public int ColumnCount => _synthesizers.Length;
+    public int IndexedColumnCount => _synthesizers.Length;
     public int ReferenceTypeColumnCount => _destructibleColumnResolvers.Count;
 
     public int RowsCount
@@ -169,56 +226,45 @@ public sealed class DataIndexRegistry : IDisposable
         _writeLogger = loggerFactory.CreateLogger<IndexersWriteLock>();
         _readLogger = loggerFactory.CreateLogger<AutoReadLock>();
         _dump = dump ?? AbstractRegistryDump.Empty;
-        _resolvers = new IColumnResolver[schema.Columns.Length];
+        _synthesizers = new ColumnSynthesizer[schema.Columns.Length];
         var i = 0;
         var offset = 0;
         var hashSize = 0;
         foreach (var column in schema.Columns)
         {
-            var indexed = false;
             var shouldBeHashed = column.ShouldBeHashed ?? column.Indexed;
             string dataType;
+            IColumnResolver resolver;
+            IIndexer? indexer;
             switch (column.DataType)
             {
                 case DataType.DWordMask:
                 {
                     dataType = nameof(DataType.DWord);
-                    var resolver = new IntegerColumnResolver(offset, shouldBeHashed);
-                    offset += resolver.Occupying;
-                    _resolvers[i] = resolver;
-                    if (column.Indexed)
-                    {
-                        _indexers.Add(new IntegerIndexer(resolver));
-                        indexed = true;
-                    }
+                    var cResolver = new IntegerColumnResolver(offset, shouldBeHashed);
+                    offset += cResolver.Occupying;
+                    resolver = cResolver;
+                    indexer = column.Indexed ? new IntegerIndexer(cResolver) : null;
                     break;
                 }
                 case DataType.StringMask:
                 {
                     dataType = nameof(DataType.String);
-                    var resolver = new StringColumnResolver(offset, shouldBeHashed);
-                    _destructibleColumnResolvers.Add(resolver);
-                    offset += resolver.Occupying;
-                    _resolvers[i] = resolver;
-                    if (column.Indexed)
-                    {
-                        _indexers.Add(new StringIndexer(resolver));
-                        indexed = true;
-                    }
+                    var cResolver = new StringColumnResolver(offset, shouldBeHashed);
+                    _destructibleColumnResolvers.Add(cResolver);
+                    offset += cResolver.Occupying;
+                    resolver = cResolver;
+                    indexer = column.Indexed ? new StringIndexer(cResolver) : null;
                     break;
                 }
                 case DataType.BytesMask:
                 {
                     dataType = nameof(DataType.Bytes);
-                    var resolver = new BytesColumnResolver(offset, shouldBeHashed);
-                    _destructibleColumnResolvers.Add(resolver);
-                    offset += resolver.Occupying;
-                    _resolvers[i] = resolver;
-                    if (column.Indexed)
-                    {
-                        _indexers.Add(new BytesIndexer(resolver));
-                        indexed = true;
-                    }
+                    var cResolver = new BytesColumnResolver(offset, shouldBeHashed);
+                    _destructibleColumnResolvers.Add(cResolver);
+                    offset += cResolver.Occupying;
+                    resolver = cResolver;
+                    indexer = column.Indexed ? new BytesIndexer(cResolver) : null;
                     break;
                 }
                 default:
@@ -227,17 +273,17 @@ public sealed class DataIndexRegistry : IDisposable
 
             if (shouldBeHashed)
             {
-                hashSize += _resolvers[i].HashSize;
+                hashSize += resolver.HashSize;
             }
             _logger.LogDebug("Column {}: found type: {}, indexed: {}, should be hashed: {}",
                 i, dataType, column.Indexed, shouldBeHashed);
 
-            if (indexed && !column.Indexed)
+            if (indexer != null && !column.Indexed)
             {
                 _logger.LogWarning("Schema requires column {} to be indexed, but data type does not support indexing",
                     column.Name);
             }
-            i++;
+            _synthesizers[i++] = ColumnSynthesizer.Create(indexer, resolver);
         }
         _rowSize = offset;
         _hashSize = hashSize;
@@ -247,14 +293,14 @@ public sealed class DataIndexRegistry : IDisposable
     
     private IndexersWriteLock AcquireWriteLock()
     {
-        var handlers = new IIndexer.IIndexerWriteHandler[_indexers.Count];
+        var s = new SynthesizersWrite[_synthesizers.Length];
         var i = 0;
-        foreach (var indexer in _indexers)
+        foreach (var synthesizer in _synthesizers)
         {
-            handlers[i++] = indexer.Write();
+            s[i++] = synthesizer.Write();
         }
 
-        return new(handlers, _writeLogger);
+        return new(s, _writeLogger);
     }
     
     public void Dispose()
@@ -286,16 +332,45 @@ public sealed class DataIndexRegistry : IDisposable
             yield return enumerator.Current;
         }
     }
-
-    public HashSet<ImmutableDataRow>? Aggregate(Stream predicateStream)
+    
+    public IEnumerable<T> Aggregate<T>(Stream predicateStream) where T : IAstraSerializable
     {
-        return predicateStream.Aggregate(new AutoReadLock(this, _readLogger));
+        var dataOut = MemoryStreamPool.Allocate();
+        try
+        {
+            using var readLock = new AutoReadLock(this, _readLogger);
+            predicateStream.AggregateStream(dataOut, readLock);
+            dataOut.Position = 0;
+        }
+        catch (Exception)
+        {
+            dataOut.Dispose();
+            throw;
+        }
+        return IAstraSerializable.DeserializeStream<T, RecyclableMemoryStream>(dataOut);
     }
 
-    public int DeleteRows(Stream predicateStream)
+    private static int ConditionalCountInternal<T>(Stream predicateStream, T indexersLock) where T : struct, DataIndexRegistry.IIndexersLock
     {
-        using var autoIndexerLock = _autoIndexer.Write();
-        using var writeLock = AcquireWriteLock();
+        var set = predicateStream.Aggregate(indexersLock);
+        return set?.Count ?? 0;
+    }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public int ConditionalCount(Stream predicateStream)
+    {
+        using var readLock = new AutoReadLock(this, _readLogger);
+        return ConditionalCountInternal(predicateStream, readLock);
+    }
+
+    private static void CountAll<T>(AutoIndexer.WriteHandler writeHandler, T outStream) where T : Stream
+    {
+        outStream.WriteValue(writeHandler.Count);
+    }
+    
+
+    private int DeleteRows(Stream predicateStream, AutoIndexer.WriteHandler autoIndexerLock, IndexersWriteLock writeLock)
+    {
         var set = predicateStream.Aggregate(writeLock);
         var count = 0;
         if (set != null)
@@ -304,19 +379,23 @@ public sealed class DataIndexRegistry : IDisposable
             foreach (var row in set)
             {
                 autoIndexerLock.RemoveExact(row);
-                foreach (var indexer in writeLock)
+                foreach (var write in writeLock)
                 {
-                    indexer.RemoveExact(row);
+                    write.handler?.RemoveExact(row);
                 }
                 row.SelectiveDispose(_destructibleColumnResolvers);
             }
         }
-        writeLock.Commit();
-        autoIndexerLock.Commit();
-        _logger.LogInformation("{} row(s) deleted", count);
+        _logger.LogDebug("{} row(s) deleted", count);
         return count;
     }
-    
+
+    public int Delete(Stream predicateStream)
+    {
+        using var autoIndexerLock = _autoIndexer.Write();
+        using var writeLock = AcquireWriteLock();
+        return DeleteRows(predicateStream, autoIndexerLock, writeLock);
+    }
 
     private void SerializeInternal<T>(Stream writer, T autoIndexerLock)
         where T : struct, IIndexer.IIndexerReadHandler
@@ -326,9 +405,9 @@ public sealed class DataIndexRegistry : IDisposable
         while (enumerator.MoveNext())
         {
             var row = enumerator.Current;
-            foreach (var resolver in _resolvers)
+            foreach (var synthesizer in _synthesizers)
             {
-                resolver.Serialize(writer, row);
+                synthesizer.Resolver.Serialize(writer, row);
             }
         }
     }
@@ -339,24 +418,10 @@ public sealed class DataIndexRegistry : IDisposable
         SerializeInternal(writer, autoIndexerLock);
     }
 
-    /// <summary>
-    /// Inserts a single row into the registry.
-    /// </summary>
-    /// <param name="reader">The <see cref="Stream"/> providing data for the new row.</param>
-    /// <param name="autoIndexerLock">The <see cref="AutoIndexer.WriteHandler"/> used for managing unique indexes.</param>
-    /// <param name="writeLock">The <see cref="IndexersWriteLock"/> used for managing write access to indexers.</param>
-    /// <returns>
-    /// <c>true</c> if the row was successfully inserted; otherwise, <c>false</c> if the row already existed.
-    /// </returns>
-    /// <remarks>
-    /// This method reads data from the provided <paramref name="reader"/> and attempts to insert a new row into the data registry.
-    /// If the row already exists in the <paramref name="autoIndexerLock"/> or an exception occurs during the insertion process,
-    /// appropriate logging is performed, the newly created row is disposed, and the method returns <c>false</c>.
-    /// </remarks>
     private bool InsertOne(Stream reader, AutoIndexer.WriteHandler autoIndexerLock, IndexersWriteLock writeLock)
     {
-        var row = DataRow.Create(reader, _resolvers, _rowSize, _hashSize);
-        var immutableDataRow = row.Consume(_resolvers);
+        var row = DataRow.Create(reader, _synthesizers, _rowSize, _hashSize);
+        var immutableDataRow = row.Consume(_synthesizers);
     
         try
         {
@@ -367,9 +432,9 @@ public sealed class DataIndexRegistry : IDisposable
                 return false;
             }
             autoIndexerLock.Add(immutableDataRow);
-            foreach (var handler in writeLock)
+            foreach (var synthesizer in writeLock)
             {
-                handler.Add(immutableDataRow);
+                synthesizer.handler?.Add(immutableDataRow);
             }
             _logger.LogDebug("Row inserted: {}", immutableDataRow.Hash);
         }
@@ -383,22 +448,25 @@ public sealed class DataIndexRegistry : IDisposable
 
         return true;
     }
-    public int Insert(Stream reader)
+    
+    private int Insert(Stream reader, int rowCount, AutoIndexer.WriteHandler autoIndexerLock, IndexersWriteLock writeLock)
     {
-        var rowCount = reader.ReadInt();
         var inserted = 0;
-        using var autoIndexerLock = _autoIndexer.Write();
-        using var writeLock = AcquireWriteLock();
         for (var i = 0; i < rowCount; i++)
         {
             _ = InsertOne(reader, autoIndexerLock, writeLock) ? ++inserted : 0;
         }
-        writeLock.Commit();
-        autoIndexerLock.Commit();
         return inserted;
     }
+    
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private int Insert(Stream reader, AutoIndexer.WriteHandler autoIndexerLock, IndexersWriteLock writeLock)
+    {
+        var rowCount = reader.ReadInt();
+        return Insert(reader, rowCount, autoIndexerLock, writeLock);
+    }
 
-    private void ConsumeOnce<TIn, TOut>(TIn dataIn, TOut dataOut) where TIn : Stream where TOut : Stream
+    private void WriteOnce<TIn, TOut>(TIn dataIn, TOut dataOut,  AutoIndexer.WriteHandler autoIndexerLock, IndexersWriteLock writeLock) where TIn : Stream where TOut : Stream
     {
         var command = dataIn.ReadUInt();
         switch (command)
@@ -415,32 +483,30 @@ public sealed class DataIndexRegistry : IDisposable
 #endif
             case Command.UnsortedAggregate:
             {
-                var result = Aggregate(dataIn);
-                if (result == null)
-                {
-                    dataOut.WriteValue(0);
-                    break;
-                }
-                dataOut.WriteValue(result.Count);
-                foreach (var row in result)
-                {
-                    foreach (var resolver in _resolvers)
-                    {
-                        resolver.Serialize(dataOut, row);
-                    }
-                }
+                dataIn.AggregateStream(dataOut, writeLock);
                 break;
             }
             case Command.UnsortedInsert:
             {
-                var inserted = Insert(dataIn);
+                var inserted = Insert(dataIn, autoIndexerLock, writeLock);
                 dataOut.WriteValue(inserted);
                 break;
             }
             case Command.Delete:
             {
-                var deleted = DeleteRows(dataIn);
+                var deleted = DeleteRows(dataIn, autoIndexerLock, writeLock);
                 dataOut.WriteValue(deleted);
+                break;
+            }
+            case Command.CountAll:
+            {
+                CountAll(autoIndexerLock, dataOut);
+                break;
+            }
+            case Command.ConditionalCount:
+            {
+                var count = ConditionalCountInternal(dataIn, writeLock);
+                dataOut.WriteValue(count);
                 break;
             }
             default:
@@ -448,9 +514,40 @@ public sealed class DataIndexRegistry : IDisposable
         }
     }
     
+    private void ReadOnce<TIn, TOut>(TIn dataIn, TOut dataOut) where TIn : Stream where TOut : Stream
+    {
+        var command = dataIn.ReadUInt();
+        switch (command)
+        {
+            case Command.UnsortedAggregate:
+            {
+                using var readLock = new AutoReadLock(this, _readLogger);
+                dataIn.AggregateStream(dataOut, readLock);
+                break;
+            }
+            case Command.CountAll:
+            {
+                dataOut.WriteValue(RowsCount);
+                break;
+            }
+            case Command.ConditionalCount:
+            {
+                using var readLock = new AutoReadLock(this, _readLogger);
+                var count = ConditionalCountInternal(dataIn, readLock);
+                dataOut.WriteValue(count);
+                break;
+            }
+            case Command.UnsortedInsert:
+            case Command.Delete:
+                throw new WriteOperationsNotAllowed("This frame can only execute read commands");
+            default:
+                throw new CommandNotSupported($"Command code not found: {command}");
+        }
+    }
+    
     // dataIn layout
-    // [count[command[description]]]
-    //  1     4       >= 0
+    // [header[command[description]]]
+    //  1      4       >= 0
     //
     // dataOut layout
     // [is_faulted][results]
@@ -458,13 +555,47 @@ public sealed class DataIndexRegistry : IDisposable
     public void ConsumeStream<TIn, TOut>(TIn dataIn, TOut dataOut) where TIn : Stream where TOut : Stream
     {
         dataOut.WriteByte(0);
-        var commandCount = dataIn.ReadUInt();
-        for (var i = 0; i < commandCount; i++)
-            ConsumeOnce(dataIn, dataOut);
+        var commandHeader = dataIn.ReadUInt();
+        var (commandCount, enableWrite) = Command.SplitCommandHeader(commandHeader);
+        if (enableWrite)
+        {
+            using var autoIndexerLock = _autoIndexer.Write();
+            using var writeLock = AcquireWriteLock();
+            for (var i = 0U; i < commandCount; i++)
+                WriteOnce(dataIn, dataOut, autoIndexerLock, writeLock);
+            writeLock.Commit();
+            autoIndexerLock.Commit();
+            return;
+        }
+
+        for (var i = 0U; i < commandCount; i++)
+            ReadOnce(dataIn, dataOut);
+    }
+
+    public int Insert<T>(T value) where T : IAstraSerializable
+    {
+        using var inStream = MemoryStreamPool.Allocate();
+        value.SerializeStream(inStream);
+        inStream.Position = 0;
+        using var autoIndexerLock = _autoIndexer.Write();
+        using var writeLock = AcquireWriteLock();
+        return Insert(inStream, 1, autoIndexerLock, writeLock);
     }
     
-    public Task ConsumeStreamAsync(Stream dataIn, Stream dataOut)
+    public int BulkInsert<T>(IEnumerable<T> values) where T : IAstraSerializable
     {
-        throw new NotSupportedException();
+        using var inStream = MemoryStreamPool.Allocate();
+        var count = 0;
+        foreach (var value in values)
+        {
+            value.SerializeStream(inStream);
+            count++;
+        }
+
+        if (count == 0) return 0;
+        inStream.Position = 0;
+        using var autoIndexerLock = _autoIndexer.Write();
+        using var writeLock = AcquireWriteLock();
+        return Insert(inStream, count, autoIndexerLock, writeLock);
     }
 }

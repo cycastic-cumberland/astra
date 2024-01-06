@@ -15,7 +15,7 @@ public static class StreamWriteAddons
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static unsafe void WriteValueInternal(this Stream writer, void* ptr, int size)
     {
-        writer.Write(new ReadOnlySpan<byte>(ptr, size));
+        writer.Write(new ReadOnlySpan<byte>(ptr, size));  
     }
     
     public static void WriteValue(this Stream writer, int value)

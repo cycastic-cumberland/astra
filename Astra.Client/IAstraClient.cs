@@ -1,3 +1,5 @@
+using Astra.Engine;
+
 namespace Astra.Client;
 
 /// <summary>
@@ -33,29 +35,35 @@ public interface IAstraClient : IDisposable
     public Task<int> InsertSerializableAsync<T>(T value, CancellationToken cancellationToken = default) where T : IAstraSerializable;
     
     /// <summary>
-    /// Asynchronously inserts a value type implementing <see cref="IAstraSerializable"/> into the Astra database.
-    /// </summary>
-    /// <typeparam name="T">The value type implementing <see cref="IAstraSerializable"/>.</typeparam>
-    /// <param name="value">The value to insert into the database.</param>
-    /// <param name="cancellationToken">The cancellation token to observe while waiting for the task to complete.</param>
-    /// <returns>A task representing the asynchronous operation, returning the number of inserted rows.</returns>
-    public Task<int> InsertSerializableValueAsync<T>(T value, CancellationToken cancellationToken = default) where T : struct, IAstraSerializable;
-    
-    /// <summary>
     /// Asynchronously inserts a collection of serializable objects into the Astra database.
     /// </summary>
     /// <typeparam name="T">The type of the serializable objects implementing <see cref="IAstraSerializable"/>.</typeparam>
     /// <param name="values">The collection of objects to insert into the database.</param>
     /// <param name="cancellationToken">The cancellation token to observe while waiting for the task to complete.</param>
     /// <returns>A task representing the asynchronous operation, returning the number of inserted rows.</returns>
-    public Task<int> InsertSerializableAsync<T>(IEnumerable<T> values, CancellationToken cancellationToken = default) where T : IAstraSerializable;
+    public Task<int> BulkInsertSerializableAsync<T>(IEnumerable<T> values, CancellationToken cancellationToken = default) where T : IAstraSerializable;
+
+    /// <summary>
+    /// Asynchronously aggregate data from Astra database and cast them to <typeparamref name="T"/>.
+    /// </summary>
+    /// <typeparam name="T">The type of the deserializable objects implementing <see cref="IAstraSerializable"/>.</typeparam>
+    /// <param name="predicateStream">The pre-serialized predicate used for aggregation.</param>
+    /// <param name="cancellationToken">The cancellation token to observe while waiting for the task to complete.</param>
+    /// <returns>A task representing the asynchronous operation, returning the coroutine that will deserialize the retrieved data.</returns>
+    public Task<IEnumerable<T>> SimpleAggregateAsync<T>(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default) where T : IAstraSerializable;
+
+    /// <summary>
+    /// Asynchronously count all rows from Astra database.
+    /// </summary>
+    /// <param name="cancellationToken">The cancellation token to observe while waiting for the task to complete.</param>
+    /// <returns>A task representing the asynchronous operation, returning the total number of rows.</returns>
+    public Task<int> CountAllAsync(CancellationToken cancellationToken = default);
     
     /// <summary>
-    /// Asynchronously inserts a collection of value types implementing <see cref="IAstraSerializable"/> into the Astra database.
+    /// Asynchronously count all rows from Astra database that satisfy the condition provided by <paramref name="predicateStream"/>.
     /// </summary>
-    /// <typeparam name="T">The value type implementing <see cref="IAstraSerializable"/>.</typeparam>
-    /// <param name="values">The collection of values to insert into the database.</param>
+    /// /// <param name="predicateStream">The pre-serialized predicate used for aggregation.</param>
     /// <param name="cancellationToken">The cancellation token to observe while waiting for the task to complete.</param>
-    /// <returns>A task representing the asynchronous operation, returning the number of inserted rows.</returns>
-    public Task<int> InsertSerializableValueAsync<T>(IEnumerable<T> values, CancellationToken cancellationToken = default) where T : struct, IAstraSerializable;
+    /// <returns>A task representing the asynchronous operation, returning the total number of satisfied rows.</returns>
+    public Task<int> SimpleConditionalCountAsync(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default);
 }

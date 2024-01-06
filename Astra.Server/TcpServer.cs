@@ -158,15 +158,10 @@ public class TcpServer : IDisposable
                 continue;
             }
             stopwatch.Start();
-            var cluster = BytesCluster.Rent((int)threshold);
-
-            _ = await stream.ReadAsync(cluster.WriterMemory, cancellationToken);
-
-            await using var readStream = cluster.Promote();
             await using var writeStream = MemoryStreamPool.Allocate();
             try
             {
-                _registry.ConsumeStream(readStream, writeStream);
+                _registry.ConsumeStream(stream, writeStream);
                 await stream.WriteValueAsync(writeStream.Length, token: cancellationToken);
                 await stream.WriteAsync(new ReadOnlyMemory<byte>(writeStream.GetBuffer(), 0,
                     (int)writeStream.Length), cancellationToken);
@@ -185,7 +180,7 @@ public class TcpServer : IDisposable
                 stopwatch.Reset();
             }
             threshold = sizeof(long);
-            waiting = false;
+            waiting = true;
         }
     }
     

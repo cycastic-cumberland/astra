@@ -98,17 +98,8 @@ public struct DataRow : IDataRow
             _disposed = true;
         }
     }
-    
-    // public DataRow Clone<T>(T resolvers) where T : IEnumerable<IColumnResolver>
-    // {
-    //     using var stream = MemoryStreamPool.Allocate();
-    //     Save(stream, resolvers);
-    //     stream.Position = 0;
-    //     var ret = Create(stream, resolvers, _raw.Count);
-    //     return ret;
-    // }
 
-    public ImmutableDataRow Consume<T>(T resolvers) where T : IEnumerable<IColumnResolver>
+    public ImmutableDataRow Consume<T>(T synthesizers) where T : IEnumerable<ColumnSynthesizer>
     {
         if (_disposed) throw new ObjectDisposedException($"{nameof(DataRow)} consumed");
         _disposed = true;
@@ -135,9 +126,9 @@ public struct DataRow : IDataRow
             }
         }
         using var stream = MemoryStreamPool.Allocate();
-        foreach (var resolver in resolvers)
+        foreach (var synthesizer in synthesizers)
         {
-            resolver.BeginHash(stream, this);
+            synthesizer.Resolver.BeginHash(stream, this);
         }
         var buffer = stream.GetBuffer();
         return new(_raw, Hash128.HashMd5(new ReadOnlySpan<byte>(buffer, 0, (int)stream.Length)));
@@ -149,28 +140,28 @@ public struct DataRow : IDataRow
         _hashStream = hashStream;
     }
 
-    public static DataRow Create<T>(T resolvers, int rawSize) where T : IEnumerable<IColumnResolver>
+    public static DataRow Create<T>(T synthesizers, int rawSize) where T : IEnumerable<ColumnSynthesizer>
     {
         var row = new DataRow(BytesCluster.Rent(rawSize));
-        foreach (var resolver in resolvers)
+        foreach (var synthesizer in synthesizers)
         {
             // DataRow only hold a single reference so no need to worry
-            resolver.Initialize(row);
+            synthesizer.Resolver.Initialize(row);
         }
 
         return row;
     }
 
-    public static DataRow Create<T>(Stream reader, T resolvers, int rawSize, int hashSize) where T : IEnumerable<IColumnResolver>
+    public static DataRow Create<T>(Stream reader, T synthesizers, int rawSize, int hashSize) where T : IEnumerable<ColumnSynthesizer>
     {
         var hashStream = BytesCluster.Rent(hashSize).Promote();
         try
         {
             var row = new DataRow(BytesCluster.Rent(rawSize), hashStream);
-            foreach (var resolver in resolvers)
+            foreach (var synthesizer in synthesizers)
             {
                 // DataRow only hold a single reference so no need to worry
-                resolver.Initialize(reader, hashStream, row);
+                synthesizer.Resolver.Initialize(reader, hashStream, row);
             }
 
             return row;
@@ -182,13 +173,13 @@ public struct DataRow : IDataRow
         }
     }
 
-    public void Load<T>(Stream reader, T resolvers) where T : IEnumerable<IColumnResolver>
+    public void Load<T>(Stream reader, T synthesizers) where T : IEnumerable<ColumnSynthesizer>
     {
         _hashStream?.Dispose();
         _hashStream = null;
-        foreach (var resolver in resolvers)
+        foreach (var synthesizer in synthesizers)
         {
-            resolver.Deserialize(reader, this);
+            synthesizer.Resolver.Deserialize(reader, this);
         }
     }
 
@@ -199,13 +190,13 @@ public struct DataRow : IDataRow
     }
     public bool IsImmutable => false;
 
-    public void Save<T>(Stream writer, T resolvers) where T : IEnumerable<IColumnResolver>
+    public void Save<T>(Stream writer, T synthesizers) where T : IEnumerable<ColumnSynthesizer>
     {
-        foreach (var resolver in resolvers)
+        foreach (var synthesizer in synthesizers)
         {
             // ImmutableDataRow is read-only so no need to worry about passing values
             // Also its size is not too big (at least 24-byte, 32 if aligned)
-            resolver.Serialize(writer, this);
+            synthesizer.Resolver.Serialize(writer, this);
         }
     }
 

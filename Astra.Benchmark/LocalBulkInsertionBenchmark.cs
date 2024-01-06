@@ -1,51 +1,39 @@
 using Astra.Engine;
 using BenchmarkDotNet.Attributes;
-using BenchmarkDotNet.Engines;
 using BenchmarkDotNet.Jobs;
-using Microsoft.IO;
 
 namespace Astra.Benchmark;
 
 [SimpleJob(RuntimeMoniker.Net80)]
-public class LocalOneIntTwoTextBulkInsertBenchmark
+public class LocalBulkInsertionBenchmark
 {
-    private RecyclableMemoryStream _inStream = null!;
-    private RecyclableMemoryStream _outStream = null!;
     private DataIndexRegistry _registry = null!;
+    private SimpleSerializableStruct[] _data = null!;
     
     private int _bulkCounter = 1;
     
-    [Params(10, 100, 1_000)]
-    public uint BulkInsertRowsCount;
+    [Params(10, 100, 1_000, 10_000)]
+    public uint BulkInsertAmount;
     
     [IterationSetup]
     public void SetUp()
     {
-        _outStream = MemoryStreamPool.Allocate();
-        _inStream = MemoryStreamPool.Allocate();
-        _inStream.WriteValue(1); // 1 Command
-        _inStream.WriteValue(Command.UnsortedInsert); // That command is insert
-            
-        _inStream.WriteValue(BulkInsertRowsCount); // Insert this much rows
-            
-    
-        for (var j = 0U; j < BulkInsertRowsCount; j++)
+        _data = new SimpleSerializableStruct[BulkInsertAmount];
+        for (var i = 0; i < BulkInsertAmount; i++)
         {
-            _inStream.WriteValue(_bulkCounter++);
-            _inStream.WriteValue("test1");
-            _inStream.WriteValue("test2");
+            _data[i] = new()
+            {
+                Value1 = ++_bulkCounter,
+                Value2 = "test2",
+                Value3 = "test3",
+            };
         }
-    
-        _inStream.Position = 0;
     }
 
     [IterationCleanup]
     public void CleanUp()
     {
-        _inStream.Dispose();
-        _outStream.Dispose();
-        _inStream = null!;
-        _outStream = null!;
+        _data = null!;
     }
 
     [GlobalSetup]
@@ -84,8 +72,8 @@ public class LocalOneIntTwoTextBulkInsertBenchmark
     }
 
     [Benchmark]
-    public void PureBulkInsertionBenchmark()
+    public void BulkInsertionBenchmark()
     {
-        _registry.ConsumeStream(_inStream, _outStream);
+        _registry.BulkInsert(_data);
     }
 }

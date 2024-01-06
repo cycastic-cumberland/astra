@@ -25,7 +25,6 @@ public readonly struct Hash128 : IEquatable<Hash128>
             }
         }
     }
-    
     public static Hash128 Create(UInt128 i128)
     {
         return new(i128);
@@ -38,12 +37,6 @@ public readonly struct Hash128 : IEquatable<Hash128>
     public static Hash128 HashMd5(string str) => HashMd5(Encoding.UTF8.GetBytes(str));
     
     public static Hash128 HashMd5Fast(string str) => HashMd5(MemoryMarshal.AsBytes(str.AsSpan()));
-
-    public static Hash128 HashMurmur3(ReadOnlySpan<byte> array) => MurmurHashInterop.MurmurHash3_x64_128(array);
-    
-    public static Hash128 HashMurmur3(string str) => MurmurHashInterop.MurmurHash3_x64_128(Encoding.UTF8.GetBytes(str));
-    
-    public static Hash128 HashMurmur3Fast(string str) => MurmurHashInterop.MurmurHash3_x64_128(MemoryMarshal.AsBytes(str.AsSpan()));
 
     public static Hash128 HashXx128(ReadOnlySpan<byte> array) => Create(System.IO.Hashing.XxHash128.HashToUInt128(array));
     
