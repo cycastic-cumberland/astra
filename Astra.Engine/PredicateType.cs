@@ -1,5 +1,6 @@
 namespace Astra.Engine;
 
+// Such dumbass names...
 public static class PredicateType
 {
     // -------------- LAYOUT --------------

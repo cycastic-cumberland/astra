@@ -492,7 +492,7 @@ public sealed class DataIndexRegistry : IDisposable
                 dataOut.WriteValue(inserted);
                 break;
             }
-            case Command.Delete:
+            case Command.ConditionalDelete:
             {
                 var deleted = DeleteRows(dataIn, autoIndexerLock, writeLock);
                 dataOut.WriteValue(deleted);
@@ -538,7 +538,7 @@ public sealed class DataIndexRegistry : IDisposable
                 break;
             }
             case Command.UnsortedInsert:
-            case Command.Delete:
+            case Command.ConditionalDelete:
                 throw new WriteOperationsNotAllowed("This frame can only execute read commands");
             default:
                 throw new CommandNotSupported($"Command code not found: {command}");

@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
+using Astra.Client.Aggregator;
 using Astra.Engine;
 using Microsoft.IO;
 
@@ -239,7 +240,7 @@ public class SimpleAstraClient : IAstraClient
         var inserted = _shortOutStream.ReadInt();
         return inserted;
     }
-    public async Task<IEnumerable<T>> SimpleAggregateAsync<T>(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default) where T : IAstraSerializable
+    private async Task<IEnumerable<T>> AggregateInternalAsync<T>(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default) where T : IAstraSerializable
     {
         var (client, clientStream) = _client ?? throw new NotConnectedException();
         await clientStream.WriteValueAsync(HeaderSize + predicateStream.Length, cancellationToken);
@@ -273,6 +274,11 @@ public class SimpleAstraClient : IAstraClient
         var faulted = (byte)stream.ReadByte();
         if (faulted != 0) throw new FaultedRequestException();
         return IAstraSerializable.DeserializeStream<T, BytesClusterStream>(stream);
+    }
+
+    public Task<IEnumerable<T>> AggregateAsync<T>(IAstraQueryBranch predicate, CancellationToken cancellationToken = default) where T : IAstraSerializable
+    {
+        return AggregateInternalAsync<T>(predicate.DumpAsync(), cancellationToken);
     }
 
     public async Task<int> CountAllAsync(CancellationToken cancellationToken = default)
@@ -309,7 +315,7 @@ public class SimpleAstraClient : IAstraClient
         return stream.ReadInt();
     }
 
-    public async Task<int> SimpleConditionalCountAsync(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default)
+    private async Task<int> ConditionalCountInternalAsync(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default)
     {
         var (client, clientStream) = _client ?? throw new NotConnectedException();
         await clientStream.WriteValueAsync(HeaderSize + predicateStream.Length, cancellationToken);
@@ -343,5 +349,51 @@ public class SimpleAstraClient : IAstraClient
         var faulted = (byte)stream.ReadByte();
         if (faulted != 0) throw new FaultedRequestException();
         return stream.ReadInt();
+    }
+    
+    public Task<int> ConditionalCountAsync<TA>(TA predicate, CancellationToken cancellationToken = default) where TA : IAstraQueryBranch
+    {
+        return ConditionalCountInternalAsync(predicate.DumpAsync(), cancellationToken);
+    }
+    
+    private async Task<int> ConditionalDeleteInternalAsync(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default) 
+    {
+        var (client, clientStream) = _client ?? throw new NotConnectedException();
+        await clientStream.WriteValueAsync(HeaderSize + predicateStream.Length, cancellationToken);
+        await clientStream.WriteValueAsync(Command.CreateWriteHeader(1U), cancellationToken); // 1 command
+        await clientStream.WriteValueAsync(Command.ConditionalDelete, cancellationToken); // Command type (conditional count)
+        await clientStream.WriteAsync(predicateStream, cancellationToken);
+        var timer = Stopwatch.StartNew();
+        while (client.Available < sizeof(long))
+        {
+#if DEBUG
+                await Task.Delay(100, cancellationToken);
+#endif
+            if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
+                throw new TimeoutException();
+        }
+
+        var outStreamSize = await clientStream.ReadLongAsync(cancellationToken);
+        timer.Restart();
+        while (client.Available < outStreamSize)
+        {
+#if DEBUG
+                await Task.Delay(100, cancellationToken);
+#endif
+            if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
+                throw new TimeoutException();
+        }
+
+        var outCluster = BytesCluster.Rent((int)outStreamSize);
+        await clientStream.ReadExactlyAsync(outCluster.WriterMemory, cancellationToken);
+        using var stream = outCluster.Promote();
+        var faulted = (byte)stream.ReadByte();
+        if (faulted != 0) throw new FaultedRequestException();
+        return stream.ReadInt();
+    }
+
+    public Task<int> ConditionalDeleteAsync<TA>(TA predicate, CancellationToken cancellationToken = default) where TA : IAstraQueryBranch
+    {
+        return ConditionalDeleteInternalAsync(predicate.DumpAsync(), cancellationToken);
     }
 }

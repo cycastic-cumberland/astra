@@ -107,8 +107,11 @@ public class ClientTestFixture
             },
         });
         var newAmount = await _simpleAstraClient.CountAllAsync();
-        Assert.That(inserted, Is.EqualTo(2));
-        Assert.That(newAmount - originalAmount, Is.EqualTo(2));
+        Assert.Multiple(() =>
+        {
+            Assert.That(inserted, Is.EqualTo(2));
+            Assert.That(newAmount - originalAmount, Is.EqualTo(2));
+        });
     }
 
     [Test]

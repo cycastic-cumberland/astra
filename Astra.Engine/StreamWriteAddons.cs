@@ -119,18 +119,18 @@ public static class StreamWriteAddons
         }
     }
     
-    public static void WriteValue<T>(this Stream writer, T? value) where T : struct
-    {
-        if (value != null)
-        {
-            writer.WriteValue(true);
-            WriteValue(writer, value.Value);
-        }
-        else
-        {
-            writer.WriteValue(false);
-        }
-    }
+    // public static void WriteValue<T>(this Stream writer, T? value) where T : struct
+    // {
+    //     if (value != null)
+    //     {
+    //         writer.WriteValue(true);
+    //         WriteValue(writer, value.Value);
+    //     }
+    //     else
+    //     {
+    //         writer.WriteValue(false);
+    //     }
+    // }
     
     public static void WriteValue(this Stream writer, BytesCluster array)
     {

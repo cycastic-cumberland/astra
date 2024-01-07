@@ -50,7 +50,7 @@ public sealed class BytesColumnResolver(int offset, bool shouldBeHashed) :
     public void Serialize<T>(Stream writer, T row) where T : struct, IImmutableDataRow
     {
         var bytes = Dump(row);
-        writer.WriteValue(bytes);
+        writer.WriteValue(bytes.cluster);
     }
 
     public void Deserialize<T>(Stream reader, T row) where T : struct, IDataRow

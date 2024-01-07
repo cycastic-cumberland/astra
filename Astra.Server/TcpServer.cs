@@ -75,20 +75,21 @@ public class TcpServer : IDisposable
             });
         });
         _registry = new(settings.Schema, _loggerFactory);
-        _logger = _loggerFactory.CreateLogger<TcpServer>();
-        _port = DefaultPort;
+        _logger = GetLogger<TcpServer>();
+        _port = settings.Port ?? DefaultPort;
         _listener = new(Address, _port);
         Console.CancelKeyPress += delegate(object? _, ConsoleCancelEventArgs e)
         {
             e.Cancel = true;
             Kill();
         };
-        _logger.LogInformation("Initialization completed: {} = {}, {} = {}, {} = {}, {} = {}, {} = {})",
-             nameof(settings.LogLevel), logLevel.ToString(), 
-             nameof(_registry.ColumnCount), _registry.ColumnCount, 
-            nameof(_registry.IndexedColumnCount), _registry.IndexedColumnCount, 
-            nameof(_registry.ReferenceTypeColumnCount), _registry.ReferenceTypeColumnCount,
-             nameof(settings.AuthenticationMethod), settings.AuthenticationMethod);
+        _logger.LogInformation("Initialization completed: {} = {}, {} = {}, {} = {}, {} = {}, {} = {}, {} = {})",
+                nameof(settings.LogLevel), logLevel.ToString(), 
+                nameof(_registry.ColumnCount), _registry.ColumnCount, 
+                nameof(_registry.IndexedColumnCount), _registry.IndexedColumnCount, 
+                nameof(_registry.ReferenceTypeColumnCount), _registry.ReferenceTypeColumnCount,
+                nameof(settings.AuthenticationMethod), settings.AuthenticationMethod,
+                nameof(settings.Timeout), TimeSpan.FromMilliseconds(_timeout));
     }
 
     public static async Task<TcpServer?> Initialize()
@@ -118,10 +119,14 @@ public class TcpServer : IDisposable
         }
 
         var configContent = await File.ReadAllTextAsync(configPath);
-        var config = JsonConvert.DeserializeObject<AstraLaunchSettings>(configContent);
-        if (config.Schema.Columns == null)
+        AstraLaunchSettings config;
+        try
         {
-            logger.LogError("File '{}' does not follow the correct format", configPath);
+            config = JsonConvert.DeserializeObject<RepresentableAstraLaunchSettings>(configContent).ToInternal();
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "Exception occured while deserializing launch settings");
             return null;
         }
         Func<IAuthenticationHandler> authSpawner;

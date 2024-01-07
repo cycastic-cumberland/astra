@@ -1,3 +1,4 @@
+using Astra.Client.Aggregator;
 using Astra.Engine;
 
 namespace Astra.Client;
@@ -47,10 +48,11 @@ public interface IAstraClient : IDisposable
     /// Asynchronously aggregate data from Astra database and cast them to <typeparamref name="T"/>.
     /// </summary>
     /// <typeparam name="T">The type of the deserializable objects implementing <see cref="IAstraSerializable"/>.</typeparam>
-    /// <param name="predicateStream">The pre-serialized predicate used for aggregation.</param>
+    /// <param name="predicate">The predicate used for aggregation.</param>
     /// <param name="cancellationToken">The cancellation token to observe while waiting for the task to complete.</param>
     /// <returns>A task representing the asynchronous operation, returning the coroutine that will deserialize the retrieved data.</returns>
-    public Task<IEnumerable<T>> SimpleAggregateAsync<T>(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default) where T : IAstraSerializable;
+    public Task<IEnumerable<T>> AggregateAsync<T>(IAstraQueryBranch predicate, CancellationToken cancellationToken = default) 
+        where T : IAstraSerializable;
 
     /// <summary>
     /// Asynchronously count all rows from Astra database.
@@ -60,10 +62,20 @@ public interface IAstraClient : IDisposable
     public Task<int> CountAllAsync(CancellationToken cancellationToken = default);
     
     /// <summary>
-    /// Asynchronously count all rows from Astra database that satisfy the condition provided by <paramref name="predicateStream"/>.
+    /// Asynchronously count all rows from Astra database that satisfy the condition provided by <paramref name="predicate"/>.
     /// </summary>
-    /// /// <param name="predicateStream">The pre-serialized predicate used for aggregation.</param>
+    /// <param name="predicate">The predicate used for aggregation.</param>
     /// <param name="cancellationToken">The cancellation token to observe while waiting for the task to complete.</param>
     /// <returns>A task representing the asynchronous operation, returning the total number of satisfied rows.</returns>
-    public Task<int> SimpleConditionalCountAsync(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default);
+    public Task<int> ConditionalCountAsync<TA>(TA predicate, CancellationToken cancellationToken = default) 
+        where TA : IAstraQueryBranch;
+    
+    /// <summary>
+    /// Asynchronously delete all rows that satisfy the condition provided by <paramref name="predicate"/>.
+    /// </summary>
+    /// <param name="predicate">The predicate used for aggregation.</param>
+    /// <param name="cancellationToken">The cancellation token to observe while waiting for the task to complete.</param>
+    /// <returns>A task representing the asynchronous operation, returning the total number of affected rows.</returns>
+    public Task<int> ConditionalDeleteAsync<TA>(TA predicate, CancellationToken cancellationToken = default) 
+        where TA : IAstraQueryBranch;
 }

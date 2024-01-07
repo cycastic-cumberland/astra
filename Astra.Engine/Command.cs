@@ -11,7 +11,7 @@ public static class Command
 #endif
     public const uint UnsortedAggregate = 2U;
     public const uint UnsortedInsert = 3U;
-    public const uint Delete = 4U;
+    public const uint ConditionalDelete = 4U;
     public const uint CountAll = 5U;
     public const uint ConditionalCount = 6U;
 

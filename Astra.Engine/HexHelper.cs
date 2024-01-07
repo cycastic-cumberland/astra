@@ -1,6 +1,6 @@
 namespace Astra.Engine;
 
-internal static class HexHelper
+public static class HexHelper
 {
     private const string HexDigitsUpper = "0123456789ABCDEF";
     private const string HexDigitsLower = "0123456789abcdef";
