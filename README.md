@@ -55,8 +55,8 @@ UnrollFactor=1
 
 - NetworkBulkInsertionBenchmark:
 
-| Method                 | BulkInsertAmount | Mean      |    Error |    StdDev |    Median |
-|:-----------------------|-----------------:|-----------|---------:|----------:|----------:|
+| Method                 | BulkInsertAmount |      Mean |    Error |    StdDev |    Median |
+|:-----------------------|-----------------:|----------:|---------:|----------:|----------:|
 | BulkInsertionBenchmark |               10 | 86.685 ms | 1.657 ms |  1.701 ms | 85.600 ms |
 | BulkInsertionBenchmark |              100 | 86.007 ms | 1.707 ms |  2.033 ms | 85.137 ms |
 | BulkInsertionBenchmark |             1000 | 22.112 ms | 7.479 ms | 22.051 ms |  3.990 ms |

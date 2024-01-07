@@ -1,6 +1,8 @@
+using System.Security.Cryptography;
 using Astra.Client;
 using Astra.Engine;
 using Astra.Server;
+using Astra.Server.Authentication;
 
 namespace Astra.Tests;
 
@@ -39,8 +41,15 @@ public class ParallelClientsTestFixture
     private Task _serverTask = null!;
     
     [OneTimeSetUp]
-    public async Task SetUp()
+    public Task SetUp()
     {
+        string publicKey;
+        string privateKey;
+        using (var rsa = new RSACryptoServiceProvider())
+        {
+            publicKey = Convert.ToBase64String(rsa.ExportRSAPublicKey());
+            privateKey = Convert.ToBase64String(rsa.ExportRSAPrivateKey());
+        }
         _connectionSettings = new()
         {
             Address = "127.0.0.1",
@@ -48,7 +57,8 @@ public class ParallelClientsTestFixture
             Schema = new()
             {
                 Columns = _columns
-            }
+            },
+            PrivateKey = privateKey
         };
         _server = new(new()
         {
@@ -57,9 +67,9 @@ public class ParallelClientsTestFixture
             {
                 Columns = _columns
             }
-        });
+        }, AuthenticationHelper.RSA(publicKey));
         _serverTask = _server.RunAsync();
-        await Task.Delay(100);
+        return Task.Delay(100);
     }
     
     [OneTimeTearDown]
@@ -120,6 +130,27 @@ public class ParallelClientsTestFixture
     [Test]
     [Parallelizable]
     public Task ValueTypeBulkInsertionThree()
+    {
+        return SimpleValueTypeInsertionTestAsync();
+    }
+    
+    [Test]
+    [Parallelizable]
+    public Task ValueTypeBulkInsertionFour()
+    {
+        return SimpleValueTypeInsertionTestAsync();
+    }
+    
+    [Test]
+    [Parallelizable]
+    public Task ValueTypeBulkInsertionFive()
+    {
+        return SimpleValueTypeInsertionTestAsync();
+    }
+    
+    [Test]
+    [Parallelizable]
+    public Task ValueTypeBulkInsertionSix()
     {
         return SimpleValueTypeInsertionTestAsync();
     }

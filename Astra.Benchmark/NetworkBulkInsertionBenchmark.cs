@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using Astra.Client;
 using Astra.Engine;
 using Astra.Server;
+using Astra.Server.Authentication;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
@@ -49,7 +50,7 @@ public class NetworkBulkInsertionBenchmark
         {
             LogLevel = "Critical",
             Schema = Schema
-        });
+        }, AuthenticationHelper.NoAuthentication());
         _serverTask = _server.RunAsync();
         await Task.Delay(100);
         _client = new();
@@ -91,7 +92,7 @@ public class NetworkBulkInsertionBenchmark
             {
                 Value1 = unchecked((int)i),
                 Value2 = "test",
-                Value3 = Hash128.Create(RandomNumberGenerator.GetBytes(Hash128.Size)).ToStringUpperCase()
+                Value3 = Hash128.CreateUnsafe(RandomNumberGenerator.GetBytes(Hash128.Size)).ToStringUpperCase()
             };
         }
     }

@@ -1,5 +1,8 @@
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
+using System.Security.Cryptography;
+using System.Text;
 using Astra.Engine;
 using Microsoft.IO;
 
@@ -8,6 +11,10 @@ namespace Astra.Client;
 public class SimpleAstraClient : IAstraClient
 {
     public class EndianModeNotSupportedException(string? msg = null) : NotSupportedException(msg);
+    public class HandshakeFailedException(string? msg = null) : Exception(msg);
+    public class AuthenticationMethodNotSupportedException(string? msg = null) : Exception(msg);
+    public class AuthenticationInfoNotProvidedException(string? msg = null) : Exception(msg);
+    public class AuthenticationAttemptRejectedException(string? msg = null) : Exception(msg);
     public class NotConnectedException(string? msg = null) : Exception(msg);
     public class FaultedRequestException(string? msg = null) : Exception(msg);
     private readonly struct InternalClient(TcpClient client, NetworkStream clientStream) : IDisposable
@@ -53,26 +60,102 @@ public class SimpleAstraClient : IAstraClient
 
     public AstraConnectionSettings? ConnectionSettings { get; private set; }
     public bool IsConnected => _client?.IsConnected ?? false;
-    
+
     public async Task ConnectAsync(AstraConnectionSettings settings, CancellationToken cancellationToken = default)
     {
         _client?.Dispose();
         _client = null;
+        if (settings.Timeout == 0) settings.Timeout = 100_000; // 100 seconds
         ConnectionSettings = settings;
         var networkClient = new TcpClient(settings.Address, settings.Port);
         var networkStream = networkClient.GetStream();
-        while (networkClient.Available < sizeof(int))
+        try
         {
+            var timer = Stopwatch.StartNew();
+            // Wait for endian check and handshake signal
+            while (networkClient.Available < sizeof(int) + sizeof(ulong))
+            {
 #if DEBUG
-            await Task.Delay(100, cancellationToken);
+                await Task.Delay(100, cancellationToken);
 #endif
+                if (timer.ElapsedMilliseconds <= settings.Timeout) continue;
+                throw new TimeoutException($"Timed out: {settings.Timeout} ms");
+            }
+            using var outBuffer = BytesCluster.Rent(sizeof(ulong));
+            _ = await networkStream.ReadAsync(outBuffer.WriterMemory[..sizeof(int)], cancellationToken);
+            var isLittleEndian = outBuffer.Reader[0] == 1;
+            if (isLittleEndian != BitConverter.IsLittleEndian)
+                throw new EndianModeNotSupportedException($"Endianness not supported: {(isLittleEndian ? "little endian" : "big endian")}");
+            await networkStream.ReadExactlyAsync(outBuffer.WriterMemory[..sizeof(ulong)], cancellationToken);
+            var handshakeSignal = BitConverter.ToUInt64(outBuffer.Reader[..sizeof(ulong)]);
+            if (handshakeSignal != CommunicationProtocol.ServerIdentification)
+            {
+                throw new HandshakeFailedException();
+            }
+
+            await networkStream.WriteValueAsync(CommunicationProtocol.HandshakeResponse, cancellationToken);
+            timer.Restart();
+            while (networkClient.Available < sizeof(uint))
+            {
+#if DEBUG
+                await Task.Delay(100, cancellationToken);
+#endif
+                if (timer.ElapsedMilliseconds <= settings.Timeout) continue;
+                throw new TimeoutException($"Timed out: {settings.Timeout} ms");
+            }
+            await networkStream.ReadExactlyAsync(outBuffer.WriterMemory[..sizeof(int)], cancellationToken);
+            var authMethod = BitConverter.ToUInt32(outBuffer.Reader[..sizeof(uint)]);
+            switch (authMethod)
+            {
+                case CommunicationProtocol.NoAuthentication:
+                {
+                    break;
+                }
+                case CommunicationProtocol.PasswordAuthentication:
+                {
+                    if (string.IsNullOrEmpty(settings.Password))
+                        throw new AuthenticationInfoNotProvidedException(nameof(settings.Password));
+                    var pwdBytes = Encoding.UTF8.GetBytes(settings.Password);
+                    await networkStream.WriteValueAsync(pwdBytes.Length, token: cancellationToken);
+                    await networkStream.WriteAsync(pwdBytes, cancellationToken);
+                    break;
+                }
+                case CommunicationProtocol.PubKeyAuthentication:
+                {
+                    using RSA rsa = new RSACryptoServiceProvider();
+                    if (string.IsNullOrEmpty(settings.PrivateKey))
+                        throw new AuthenticationInfoNotProvidedException(nameof(settings.PrivateKey));
+                    rsa.ImportRSAPrivateKey(Convert.FromBase64String(settings.PrivateKey), out _);
+                    var dataBytes = BitConverter.GetBytes(CommunicationProtocol.PubKeyPayload);
+                    var signatureBytes = rsa.SignData(new ReadOnlySpan<byte>(dataBytes), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+                    await networkStream.WriteValueAsync(signatureBytes.LongLength, token: cancellationToken);
+                    await networkStream.WriteAsync(signatureBytes, cancellationToken);
+                    break;
+                }
+                default:
+                    throw new AuthenticationMethodNotSupportedException($"Authentication method not supported: {authMethod}");
+            }
+            timer.Restart();
+            while (networkClient.Available < sizeof(uint))
+            {
+#if DEBUG
+                await Task.Delay(100, cancellationToken);
+#endif
+                if (timer.ElapsedMilliseconds <= settings.Timeout) continue;
+                throw new TimeoutException($"Timed out: {settings.Timeout} ms");
+            }
+
+            await networkStream.ReadExactlyAsync(outBuffer.WriterMemory[..sizeof(uint)], cancellationToken);
+            var attemptResult = BitConverter.ToUInt32(outBuffer.Reader[..sizeof(uint)]);
+            if (attemptResult != CommunicationProtocol.AllowedConnection)
+                throw new AuthenticationAttemptRejectedException();
+            _client = new(networkClient, networkStream);
         }
-        using var checkEndianness = BytesCluster.Rent(sizeof(int));
-        _ = await networkStream.ReadAsync(checkEndianness.WriterMemory, cancellationToken);
-        var isLittleEndian = checkEndianness.Reader[0] == 1;
-        if (isLittleEndian != BitConverter.IsLittleEndian)
-            throw new EndianModeNotSupportedException($"Endianness not supported: {(isLittleEndian ? "little endian" : "big endian")}");
-        _client = new(networkClient, networkStream);
+        catch (Exception)
+        {
+            networkClient.Dispose();
+            throw;
+        }
     }
     public async Task<int> InsertSerializableAsync<T>(T value, CancellationToken cancellationToken = default) where T : IAstraSerializable
     {
@@ -85,19 +168,25 @@ public class SimpleAstraClient : IAstraClient
         await clientStream.WriteValueAsync(1, cancellationToken); // 1 row
         await clientStream.WriteAsync(new ReadOnlyMemory<byte>(_inStream.GetBuffer(),
             0, (int)_inStream.Position), cancellationToken);
+        var timer = Stopwatch.StartNew();
         while (client.Available < sizeof(long))
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
 #endif
+            if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
+                throw new TimeoutException();
         }
 
         var outStreamSize = await clientStream.ReadLongAsync(cancellationToken);
+        timer.Restart();
         while (client.Available < outStreamSize)
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
 #endif
+            if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
+                throw new TimeoutException();
         }
         _ = await clientStream.ReadAsync(_shortOutStream.AsMemory()[..(int)outStreamSize], cancellationToken);
         _shortOutStream.Position = 0;
@@ -123,19 +212,25 @@ public class SimpleAstraClient : IAstraClient
         await clientStream.WriteValueAsync(count, cancellationToken); // `count` rows
         await clientStream.WriteAsync(new ReadOnlyMemory<byte>(_inStream.GetBuffer(),
             0, (int)_inStream.Position), cancellationToken);
+        var timer = Stopwatch.StartNew();
         while (client.Available < sizeof(long))
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
 #endif
+            if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
+                throw new TimeoutException();
         }
 
         var outStreamSize = await clientStream.ReadLongAsync(cancellationToken);
+        timer.Restart();
         while (client.Available < outStreamSize)
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
 #endif
+            if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
+                throw new TimeoutException();
         }
         _ = await clientStream.ReadAsync(_shortOutStream.AsMemory()[..(int)outStreamSize], cancellationToken);
         _shortOutStream.Position = 0;
@@ -151,19 +246,25 @@ public class SimpleAstraClient : IAstraClient
         await clientStream.WriteValueAsync(Command.CreateReadHeader(1U), cancellationToken); // 1 command
         await clientStream.WriteValueAsync(Command.UnsortedAggregate, cancellationToken); // Command type (aggregate)
         await clientStream.WriteAsync(predicateStream, cancellationToken);
+        var timer = Stopwatch.StartNew();
         while (client.Available < sizeof(long))
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
 #endif
+            if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
+                throw new TimeoutException();
         }
 
         var outStreamSize = await clientStream.ReadLongAsync(cancellationToken);
+        timer.Restart();
         while (client.Available < outStreamSize)
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
 #endif
+            if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
+                throw new TimeoutException();
         }
 
         var outCluster = BytesCluster.Rent((int)outStreamSize);
@@ -180,19 +281,25 @@ public class SimpleAstraClient : IAstraClient
         await clientStream.WriteValueAsync(HeaderSize, cancellationToken);
         await clientStream.WriteValueAsync(Command.CreateReadHeader(1U), cancellationToken); // 1 command
         await clientStream.WriteValueAsync(Command.CountAll, cancellationToken); // Command type (count all)
+        var timer = Stopwatch.StartNew();
         while (client.Available < sizeof(long))
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
 #endif
+            if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
+                throw new TimeoutException();
         }
 
         var outStreamSize = await clientStream.ReadLongAsync(cancellationToken);
+        timer.Restart();
         while (client.Available < outStreamSize)
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
 #endif
+            if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
+                throw new TimeoutException();
         }
         var outCluster = BytesCluster.Rent((int)outStreamSize);
         await clientStream.ReadExactlyAsync(outCluster.WriterMemory, cancellationToken);
@@ -207,21 +314,27 @@ public class SimpleAstraClient : IAstraClient
         var (client, clientStream) = _client ?? throw new NotConnectedException();
         await clientStream.WriteValueAsync(HeaderSize + predicateStream.Length, cancellationToken);
         await clientStream.WriteValueAsync(Command.CreateReadHeader(1U), cancellationToken); // 1 command
-        await clientStream.WriteValueAsync(Command.UnsortedAggregate, cancellationToken); // Command type (aggregate)
+        await clientStream.WriteValueAsync(Command.ConditionalCount, cancellationToken); // Command type (conditional count)
         await clientStream.WriteAsync(predicateStream, cancellationToken);
+        var timer = Stopwatch.StartNew();
         while (client.Available < sizeof(long))
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
 #endif
+            if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
+                throw new TimeoutException();
         }
 
         var outStreamSize = await clientStream.ReadLongAsync(cancellationToken);
+        timer.Restart();
         while (client.Available < outStreamSize)
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
 #endif
+            if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
+                throw new TimeoutException();
         }
 
         var outCluster = BytesCluster.Rent((int)outStreamSize);

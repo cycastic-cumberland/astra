@@ -2,7 +2,9 @@
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using System.Security.Cryptography;
 using Astra.Engine;
+using Astra.Server.Authentication;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
@@ -48,7 +50,9 @@ public class TcpServer : IDisposable
     private readonly ILogger<TcpServer> _logger;
     private readonly int _port;
     private readonly CancellationTokenSource _cancellationTokenSource = new();
-    
+    private readonly Func<IAuthenticationHandler> _authenticationSpawner;
+    private readonly int _timeout;
+
     public int Port => _port;
 
     public ILogger<TL> GetLogger<TL>() => _loggerFactory.CreateLogger<TL>();
@@ -57,8 +61,10 @@ public class TcpServer : IDisposable
     public DataIndexRegistry ProbeRegistry() => _registry;
 #endif
     
-    public TcpServer(AstraLaunchSettings settings)
+    public TcpServer(AstraLaunchSettings settings, Func<IAuthenticationHandler> authenticationSpawner)
     {
+        _timeout = settings.Timeout <= 0 ? 100_000 : settings.Timeout;
+        _authenticationSpawner = authenticationSpawner;
         var logLevel = StringToLog.GetValueOrDefault(settings.LogLevel ?? "Information", LogLevel.Information);
         _loggerFactory = LoggerFactory.Create(builder =>
         {
@@ -77,11 +83,12 @@ public class TcpServer : IDisposable
             e.Cancel = true;
             Kill();
         };
-        _logger.LogInformation("Initialization completed: {} = {}, {} = {}, {} = {}, {} = {})",
+        _logger.LogInformation("Initialization completed: {} = {}, {} = {}, {} = {}, {} = {}, {} = {})",
              nameof(settings.LogLevel), logLevel.ToString(), 
              nameof(_registry.ColumnCount), _registry.ColumnCount, 
             nameof(_registry.IndexedColumnCount), _registry.IndexedColumnCount, 
-            nameof(_registry.ReferenceTypeColumnCount), _registry.ReferenceTypeColumnCount);
+            nameof(_registry.ReferenceTypeColumnCount), _registry.ReferenceTypeColumnCount,
+             nameof(settings.AuthenticationMethod), settings.AuthenticationMethod);
     }
 
     public static async Task<TcpServer?> Initialize()
@@ -112,9 +119,81 @@ public class TcpServer : IDisposable
 
         var configContent = await File.ReadAllTextAsync(configPath);
         var config = JsonConvert.DeserializeObject<AstraLaunchSettings>(configContent);
-        if (config.Schema.Columns != null!) return new TcpServer(config);
-        logger.LogError("File '{}' does not follow the correct format", configPath);
-        return null;
+        if (config.Schema.Columns == null)
+        {
+            logger.LogError("File '{}' does not follow the correct format", configPath);
+            return null;
+        }
+        Func<IAuthenticationHandler> authSpawner;
+        switch (config.AuthenticationMethod)
+        {
+            case CommunicationProtocol.NoAuthentication:
+                authSpawner = () => new NoAuthenticationHandler();
+                break;
+            case CommunicationProtocol.PasswordAuthentication:
+            {
+                if (string.IsNullOrEmpty(config.HashedPasswordPath))
+                {
+                    logger.LogError("Password authentication required but no hashed password path specified");
+                    return null;
+                }
+
+                if (!File.Exists(config.HashedPasswordPath))
+                {
+                    logger.LogError("Hashed password path is invalid");
+                    return null;
+                }
+
+                var pwd = await File.ReadAllBytesAsync(config.HashedPasswordPath);
+                
+                if (pwd.Length != Hash256.Size)
+                {
+                    logger.LogError("SHA-256 hashed password is of incorrect length: {}", pwd.Length);
+                    return null;
+                }
+
+                var hash = Hash256.CreateUnsafe(pwd);
+                var timeout = config.Timeout;
+                authSpawner = () => new PasswordAuthenticationHandler(hash, Hash256.HashSha256, Hash256.Compare, timeout);
+                break;
+            }
+            case CommunicationProtocol.PubKeyAuthentication:
+            {
+                if (string.IsNullOrEmpty(config.PublicKeyPath))
+                {
+                    logger.LogError("Public key authentication required but no public key path specified");
+                    return null;
+                }
+
+                if (!File.Exists(config.PublicKeyPath))
+                {
+                    logger.LogError("Public key path is invalid");
+                    return null;
+                }
+
+                var pubKey = await File.ReadAllTextAsync(config.PublicKeyPath);
+                
+                var timeout = config.Timeout;
+
+                try
+                {
+                    authSpawner = () => new PublicKeyAuthenticationHandler(pubKey, timeout);
+                    using var testSubject = new PublicKeyAuthenticationHandler(pubKey, timeout);
+                }
+                catch (CryptographicException)
+                {
+                    logger.LogError("Provided public key is invalid");
+                    return null;
+                }
+                break;
+            }
+            default:
+            {
+                logger.LogError("Authentication method not supported {}", config.AuthenticationMethod);
+                return null;
+            }
+        }
+        return new TcpServer(config, authSpawner);
     }
 
     private static bool IsConnected(TcpClient client)
@@ -130,18 +209,11 @@ public class TcpServer : IDisposable
     private async Task ResolveClientAsync(TcpClient client)
     {
         var cancellationToken = _cancellationTokenSource.Token;
-        // Send info regarding endianness
-        // Checking endianness:
-        // {
-        //     using var checkEndianness = BytesCluster.Rent(4);
-        //     await stream.ReadAsync(checkEndianness.WriterMemory);
-        //     var isLittleEndian = checkEndianness.Reader[0] == 1;
-        // }
         var stream = client.GetStream();
-        await stream.WriteValueAsync(1, cancellationToken);
         var stopwatch = new Stopwatch();
         var threshold = (long)sizeof(long);
         var waiting = true;
+        var timer = Stopwatch.StartNew();
         while (!cancellationToken.IsCancellationRequested)
         {
             if (client.Available < threshold)
@@ -149,12 +221,18 @@ public class TcpServer : IDisposable
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
 #endif
+                if (!waiting && timer.ElapsedMilliseconds > _timeout)
+                {
+                    _logger.LogInformation("Client timed out");
+                    return;
+                }
                 continue;
             }
             if (waiting)
             {
                 threshold = await stream.ReadLongAsync(cancellationToken);
                 waiting = false;
+                timer.Restart();
                 continue;
             }
             stopwatch.Start();
@@ -181,7 +259,66 @@ public class TcpServer : IDisposable
             }
             threshold = sizeof(long);
             waiting = true;
+            timer.Restart();
         }
+    }
+    
+    // Handshake procedure:
+    // 1. Send a 32-bit integer to check for endianness
+    // 2. Send a 64-bit integer as identification
+    // 3. Wait for the client to send back another corresponding 64-bit integer to complete handshake
+    // 4. If the integer match, allow further procedures
+    private async Task AuthenticateClient(TcpClient client, IPAddress address)
+    {
+        var cancellationToken = _cancellationTokenSource.Token;
+        var stream = client.GetStream();
+        try
+        {
+            await stream.WriteValueAsync(1, cancellationToken);
+            await stream.WriteValueAsync(CommunicationProtocol.ServerIdentification, cancellationToken);
+            var timer = Stopwatch.StartNew();
+            while (client.Available < sizeof(ulong))
+            {
+#if DEBUG
+                await Task.Delay(100, cancellationToken);
+#endif
+                if (timer.ElapsedMilliseconds <= _timeout) continue;
+                _logger.LogInformation("Client {} failed handshake attempt: timed out", address);
+                client.Close();
+                return;
+            }
+
+            var handshakeAttempt = await stream.ReadULongAsync(token: cancellationToken);
+            if (handshakeAttempt != CommunicationProtocol.HandshakeResponse)
+            {
+                _logger.LogDebug("Client {} failed handshake attempt: incorrect message", address);
+                client.Close();
+                return;
+            }
+            using var authHandler = _authenticationSpawner();
+            var authResult = await authHandler.Authenticate(client, cancellationToken);
+            if (authResult != IAuthenticationHandler.AuthenticationState.AllowConnection)
+            {
+                await stream.WriteValueAsync(CommunicationProtocol.RejectedConnection, token: cancellationToken);
+                var reason = authResult switch
+                {
+                    IAuthenticationHandler.AuthenticationState.Timeout => "timed out",
+                    IAuthenticationHandler.AuthenticationState.RejectConnection => "authentication failed",
+                    _ => "<unknown>"
+                };
+                _logger.LogDebug("Authentication for client {} was rejected: {}", address, reason);
+                client.Close();
+                return;
+            }
+        }
+        catch (Exception)
+        {
+            client.Close();
+            throw;
+        }
+        _logger.LogDebug("Authentication completed, {} is allowed to connect", address);
+        await stream.WriteValueAsync(CommunicationProtocol.AllowedConnection, token: cancellationToken);
+        await ResolveClientAsync(client);
     }
     
     private async Task ResolveClientWrappedAsync(TcpClient client)
@@ -197,7 +334,8 @@ public class TcpServer : IDisposable
         try
         {
             _logger.LogDebug("Connection from {}:{} opened", addr, port);
-            await ResolveClientAsync(client);
+            // await ResolveClientAsync(client);
+            await AuthenticateClient(client, addr);
             _logger.LogDebug("Connection from {}:{} closed", addr, port);
         }
         catch (SocketException)

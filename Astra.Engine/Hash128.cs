@@ -13,16 +13,13 @@ public readonly struct Hash128 : IEquatable<Hash128>
     
     private Hash128(UInt128 vector) => _vector = vector;
 
-    public static Hash128 Create(ReadOnlySpan<byte> array)
+    public static unsafe Hash128 CreateUnsafe(ReadOnlySpan<byte> array)
     {
         if (array.Length != 16) throw new ArgumentException(nameof(array));
-        unsafe
+        fixed (void* ptr = &array[0])
         {
-            fixed (void* ptr = &array[0])
-            {
-                // Type punning magic
-                return new(*(UInt128*)ptr);
-            }
+            // Type punning magic
+            return *(Hash128*)ptr;
         }
     }
     public static Hash128 Create(UInt128 i128)
@@ -32,7 +29,7 @@ public readonly struct Hash128 : IEquatable<Hash128>
 
     public static readonly Hash128 Empty = new(UInt128.Zero);
     
-    public static Hash128 HashMd5(ReadOnlySpan<byte> array) => Create(MD5.HashData(array));
+    public static Hash128 HashMd5(ReadOnlySpan<byte> array) => CreateUnsafe(MD5.HashData(array));
 
     public static Hash128 HashMd5(string str) => HashMd5(Encoding.UTF8.GetBytes(str));
     

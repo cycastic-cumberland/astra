@@ -26,6 +26,13 @@ public static class StreamReadAddons
         return ReadUnmanagedStruct<int>(reader, sizeof(int));
     }
     
+    public static async ValueTask<int> ReadIntAsync(this Stream reader, CancellationToken token = default)
+    {
+        var bytes = new byte[sizeof(int)];
+        await reader.ReadExactlyAsync(bytes, token);
+        return BitConverter.ToInt32(bytes);
+    }
+    
     public static uint ReadUInt(this Stream reader)
     {
         return ReadUnmanagedStruct<uint>(reader, sizeof(uint));
@@ -51,6 +58,13 @@ public static class StreamReadAddons
     public static ulong ReadULong(this Stream reader)
     {
         return ReadUnmanagedStruct<ulong>(reader, sizeof(ulong));
+    }
+    
+    public static async ValueTask<ulong> ReadULongAsync(this Stream reader, CancellationToken token = default)
+    {
+        var bytes = new byte[sizeof(ulong)];
+        await reader.ReadExactlyAsync(bytes, token);
+        return BitConverter.ToUInt64(bytes);
     }
 
     public static string ReadString(this Stream reader)
@@ -97,13 +111,13 @@ public static class StreamReadAddons
         }
     }
     
-    public static async ValueTask<BytesCluster> ReadClusterAsync(this Stream reader)
+    public static async ValueTask<BytesCluster> ReadClusterAsync(this Stream reader, CancellationToken cancellationToken = default)
     {
-        var length = await reader.ReadLongAsync();
+        var length = await reader.ReadLongAsync(token: cancellationToken);
         var array = BytesCluster.Rent((int)length);
         try
         {
-            await reader.ReadExactlyAsync(array.WriterMemory);
+            await reader.ReadExactlyAsync(array.WriterMemory, cancellationToken);
             return array;
         }
         catch (Exception)

@@ -1,6 +1,8 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Security.Cryptography;
+using System.Text;
 
 namespace Astra.Engine;
 
@@ -9,15 +11,18 @@ public readonly struct Hash256 : IEquatable<Hash256>
     public const int Size = 32;
     private readonly Vector256<ulong> _vector;
     
-    private static unsafe Hash256 CreateUnsafe(ReadOnlySpan<byte> array)
+    public static unsafe Hash256 CreateUnsafe(ReadOnlySpan<byte> array)
     {
         if (array.Length != Size) throw new ArgumentException(nameof(array));
-        void* ptr = stackalloc byte[Size];
-        array.CopyTo(new Span<byte>(ptr, Size));
-        return *(Hash256*)ptr;
+        fixed (void* ptr = &array[0])
+        {
+            // Maybe this would cause some problems with alignment...
+            return *(Hash256*)ptr;
+        }
     }
 
-    public static Hash256 HashSha256(string str) => HashSha256(MemoryMarshal.AsBytes(str.AsSpan()));
+    public static Hash256 HashSha256(string str) => HashSha256(Encoding.UTF8.GetBytes(str));
+    public static Hash256 HashSha256Fast(string str) => HashSha256(MemoryMarshal.AsBytes(str.AsSpan()));
     
     public static Hash256 HashSha256(ReadOnlySpan<byte> array) => CreateUnsafe(SHA256.HashData(array));
 
@@ -25,6 +30,8 @@ public readonly struct Hash256 : IEquatable<Hash256>
     {
         return _vector.Equals(other._vector);
     }
+
+    public static bool Compare(Hash256 lhs, Hash256 rhs) => lhs.Equals(rhs);
 
     public override bool Equals(object? obj)
     {

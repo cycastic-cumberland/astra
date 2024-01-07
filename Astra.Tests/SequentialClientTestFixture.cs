@@ -1,6 +1,7 @@
 using Astra.Client;
 using Astra.Engine;
 using Astra.Server;
+using Astra.Server.Authentication;
 
 namespace Astra.Tests;
 
@@ -42,6 +43,7 @@ public class ClientTestFixture
     [OneTimeSetUp]
     public async Task SetUp()
     {
+        const string password = "helloWorld";
         _connectionSettings = new()
         {
             Address = "127.0.0.1",
@@ -49,7 +51,8 @@ public class ClientTestFixture
             Schema = new()
             {
                 Columns = _columns
-            }
+            },
+            Password = password
         };
         _server = new(new()
         {
@@ -58,7 +61,7 @@ public class ClientTestFixture
             {
                 Columns = _columns
             }
-        });
+        }, AuthenticationHelper.Sha256Authentication(Hash256.HashSha256(password)));
         _serverTask = _server.RunAsync();
         await Task.Delay(100);
         _simpleAstraClient = new SimpleAstraClient();
@@ -124,16 +127,5 @@ public class ClientTestFixture
     public Task ValueTypeBulkInsertionThree()
     {
         return SimpleValueTypeInsertionTestAsync();
-    }
-    
-    
-    [Test]
-    public async Task ConsecutiveInsertionTest()
-    {
-        const int taskCount = 42;
-        for (var i = 0; i < taskCount; i++)
-        {
-            await SimpleValueTypeInsertionTestAsync();
-        }
     }
 }

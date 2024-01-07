@@ -69,6 +69,11 @@ public static class StreamWriteAddons
         return writer.WriteAsync(BitConverter.GetBytes(value), token);
     }
     
+    public static ValueTask WriteValueAsync(this Stream writer, ulong value, CancellationToken token = default)
+    {
+        return writer.WriteAsync(BitConverter.GetBytes(value), token);
+    }
+    
     public static void WriteValue(this Stream writer, ulong value)
     {
         unsafe
