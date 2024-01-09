@@ -92,65 +92,30 @@ public class ParallelClientsTestFixture
             {
                 Value1 = Interlocked.Increment(ref _num),
                 Value2 = "test1",
-                Value3 = "test2",
+                Value3 = "𝄞",
                 Value4 = new byte[] { 1, 2, 3, 4 }
             },
             new()
             {
                 Value1 = Interlocked.Increment(ref _num),
                 Value2 = "test1",
-                Value3 = "test2",
+                Value3 = "𝄞",
                 Value4 = new byte[] { 1, 2, 3, 4 }
             },
             new()
             {
                 Value1 = Interlocked.Increment(ref _num),
                 Value2 = "test1",
-                Value3 = "test2",
+                Value3 = "𝄞",
                 Value4 = new byte[] { 1, 2, 3, 4 }
             },
         });
         Assert.That(inserted, Is.EqualTo(3));
     }
     
-    [Test]
+    [Test, Repeat(10)]
     [Parallelizable]
-    public Task ValueTypeBulkInsertionOne()
-    {
-        return SimpleValueTypeInsertionTestAsync();
-    }
-    
-    [Test]
-    [Parallelizable]
-    public Task ValueTypeBulkInsertionTwo()
-    {
-        return SimpleValueTypeInsertionTestAsync();
-    }
-    
-    [Test]
-    [Parallelizable]
-    public Task ValueTypeBulkInsertionThree()
-    {
-        return SimpleValueTypeInsertionTestAsync();
-    }
-    
-    [Test]
-    [Parallelizable]
-    public Task ValueTypeBulkInsertionFour()
-    {
-        return SimpleValueTypeInsertionTestAsync();
-    }
-    
-    [Test]
-    [Parallelizable]
-    public Task ValueTypeBulkInsertionFive()
-    {
-        return SimpleValueTypeInsertionTestAsync();
-    }
-    
-    [Test]
-    [Parallelizable]
-    public Task ValueTypeBulkInsertionSix()
+    public Task ValueTypeBulkInsertion()
     {
         return SimpleValueTypeInsertionTestAsync();
     }

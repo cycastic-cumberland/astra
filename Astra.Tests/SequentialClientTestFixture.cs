@@ -88,21 +88,21 @@ public class ClientTestFixture
             {
                 Value1 = ++_num,
                 Value2 = "test1",
-                Value3 = "test2",
+                Value3 = "𝄞",
                 Value4 = new byte[] { 1, 2, 3, 4 }
             },
             new()
             {
                 Value1 = ++_num,
                 Value2 = "test1",
-                Value3 = "test2",
+                Value3 = "𝄞",
                 Value4 = new byte[] { 1, 2, 3, 4 }
             },
             new()
             {
                 Value1 = _num,
                 Value2 = "test1",
-                Value3 = "test2",
+                Value3 = "𝄞",
                 Value4 = new byte[] { 1, 2, 3, 4 }
             },
         });

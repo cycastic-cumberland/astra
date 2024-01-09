@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using Astra.Engine;
 using Astra.Server.Authentication;
 using Microsoft.Extensions.Logging;
+using Microsoft.IO;
 using Newtonsoft.Json;
 
 namespace Astra.Server;
@@ -15,6 +16,7 @@ public class TcpServer : IDisposable
     public const int DefaultPort = 8488;
     private const string ConfigPathEnvEntry = "ASTRA_CONFIG_PATH";
     private static readonly byte[] FaultedResponse = { 1 };
+    private static readonly ThreadLocal<RecyclableMemoryStream?> LocalOutStream = new();
 
     private static readonly IReadOnlyDictionary<string, LogLevel> StringToLog = new Dictionary<string, LogLevel>
     {
@@ -241,13 +243,31 @@ public class TcpServer : IDisposable
                 continue;
             }
             stopwatch.Start();
-            await using var writeStream = MemoryStreamPool.Allocate();
+            var writeStream = LocalOutStream.Value ?? MemoryStreamPool.Allocate();
+            // Would cause less problem for async code
+            LocalOutStream.Value = null;
             try
             {
                 _registry.ConsumeStream(stream, writeStream);
-                await stream.WriteValueAsync(writeStream.Length, token: cancellationToken);
-                await stream.WriteAsync(new ReadOnlyMemory<byte>(writeStream.GetBuffer(), 0,
-                    (int)writeStream.Length), cancellationToken);
+                try
+                {
+                    await stream.WriteValueAsync(writeStream.Length, token: cancellationToken);
+                    await stream.WriteAsync(new ReadOnlyMemory<byte>(writeStream.GetBuffer(), 0,
+                        (int)writeStream.Length), cancellationToken);
+                    await stream.FlushAsync(cancellationToken);
+                }
+                finally
+                {
+                    if (writeStream.Length > Common.ThreadLocalStreamDisposalThreshold)
+                    {
+                        await writeStream.DisposeAsync();
+                    }
+                    else
+                    {
+                        writeStream.SetLength(0);
+                        LocalOutStream.Value = writeStream;
+                    }
+                }
             }
             catch (Exception e)
             {

@@ -121,7 +121,7 @@ public class EngineTestFixture
     //         {
     //             inStream.WriteValue(num++);
     //             inStream.WriteValue("test1");
-    //             inStream.WriteValue("test2");
+    //             inStream.WriteValue("𝄞");
     //         }
     //
     //         inStream.Position = 0;
@@ -157,12 +157,12 @@ public class EngineTestFixture
             {
                 Value1 = 1,
                 Value2 = "test1",
-                Value3 = "test2",
+                Value3 = "𝄞",
             },
             new()
             {
                 Value1 = 2,
-                Value2 = "test3",
+                Value2 = "🇵🇱",
                 Value3 = "test4",
             },
             new()
@@ -188,7 +188,7 @@ public class EngineTestFixture
             Assert.Multiple(() =>
             {
                 Assert.That(row.Value1, Is.EqualTo(2));
-                Assert.That(row.Value2, Is.EqualTo("test3"));
+                Assert.That(row.Value2, Is.EqualTo("🇵🇱"));
                 Assert.That(row.Value3, Is.EqualTo("test4"));
             });
             pass = false;

@@ -102,11 +102,12 @@ public class BytesClusterStream : Stream
 
     public override int Read(byte[] buffer, int offset, int count)
     {
-        var read = offset + count;
-        read = read >= _cluster.LongLength ? (int)_cluster.LongLength : read; 
-        _cluster.Reader[(int)_pos..((int)_pos + read)].CopyTo(new Span<byte>(buffer, offset, count));
-        _pos += read;
-        return read;
+        var oldPos = (int)_pos;
+        var newPos = oldPos + count;
+        newPos = newPos > _cluster.LongLength ? (int)_cluster.LongLength : newPos; 
+        _cluster.Reader[oldPos..newPos].CopyTo(new Span<byte>(buffer, offset, count));
+        _pos = newPos;
+        return newPos - oldPos;
     }
 
     public override long Seek(long offset, SeekOrigin origin)
@@ -138,11 +139,9 @@ public class BytesClusterStream : Stream
 
     public override void Write(byte[] buffer, int offset, int count)
     {
-        var write = offset + count;
-        if (write >= _cluster.LongLength) throw new EndOfStreamException();
         new ReadOnlySpan<byte>(buffer, offset, count)
-            .CopyTo(_cluster.Writer[(int)_pos..((int)_pos + write)]);
-        _pos += write;
+            .CopyTo(_cluster.Writer[(int)_pos..((int)_pos + count)]);
+        _pos += count;
     }
 
     public Span<byte> AsSpan() => _cluster.Writer;
@@ -154,7 +153,9 @@ public class BytesClusterStream : Stream
     public override long Length => _cluster.LongLength;
     public override long Position
     {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => _pos;
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         set => _pos = value;
     }
 }

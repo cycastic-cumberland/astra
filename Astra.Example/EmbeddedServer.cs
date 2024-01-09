@@ -110,34 +110,34 @@ public class EmbeddedServer
             {
                 Value1 = 1,
                 Value2 = "test1",
-                Value3 = "test2",
+                Value3 = "𝄞",
                 Value4 = new byte[] { 1, 2, 3, 4 }
             },
             new()
             {
                 Value1 = 1,
                 Value2 = "test1",
-                Value3 = "test3",
+                Value3 = "🇵🇱",
                 Value4 = new byte[] { 1, 2, 3, 4 }
             },
             new()
             {
                 Value1 = 2,
-                Value2 = "test2",
-                Value3 = "test3",
+                Value2 = "𝄞",
+                Value3 = "🇵🇱",
                 Value4 = new byte[] { 1, 2, 3, 4 }
             },
             new()
             {
                 Value1 = 2,
                 Value2 = "test4",
-                Value3 = "test3",
+                Value3 = "🇵🇱",
                 Value4 = new byte[] { 1, 2, 3, 4 }
             },
             new()
             {
                 Value1 = 2,
-                Value2 = "test2",
+                Value2 = "𝄞",
                 Value3 = "test4",
                 Value4 = new byte[] { 1, 2, 3, 4 }
             },
@@ -155,7 +155,7 @@ public class EmbeddedServer
         
         logger.LogInformation("Fetch 2: col1 == 2 AND col3 == 'test3'");
         var fetch2 = await client.AggregateAsync<SimpleSerializableStruct>(
-            table.Column1.EqualsLiteral(2).And(table.Column3.EqualsLiteral("test3")));
+            table.Column1.EqualsLiteral(2).And(table.Column3.EqualsLiteral("🇵🇱")));
         var count2 = 0;
         foreach (var f in fetch2)
         {
@@ -166,7 +166,7 @@ public class EmbeddedServer
         
         logger.LogInformation("Fetch 3: col1 == 2 OR col3 == 'test3'");
         var fetch3 = await client.AggregateAsync<SimpleSerializableStruct>(
-            table.Column1.EqualsLiteral(2).Or(table.Column3.EqualsLiteral("test3")));
+            table.Column1.EqualsLiteral(2).Or(table.Column3.EqualsLiteral("🇵🇱")));
         var count3 = 0;
         foreach (var f in fetch3)
         {

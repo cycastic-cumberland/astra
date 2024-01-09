@@ -140,18 +140,6 @@ public struct DataRow : IDataRow
         _hashStream = hashStream;
     }
 
-    public static DataRow Create<T>(T synthesizers, int rawSize) where T : IEnumerable<ColumnSynthesizer>
-    {
-        var row = new DataRow(BytesCluster.Rent(rawSize));
-        foreach (var synthesizer in synthesizers)
-        {
-            // DataRow only hold a single reference so no need to worry
-            synthesizer.Resolver.Initialize(row);
-        }
-
-        return row;
-    }
-
     public static DataRow Create<T>(Stream reader, T synthesizers, int rawSize, int hashSize) where T : IEnumerable<ColumnSynthesizer>
     {
         var hashStream = BytesCluster.Rent(hashSize).Promote();
@@ -170,6 +158,57 @@ public struct DataRow : IDataRow
         {
             hashStream.Dispose();
             throw;
+        }
+    }
+
+    private static readonly ThreadLocal<BytesClusterStream?> LocalHashStream = new();
+    
+    public static ImmutableDataRow CreateImmutable<T>(Stream reader, T synthesizers, int rawSize, int hashSize) where T : IEnumerable<ColumnSynthesizer>
+    {
+        var hashStream = LocalHashStream.Value;
+        if (hashStream == null)
+        {
+            hashStream = BytesCluster.Rent(hashSize).Promote();
+        }
+        else
+        {
+            if (hashStream.Length < hashSize)
+            {
+                hashStream.Dispose();
+                hashStream = BytesCluster.Rent(hashSize).Promote();
+            }
+        }
+
+        var rowBuffer = BytesCluster.Rent(rawSize);
+        try
+        {
+            var row = new DataRow(rowBuffer, hashStream);
+            foreach (var synthesizer in synthesizers)
+            {
+                // DataRow only hold a single reference so no need to worry
+                synthesizer.Resolver.Initialize(reader, hashStream, row);
+            }
+
+            var sBuffer = hashStream.AsSpan()[..hashSize];
+            var ret = new ImmutableDataRow(rowBuffer, Hash128
+#if USE_MURMUR3_SO
+                    .HashMurmur3
+#else
+                .HashXx128
+#endif
+                    (sBuffer));
+
+            return ret;
+        }
+        catch (Exception)
+        {
+            rowBuffer.Dispose();
+            throw;
+        }
+        finally
+        {
+            hashStream.Position = 0;
+            LocalHashStream.Value = hashStream;
         }
     }
 

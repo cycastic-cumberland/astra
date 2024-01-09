@@ -75,34 +75,34 @@ public class AggregationTestFixture
             {
                 Value1 = 1,
                 Value2 = "test1",
-                Value3 = "test2",
+                Value3 = "𝄞",
                 Value4 = new byte[] { 1, 2, 3, 4 }
             },
             new()
             {
                 Value1 = 1,
                 Value2 = "test1",
-                Value3 = "test3",
+                Value3 = "🇵🇱",
                 Value4 = new byte[] { 1, 2, 3, 4 }
             },
             new()
             {
                 Value1 = 2,
-                Value2 = "test2",
-                Value3 = "test3",
+                Value2 = "𝄞",
+                Value3 = "🇵🇱",
                 Value4 = new byte[] { 1, 2, 3, 4 }
             },
             new()
             {
                 Value1 = 2,
                 Value2 = "test4",
-                Value3 = "test3",
+                Value3 = "🇵🇱",
                 Value4 = new byte[] { 1, 2, 3, 4 }
             },
             new()
             {
                 Value1 = 2,
-                Value2 = "test2",
+                Value2 = "𝄞",
                 Value3 = "test4",
                 Value4 = new byte[] { 1, 2, 3, 4 }
             },
@@ -131,20 +131,20 @@ public class AggregationTestFixture
         }
         Assert.That(count1, Is.EqualTo(2));
         var fetch2 = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
-            _table.Column1.EqualsLiteral(2).And(_table.Column3.EqualsLiteral("test3")));
+            _table.Column1.EqualsLiteral(2).And(_table.Column3.EqualsLiteral("🇵🇱")));
         var count2 = 0;
         foreach (var f in fetch2)
         {
             Assert.Multiple(() =>
             {
                 Assert.That(f.Value1, Is.EqualTo(2));
-                Assert.That(f.Value3, Is.EqualTo("test3"));
+                Assert.That(f.Value3, Is.EqualTo("🇵🇱"));
             });
             count2++;
         }
         Assert.That(count2, Is.EqualTo(1));
         var fetch3 = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
-            _table.Column1.EqualsLiteral(2).Or(_table.Column3.EqualsLiteral("test3")));
+            _table.Column1.EqualsLiteral(2).Or(_table.Column3.EqualsLiteral("🇵🇱")));
         var count3 = 0;
         foreach (var _ in fetch3)
         {

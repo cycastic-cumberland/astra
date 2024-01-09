@@ -6,6 +6,7 @@ namespace Astra.Engine;
 
 public static class StreamWriteAddons
 {
+    public const int LongStringThreshold = 96;
     public static void WriteValue(this Stream writer, bool value)
     {
         Span<byte> buffer = stackalloc byte[1] { unchecked((byte)(value ? 1 : 0)) };
@@ -82,12 +83,28 @@ public static class StreamWriteAddons
         }
     }
 
-    public static void WriteValue(this Stream writer, string value)
+    private static void WriteShortString(this Stream writer, string value)
     {
-        if (value == null!) throw new ArgumentException(nameof(value));
+        // Reference: https://www.rfc-editor.org/rfc/rfc3629 (Section 3. UTF-8 definition)
+        // TLDR: The max number of bytes per UTF-8 character is 4 
+        Span<byte> bytes = stackalloc byte[value.Length * 4];
+        var written = Encoding.UTF8.GetBytes(value.AsSpan(), bytes);
+        writer.WriteValue(written);
+        writer.Write(bytes[..written]);
+    }
+    
+    private static void WriteLongString(this Stream writer, string value)
+    {
         var strArr = Encoding.UTF8.GetBytes(value);
         writer.WriteValue(strArr.Length);
         writer.Write(strArr);
+    }
+    
+    public static void WriteValue(this Stream writer, string? value)
+    {
+        if (value == null) throw new ArgumentException(nameof(value));
+        if (value.Length < LongStringThreshold) writer.WriteShortString(value);
+        else writer.WriteLongString(value);
     }
     
     public static async ValueTask WriteValueAsync(this Stream writer, string value, CancellationToken token = default)

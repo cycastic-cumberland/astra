@@ -24,8 +24,8 @@ public class LocalBulkInsertionBenchmark
             _data[i] = new()
             {
                 Value1 = ++_bulkCounter,
-                Value2 = "test2",
-                Value3 = "test3",
+                Value2 = "𝄞",
+                Value3 = "🇵🇱",
             };
         }
     }

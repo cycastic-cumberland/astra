@@ -188,6 +188,9 @@ public sealed class DataIndexRegistry : IDisposable
             }
         }
     }
+
+    private static readonly ThreadLocal<ReadOnlyBufferStream?> LocalBuffer = new();
+    private static readonly ThreadLocal<RecyclableMemoryStream?> LocalBulkInsertStream = new();
     
     private readonly ILoggerFactory? _loggerFactory;
     private readonly ILogger<DataIndexRegistry> _logger;
@@ -349,7 +352,27 @@ public sealed class DataIndexRegistry : IDisposable
         }
         return IAstraSerializable.DeserializeStream<T, RecyclableMemoryStream>(dataOut);
     }
-
+    
+    public IEnumerable<T> Aggregate<T>(ReadOnlyMemory<byte> predicateStream) where T : IAstraSerializable
+    {
+        var buffer = LocalBuffer.Value ?? new(); 
+        buffer.Buffer = predicateStream;
+        LocalBuffer.Value = buffer;
+        var dataOut = MemoryStreamPool.Allocate();
+        try
+        {
+            using var readLock = new AutoReadLock(this, _readLogger);
+            buffer.AggregateStream(dataOut, readLock);
+            dataOut.Position = 0;
+        }
+        catch (Exception)
+        {
+            dataOut.Dispose();
+            throw;
+        }
+        return IAstraSerializable.DeserializeStream<T, RecyclableMemoryStream>(dataOut);
+    }
+    
     private static int ConditionalCountInternal<T>(Stream predicateStream, T indexersLock) where T : struct, DataIndexRegistry.IIndexersLock
     {
         var set = predicateStream.Aggregate(indexersLock);
@@ -420,8 +443,7 @@ public sealed class DataIndexRegistry : IDisposable
 
     private bool InsertOne(Stream reader, AutoIndexer.WriteHandler autoIndexerLock, IndexersWriteLock writeLock)
     {
-        var row = DataRow.Create(reader, _synthesizers, _rowSize, _hashSize);
-        var immutableDataRow = row.Consume(_synthesizers);
+        var immutableDataRow = DataRow.CreateImmutable(reader, _synthesizers, _rowSize, _hashSize);
     
         try
         {
@@ -584,18 +606,34 @@ public sealed class DataIndexRegistry : IDisposable
     
     public int BulkInsert<T>(IEnumerable<T> values) where T : IAstraSerializable
     {
-        using var inStream = MemoryStreamPool.Allocate();
-        var count = 0;
-        foreach (var value in values)
+        var inStream = LocalBulkInsertStream.Value ?? MemoryStreamPool.Allocate();
+        try
         {
-            value.SerializeStream(inStream);
-            count++;
-        }
+            var count = 0;
+            foreach (var value in values)
+            {
+                value.SerializeStream(inStream);
+                count++;
+            }
 
-        if (count == 0) return 0;
-        inStream.Position = 0;
-        using var autoIndexerLock = _autoIndexer.Write();
-        using var writeLock = AcquireWriteLock();
-        return Insert(inStream, count, autoIndexerLock, writeLock);
+            if (count == 0) return 0;
+            inStream.Position = 0;
+            using var autoIndexerLock = _autoIndexer.Write();
+            using var writeLock = AcquireWriteLock();
+            return Insert(inStream, count, autoIndexerLock, writeLock);
+        }
+        finally
+        {
+            if (inStream.Length > Common.ThreadLocalStreamDisposalThreshold)
+            {
+                LocalBulkInsertStream.Value = null;
+                inStream.Dispose();
+            }
+            else
+            {
+                inStream.SetLength(0);
+                LocalBulkInsertStream.Value = inStream;
+            }
+        }
     }
 }

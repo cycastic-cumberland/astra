@@ -278,7 +278,7 @@ public class SimpleAstraClient : IAstraClient
 
     public Task<IEnumerable<T>> AggregateAsync<T>(IAstraQueryBranch predicate, CancellationToken cancellationToken = default) where T : IAstraSerializable
     {
-        return AggregateInternalAsync<T>(predicate.DumpAsync(), cancellationToken);
+        return AggregateInternalAsync<T>(predicate.DumpMemory(), cancellationToken);
     }
 
     public async Task<int> CountAllAsync(CancellationToken cancellationToken = default)
@@ -353,7 +353,7 @@ public class SimpleAstraClient : IAstraClient
     
     public Task<int> ConditionalCountAsync<TA>(TA predicate, CancellationToken cancellationToken = default) where TA : IAstraQueryBranch
     {
-        return ConditionalCountInternalAsync(predicate.DumpAsync(), cancellationToken);
+        return ConditionalCountInternalAsync(predicate.DumpMemory(), cancellationToken);
     }
     
     private async Task<int> ConditionalDeleteInternalAsync(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default) 
@@ -394,6 +394,6 @@ public class SimpleAstraClient : IAstraClient
 
     public Task<int> ConditionalDeleteAsync<TA>(TA predicate, CancellationToken cancellationToken = default) where TA : IAstraQueryBranch
     {
-        return ConditionalDeleteInternalAsync(predicate.DumpAsync(), cancellationToken);
+        return ConditionalDeleteInternalAsync(predicate.DumpMemory(), cancellationToken);
     }
 }

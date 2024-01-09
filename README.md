@@ -93,7 +93,7 @@ There are currently 3 supported data types, with more on the way:
 - [ ] Fix more bugs?
 - [ ] Run faster?
 
-## Benchmark results (January 6th, 2024)
+## Benchmark results (January 9th, 2024)
 
 ```
 // * Summary *
@@ -119,23 +119,38 @@ UnrollFactor=1
 
 - LocalBulkInsertionBenchmark:
 
-| Method                 | BulkInsertAmount |         Mean |      Error |       StdDev |       Median |
+| Method                 | BulkInsertAmount |         Mean |      Error |       Median |       StdDev |
 |:-----------------------|-----------------:|-------------:|-----------:|-------------:|-------------:|
-| BulkInsertionBenchmark |               10 |     44.96 us |   1.410 us |     4.090 us |     44.03 us |
-| BulkInsertionBenchmark |              100 |    378.67 us |  26.731 us |    77.125 us |    341.89 us |
-| BulkInsertionBenchmark |             1000 |  3,470.49 us | 478.137 us | 1,394.749 us |  3,150.87 us |
-| BulkInsertionBenchmark |            10000 | 26,186.84 us | 531.090 us | 1,515.230 us | 26,361.57 us |
-
+| BulkInsertionBenchmark |               10 |     41.82 us |   1.597 us |     40.33 us |     4.558 us |
+| BulkInsertionBenchmark |              100 |    392.22 us |  36.804 us |    337.27 us |   106.776 us |
+| BulkInsertionBenchmark |             1000 |  2,904.04 us | 511.442 us |  2,711.17 us | 1,507.998 us |
+| BulkInsertionBenchmark |            10000 | 12,181.79 us | 242.028 us | 12,127.98 us |   654.336 us |
+  
 - NetworkBulkInsertionBenchmark:
 
-| Method                 | BulkInsertAmount |      Mean |    Error |    StdDev |    Median |
-|:-----------------------|-----------------:|----------:|---------:|----------:|----------:|
-| BulkInsertionBenchmark |               10 | 86.685 ms | 1.657 ms |  1.701 ms | 85.600 ms |
-| BulkInsertionBenchmark |              100 | 86.007 ms | 1.707 ms |  2.033 ms | 85.137 ms |
-| BulkInsertionBenchmark |             1000 | 22.112 ms | 7.479 ms | 22.051 ms |  3.990 ms |
-| BulkInsertionBenchmark |             2000 |  8.818 ms | 1.466 ms |  3.862 ms |  7.467 ms |
+| Method                 | BulkInsertAmount |      Mean |     Error |     StdDev |    Median |
+|:-----------------------|-----------------:|----------:|----------:|-----------:|----------:|
+| BulkInsertionBenchmark |               10 | 87.298 ms | 1.7261 ms |  1.6953 ms | 88.299 ms |
+| BulkInsertionBenchmark |              100 | 87.490 ms | 1.5855 ms |  1.4831 ms | 88.260 ms |
+| BulkInsertionBenchmark |             1000 | 24.461 ms | 7.4499 ms | 21.9662 ms |  5.152 ms |
+| BulkInsertionBenchmark |             2000 |  6.698 ms | 0.1112 ms |  0.2769 ms |  6.597 ms |
+
 
 (benchmarkDotNet gets stuck at preparation step when bulk inserting more than 3000 rows - at least on my device)
+
+- LocalSimpleAggregationBenchmark
+
+| Method                                       | AggregatedRows |        Mean |     Error |      StdDev |      Median |
+|:---------------------------------------------|---------------:|------------:|----------:|------------:|------------:|
+| SimpleAggregationBenchmark                   |            100 |    116.2 us |   2.27 us |     3.25 us |    115.1 us |
+| SimpleAggregationAndDeserializationBenchmark |            100 |    171.5 us |   3.43 us |     5.73 us |    170.3 us |
+| SimpleAggregationBenchmark                   |           1000 |  1,090.9 us |  21.66 us |    29.65 us |  1,086.2 us |
+| SimpleAggregationAndDeserializationBenchmark |           1000 |  1,979.0 us | 144.56 us |   426.25 us |  2,222.7 us |
+| SimpleAggregationBenchmark                   |          10000 | 14,370.7 us | 285.54 us |   716.36 us | 14,021.2 us |
+| SimpleAggregationAndDeserializationBenchmark |          10000 | 15,012.5 us | 368.31 us | 1,050.80 us | 14,530.8 us |
+
+
+
 
 ## License
 
