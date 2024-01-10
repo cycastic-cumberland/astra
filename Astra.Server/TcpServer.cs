@@ -16,7 +16,6 @@ public class TcpServer : IDisposable
     public const int DefaultPort = 8488;
     private const string ConfigPathEnvEntry = "ASTRA_CONFIG_PATH";
     private static readonly byte[] FaultedResponse = { 1 };
-    private static readonly ThreadLocal<RecyclableMemoryStream?> LocalOutStream = new();
 
     private static readonly IReadOnlyDictionary<string, LogLevel> StringToLog = new Dictionary<string, LogLevel>
     {
@@ -221,70 +220,74 @@ public class TcpServer : IDisposable
         var threshold = (long)sizeof(long);
         var waiting = true;
         var timer = Stopwatch.StartNew();
-        while (!cancellationToken.IsCancellationRequested)
+        var writeStream = MemoryStreamPool.Allocate();
+        try
         {
-            if (client.Available < threshold)
+            while (!cancellationToken.IsCancellationRequested)
             {
-#if DEBUG
-                await Task.Delay(100, cancellationToken);
-#endif
-                if (!waiting && timer.ElapsedMilliseconds > _timeout)
+                if (client.Available < threshold)
                 {
-                    _logger.LogInformation("Client timed out");
-                    return;
+#if DEBUG
+                    await Task.Delay(100, cancellationToken);
+#endif
+                    if (!waiting && timer.ElapsedMilliseconds > _timeout)
+                    {
+                        _logger.LogInformation("Client timed out");
+                        return;
+                    }
+                    continue;
                 }
-                continue;
-            }
-            if (waiting)
-            {
-                threshold = await stream.ReadLongAsync(cancellationToken);
-                waiting = false;
-                timer.Restart();
-                continue;
-            }
-            stopwatch.Start();
-            var writeStream = LocalOutStream.Value ?? MemoryStreamPool.Allocate();
-            // Would cause less problem for async code
-            LocalOutStream.Value = null;
-            try
-            {
-                _registry.ConsumeStream(stream, writeStream);
+                if (waiting)
+                {
+                    threshold = await stream.ReadLongAsync(cancellationToken);
+                    waiting = false;
+                    timer.Restart();
+                    continue;
+                }
+                stopwatch.Start();
                 try
                 {
-                    await stream.WriteValueAsync(writeStream.Length, token: cancellationToken);
-                    await stream.WriteAsync(new ReadOnlyMemory<byte>(writeStream.GetBuffer(), 0,
-                        (int)writeStream.Length), cancellationToken);
-                    await stream.FlushAsync(cancellationToken);
+                    _registry.ConsumeStream(stream, writeStream);
+                    try
+                    {
+                        await stream.WriteValueAsync(writeStream.Length, token: cancellationToken);
+                        await stream.WriteAsync(new ReadOnlyMemory<byte>(writeStream.GetBuffer(), 0,
+                            (int)writeStream.Length), cancellationToken);
+                    }
+                    finally
+                    {
+                        if (writeStream.Length > Common.ThreadLocalStreamDisposalThreshold)
+                        {
+                            await writeStream.DisposeAsync();
+                            writeStream = MemoryStreamPool.Allocate();
+                        }
+                        else
+                        {
+                            writeStream.SetLength(0);
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    // "Faulted" response
+                    await writeStream.WriteValueAsync(1L, token: cancellationToken);
+                    await writeStream.WriteAsync(FaultedResponse, cancellationToken);
+                    _logger.LogError(e, "Error occured while resolving request");
                 }
                 finally
                 {
-                    if (writeStream.Length > Common.ThreadLocalStreamDisposalThreshold)
-                    {
-                        await writeStream.DisposeAsync();
-                    }
-                    else
-                    {
-                        writeStream.SetLength(0);
-                        LocalOutStream.Value = writeStream;
-                    }
+                    stopwatch.Stop();
+                    _logger.LogDebug("Request resolved after {} us", stopwatch.Elapsed.TotalMicroseconds);
+                    stopwatch.Reset();
                 }
+                threshold = sizeof(long);
+                waiting = true;
+                timer.Restart();
             }
-            catch (Exception e)
-            {
-                // "Faulted" response
-                await writeStream.WriteValueAsync(1L, token: cancellationToken);
-                await writeStream.WriteAsync(FaultedResponse, cancellationToken);
-                _logger.LogError(e, "Error occured while resolving request");
-            }
-            finally
-            {
-                stopwatch.Stop();
-                _logger.LogDebug("Request resolved after {} us", stopwatch.Elapsed.TotalMicroseconds);
-                stopwatch.Reset();
-            }
-            threshold = sizeof(long);
-            waiting = true;
-            timer.Restart();
+        }
+        finally
+        {
+            await writeStream.DisposeAsync();
         }
     }
     

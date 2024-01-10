@@ -40,8 +40,9 @@ public class NetworkBulkInsertionBenchmark
     private SimpleAstraClient _client = null!;
     private Task _serverTask = Task.CompletedTask;
     private SimpleSerializableStruct[] _array = null!;
+    private const uint MaxBulkInsertAmount = 2_000;
     
-    [Params(10, 100, 1_000, 2_000)]
+    [Params(10, 100, 1_000, MaxBulkInsertAmount)]
     public uint BulkInsertAmount;
 
     public async Task GlobalSetupAsync()
@@ -82,15 +83,18 @@ public class NetworkBulkInsertionBenchmark
         GlobalCleanupAsync().Wait();
     }
 
+    private uint _stuff;
+    
     [IterationSetup]
     public void Setup()
     {
+        var stuff = Interlocked.Increment(ref _stuff);
         _array = new SimpleSerializableStruct[BulkInsertAmount];
         for (var i = 0U; i < BulkInsertAmount; i++)
         {
             _array[i] = new()
             {
-                Value1 = unchecked((int)i),
+                Value1 = unchecked((int)stuff),
                 Value2 = "test",
                 Value3 = Hash128.CreateUnsafe(RandomNumberGenerator.GetBytes(Hash128.Size)).ToStringUpperCase()
             };
@@ -102,7 +106,7 @@ public class NetworkBulkInsertionBenchmark
     {
         _array = null!;
     }
-    
+        
     [Benchmark]
     public void BulkInsertionBenchmark()
     { 
