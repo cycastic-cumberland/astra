@@ -9,6 +9,7 @@ using Microsoft.IO;
 
 namespace Astra.Client;
 
+// Side job: handle endianness 
 public class SimpleAstraClient : IAstraClient
 {
     public class EndianModeNotSupportedException(string? msg = null) : NotSupportedException(msg);
@@ -18,7 +19,7 @@ public class SimpleAstraClient : IAstraClient
     public class AuthenticationAttemptRejectedException(string? msg = null) : Exception(msg);
     public class NotConnectedException(string? msg = null) : Exception(msg);
     public class FaultedRequestException(string? msg = null) : Exception(msg);
-    private readonly struct InternalClient(TcpClient client, NetworkStream clientStream) : IDisposable
+    private readonly struct InternalClient(TcpClient client, NetworkStream clientStream, bool reversedOrder) : IDisposable
     {
         public TcpClient Client
         {
@@ -31,11 +32,18 @@ public class SimpleAstraClient : IAstraClient
             get => clientStream;
         }
 
+        public bool ShouldReverse
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => reversedOrder;
+        }
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Deconstruct(out TcpClient outClient, out NetworkStream outClientStream)
+        public void Deconstruct(out TcpClient outClient, out NetworkStream outClientStream, out bool reversed)
         {
             outClient = client;
             outClientStream = clientStream;
+            reversed = reversedOrder;
         }
 
         public readonly bool IsConnected = true;
@@ -150,7 +158,7 @@ public class SimpleAstraClient : IAstraClient
             var attemptResult = BitConverter.ToUInt32(outBuffer.Reader[..sizeof(uint)]);
             if (attemptResult != CommunicationProtocol.AllowedConnection)
                 throw new AuthenticationAttemptRejectedException();
-            _client = new(networkClient, networkStream);
+            _client = new(networkClient, networkStream, false);
         }
         catch (Exception)
         {
@@ -160,9 +168,11 @@ public class SimpleAstraClient : IAstraClient
     }
     public async Task<int> InsertSerializableAsync<T>(T value, CancellationToken cancellationToken = default) where T : IAstraSerializable
     {
-        var (client, clientStream) = _client ?? throw new NotConnectedException();
+        var (client, clientStream, reversed) = _client ?? throw new NotConnectedException();
         _inStream.Position = 0;
-        value.SerializeStream(_inStream);
+        if (reversed)
+            value.SerializeStream(new ReverseStreamWrapper(_inStream));
+        else value.SerializeStream(new ForwardStreamWrapper(_inStream));
         await clientStream.WriteValueAsync(InsertHeaderSize + _inStream.Position, cancellationToken);
         await clientStream.WriteValueAsync(Command.CreateWriteHeader(1U), cancellationToken); // 1 command
         await clientStream.WriteValueAsync(Command.UnsortedInsert, cancellationToken); // Command type (insert)
@@ -199,12 +209,14 @@ public class SimpleAstraClient : IAstraClient
 
     public async Task<int> BulkInsertSerializableAsync<T>(IEnumerable<T> values, CancellationToken cancellationToken = default) where T : IAstraSerializable
     {
-        var (client, clientStream) = _client ?? throw new NotConnectedException();
+        var (client, clientStream, reversed) = _client ?? throw new NotConnectedException();
         _inStream.Position = 0;
         var count = 0;
         foreach (var value in values)
         {
-            value.SerializeStream(_inStream);
+            if (reversed)
+                value.SerializeStream(new ReverseStreamWrapper(_inStream));
+            else value.SerializeStream(new ForwardStreamWrapper(_inStream));
             count++;
         }
         await clientStream.WriteValueAsync(InsertHeaderSize + _inStream.Position, cancellationToken);
@@ -242,7 +254,7 @@ public class SimpleAstraClient : IAstraClient
     }
     private async Task<IEnumerable<T>> AggregateInternalAsync<T>(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default) where T : IAstraSerializable
     {
-        var (client, clientStream) = _client ?? throw new NotConnectedException();
+        var (client, clientStream, reversed) = _client ?? throw new NotConnectedException();
         await clientStream.WriteValueAsync(HeaderSize + predicateStream.Length, cancellationToken);
         await clientStream.WriteValueAsync(Command.CreateReadHeader(1U), cancellationToken); // 1 command
         await clientStream.WriteValueAsync(Command.UnsortedAggregate, cancellationToken); // Command type (aggregate)
@@ -273,7 +285,7 @@ public class SimpleAstraClient : IAstraClient
         var stream = outCluster.Promote();
         var faulted = (byte)stream.ReadByte();
         if (faulted != 0) throw new FaultedRequestException();
-        return IAstraSerializable.DeserializeStream<T, BytesClusterStream>(stream);
+        return IAstraSerializable.DeserializeStream<T, BytesClusterStream>(stream, reversed);
     }
 
     public Task<IEnumerable<T>> AggregateAsync<T>(IAstraQueryBranch predicate, CancellationToken cancellationToken = default) where T : IAstraSerializable
@@ -283,7 +295,7 @@ public class SimpleAstraClient : IAstraClient
 
     public async Task<int> CountAllAsync(CancellationToken cancellationToken = default)
     {
-        var (client, clientStream) = _client ?? throw new NotConnectedException();
+        var (client, clientStream, _) = _client ?? throw new NotConnectedException();
         await clientStream.WriteValueAsync(HeaderSize, cancellationToken);
         await clientStream.WriteValueAsync(Command.CreateReadHeader(1U), cancellationToken); // 1 command
         await clientStream.WriteValueAsync(Command.CountAll, cancellationToken); // Command type (count all)
@@ -317,7 +329,7 @@ public class SimpleAstraClient : IAstraClient
 
     private async Task<int> ConditionalCountInternalAsync(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default)
     {
-        var (client, clientStream) = _client ?? throw new NotConnectedException();
+        var (client, clientStream, _) = _client ?? throw new NotConnectedException();
         await clientStream.WriteValueAsync(HeaderSize + predicateStream.Length, cancellationToken);
         await clientStream.WriteValueAsync(Command.CreateReadHeader(1U), cancellationToken); // 1 command
         await clientStream.WriteValueAsync(Command.ConditionalCount, cancellationToken); // Command type (conditional count)
@@ -358,7 +370,7 @@ public class SimpleAstraClient : IAstraClient
     
     private async Task<int> ConditionalDeleteInternalAsync(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default) 
     {
-        var (client, clientStream) = _client ?? throw new NotConnectedException();
+        var (client, clientStream, _) = _client ?? throw new NotConnectedException();
         await clientStream.WriteValueAsync(HeaderSize + predicateStream.Length, cancellationToken);
         await clientStream.WriteValueAsync(Command.CreateWriteHeader(1U), cancellationToken); // 1 command
         await clientStream.WriteValueAsync(Command.ConditionalDelete, cancellationToken); // Command type (conditional count)

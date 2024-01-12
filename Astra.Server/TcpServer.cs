@@ -7,7 +7,6 @@ using Astra.Common;
 using Astra.Engine;
 using Astra.Server.Authentication;
 using Microsoft.Extensions.Logging;
-using Microsoft.IO;
 using Newtonsoft.Json;
 
 namespace Astra.Server;
@@ -257,7 +256,7 @@ public class TcpServer : IDisposable
                     }
                     finally
                     {
-                        if (writeStream.Length > Common.CommonProtocol.ThreadLocalStreamDisposalThreshold)
+                        if (writeStream.Length > CommonProtocol.ThreadLocalStreamDisposalThreshold)
                         {
                             await writeStream.DisposeAsync();
                             writeStream = MemoryStreamPool.Allocate();

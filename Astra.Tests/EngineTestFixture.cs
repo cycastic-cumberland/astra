@@ -16,18 +16,18 @@ public class EngineTestFixture
         public string Value2 { get; set; }
         public string Value3 { get; set; }
         
-        public void SerializeStream<TStream>(TStream writer) where TStream : Stream
+        public void SerializeStream<TStream>(TStream writer) where TStream : IStreamWrapper
         {
-            writer.WriteValue(Value1);
-            writer.WriteValue(Value2);
-            writer.WriteValue(Value3);
+            writer.SaveValue(Value1);
+            writer.SaveValue(Value2);
+            writer.SaveValue(Value3);
         }
 
-        public void DeserializeStream<TStream>(TStream reader) where TStream : Stream
+        public void DeserializeStream<TStream>(TStream reader) where TStream : IStreamWrapper
         {
-            Value1 = reader.ReadInt();
-            Value2 = reader.ReadString();
-            Value3 = reader.ReadString();
+            Value1 = reader.LoadInt();
+            Value2 = reader.LoadString();
+            Value3 = reader.LoadString();
         }
     }
     private ILoggerFactory _loggerFactory = null!;

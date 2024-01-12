@@ -6,7 +6,6 @@ namespace Astra.Common;
 
 public static class StreamWriteAddons
 {
-    public const int LongStringThreshold = 96;
     public static void WriteValue(this Stream writer, bool value)
     {
         Span<byte> buffer = stackalloc byte[1] { unchecked((byte)(value ? 1 : 0)) };
@@ -14,7 +13,7 @@ public static class StreamWriteAddons
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe void WriteValueInternal(this Stream writer, void* ptr, int size)
+    public static unsafe void WriteValueInternal(this Stream writer, void* ptr, int size)
     {
         writer.Write(new ReadOnlySpan<byte>(ptr, size));  
     }
@@ -103,7 +102,7 @@ public static class StreamWriteAddons
     public static void WriteValue(this Stream writer, string? value)
     {
         if (value == null) throw new ArgumentException(nameof(value));
-        if (value.Length < LongStringThreshold) writer.WriteShortString(value);
+        if (value.Length < CommonProtocol.LongStringThreshold) writer.WriteShortString(value);
         else writer.WriteLongString(value);
     }
     

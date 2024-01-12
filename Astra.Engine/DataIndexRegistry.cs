@@ -351,7 +351,7 @@ public sealed class DataIndexRegistry : IDisposable
             dataOut.Dispose();
             throw;
         }
-        return IAstraSerializable.DeserializeStream<T, RecyclableMemoryStream>(dataOut);
+        return IAstraSerializable.DeserializeStream<T, RecyclableMemoryStream>(dataOut, false);
     }
     
     public IEnumerable<T> Aggregate<T>(ReadOnlyMemory<byte> predicateStream) where T : IAstraSerializable
@@ -371,7 +371,7 @@ public sealed class DataIndexRegistry : IDisposable
             dataOut.Dispose();
             throw;
         }
-        return IAstraSerializable.DeserializeStream<T, RecyclableMemoryStream>(dataOut);
+        return IAstraSerializable.DeserializeStream<T, RecyclableMemoryStream>(dataOut, false);
     }
     
     private static int ConditionalCountInternal<T>(Stream predicateStream, T indexersLock) where T : struct, DataIndexRegistry.IIndexersLock
@@ -598,7 +598,7 @@ public sealed class DataIndexRegistry : IDisposable
     public int Insert<T>(T value) where T : IAstraSerializable
     {
         using var inStream = MemoryStreamPool.Allocate();
-        value.SerializeStream(inStream);
+        value.SerializeStream(new ForwardStreamWrapper(inStream));
         inStream.Position = 0;
         using var autoIndexerLock = _autoIndexer.Write();
         using var writeLock = AcquireWriteLock();
@@ -613,7 +613,7 @@ public sealed class DataIndexRegistry : IDisposable
             var count = 0;
             foreach (var value in values)
             {
-                value.SerializeStream(inStream);
+                value.SerializeStream(new ForwardStreamWrapper(inStream));
                 count++;
             }
 
