@@ -1,4 +1,5 @@
 using Astra.Client;
+using Astra.Common;
 using Astra.Engine;
 
 namespace Astra.Tests;

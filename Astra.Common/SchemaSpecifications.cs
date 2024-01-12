@@ -1,6 +1,6 @@
 using Newtonsoft.Json;
 
-namespace Astra.Engine;
+namespace Astra.Common;
 
 public struct ColumnSchemaSpecifications
 {
@@ -30,15 +30,15 @@ public struct RepresentableColumnSchemaSpecifications
     {
         var dataType = DataType switch
         {
-            "DWord" => Astra.Engine.DataType.DWordMask,
-            "dword" => Astra.Engine.DataType.DWordMask,
-            "DWORD" => Astra.Engine.DataType.DWordMask,
-            "String" => Astra.Engine.DataType.StringMask,
-            "string" => Astra.Engine.DataType.StringMask,
-            "STRING" => Astra.Engine.DataType.StringMask,
-            "Bytes" => Astra.Engine.DataType.BytesMask,
-            "bytes" => Astra.Engine.DataType.BytesMask,
-            "BYTES" => Astra.Engine.DataType.BytesMask,
+            "DWord" => Astra.Common.DataType.DWordMask,
+            "dword" => Astra.Common.DataType.DWordMask,
+            "DWORD" => Astra.Common.DataType.DWordMask,
+            "String" => Astra.Common.DataType.StringMask,
+            "string" => Astra.Common.DataType.StringMask,
+            "STRING" => Astra.Common.DataType.StringMask,
+            "Bytes" => Astra.Common.DataType.BytesMask,
+            "bytes" => Astra.Common.DataType.BytesMask,
+            "BYTES" => Astra.Common.DataType.BytesMask,
             _ => throw new NotSupportedException($"Data type not supported: {DataType}")
         };
         return new()

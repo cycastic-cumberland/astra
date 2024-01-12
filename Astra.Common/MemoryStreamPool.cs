@@ -1,6 +1,6 @@
 using Microsoft.IO;
 
-namespace Astra.Engine;
+namespace Astra.Common;
 
 public static class MemoryStreamPool
 {

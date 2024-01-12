@@ -2,7 +2,7 @@ using System.Buffers;
 using System.Collections;
 using System.Runtime.CompilerServices;
 
-namespace Astra.Engine;
+namespace Astra.Common;
 
 public readonly struct BytesCluster : IReadOnlyCollection<byte>, IDisposable
 {

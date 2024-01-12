@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Security.Cryptography;
+using Astra.Common;
 using Astra.Engine;
 using Astra.Server.Authentication;
 using Microsoft.Extensions.Logging;
@@ -256,7 +257,7 @@ public class TcpServer : IDisposable
                     }
                     finally
                     {
-                        if (writeStream.Length > Common.ThreadLocalStreamDisposalThreshold)
+                        if (writeStream.Length > Common.CommonProtocol.ThreadLocalStreamDisposalThreshold)
                         {
                             await writeStream.DisposeAsync();
                             writeStream = MemoryStreamPool.Allocate();

@@ -1,3 +1,5 @@
+using Astra.Common;
+
 namespace Astra.Engine;
 
 public sealed class BytesColumnResolver(int offset, bool shouldBeHashed) : 

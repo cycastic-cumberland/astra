@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace Astra.Engine;
+namespace Astra.Common;
 
 public class CommandNotSupported(string? msg = null) : Exception(msg);
 

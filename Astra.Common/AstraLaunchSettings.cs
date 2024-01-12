@@ -1,6 +1,6 @@
 using Newtonsoft.Json;
 
-namespace Astra.Engine;
+namespace Astra.Common;
 
 public struct AstraLaunchSettings
 {

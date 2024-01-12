@@ -1,4 +1,4 @@
-namespace Astra.Engine;
+namespace Astra.Common;
 
 public interface IReadOnlyStream : IDisposable
 {

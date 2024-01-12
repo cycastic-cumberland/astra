@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace Astra.Engine;
+namespace Astra.Common;
 
 public readonly struct Hash128 : IEquatable<Hash128>
 {

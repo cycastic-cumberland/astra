@@ -1,4 +1,5 @@
 using Astra.Client.Aggregator;
+using Astra.Common;
 using Astra.Engine;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;

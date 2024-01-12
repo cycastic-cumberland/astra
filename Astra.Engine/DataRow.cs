@@ -1,6 +1,7 @@
 // #define USE_MURMUR3_SO
 
 using System.Runtime.CompilerServices;
+using Astra.Common;
 
 namespace Astra.Engine;
 

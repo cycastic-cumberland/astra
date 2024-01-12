@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Text;
 
-namespace Astra.Engine;
+namespace Astra.Common;
 
 public static class StreamReadAddons
 {

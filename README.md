@@ -92,12 +92,12 @@ There are currently 3 supported data types, with more on the way:
 - [ ] More feature?
 - [ ] Fix more bugs?
 - [ ] Run faster?
-
+ 
 ## Benchmark results (January 10th, 2024)
 
 ```
 // * Summary *
-
+AggregatedRows
 BenchmarkDotNet v0.13.11, Arch Linux
 11th Gen Intel Core i7-11800H 2.30GHz, 1 CPU, 16 logical and 8 physical cores
 .NET SDK 8.0.100

@@ -1,3 +1,5 @@
+using Astra.Common;
+
 namespace Astra.Engine;
 
 public class MismatchedDataTypeException(string? msg = null) : Exception(msg);

@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-namespace Astra.Engine;
+namespace Astra.Common;
 
 public class IncompatibleDataTypeException(string? msg) : Exception(msg)
 {
@@ -16,24 +16,6 @@ public static class DataTypeHelper
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static DataType AstraDataType(this uint value) => new(value);
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static DataType AstraDataType(this int value) => new(unchecked((uint)value));
-    
-    // public static IData ToData(this DataType type)
-    // {
-    //     return (uint)type switch
-    //     {
-    //         DataType.NoneMask => throw new IncompatibleDataTypeException(),
-    //         DataType.ByteMask => new ByteData(),
-    //         DataType.BytesMask => new BytesData(),
-    //         DataType.DWordMask => new DWordData(),
-    //         DataType.SerialMask => new SerialData(),
-    //         DataType.QWordMask => new QWordData(),
-    //         DataType.BigSerialMask => new BigSerialData(),
-    //         DataType.StringMask => new StringData(),
-    //         _ => throw new DataTypeNotSupportedException()
-    //     };
-    // }
 }
 
 public readonly struct DataType(uint value)

@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Runtime.CompilerServices;
+using Astra.Common;
 using Microsoft.Extensions.Logging;
 using Microsoft.IO;
 
@@ -624,7 +625,7 @@ public sealed class DataIndexRegistry : IDisposable
         }
         finally
         {
-            if (inStream.Length > Common.ThreadLocalStreamDisposalThreshold)
+            if (inStream.Length > Common.CommonProtocol.ThreadLocalStreamDisposalThreshold)
             {
                 LocalBulkInsertStream.Value = null;
                 inStream.Dispose();

@@ -1,3 +1,5 @@
+using Astra.Common;
+
 namespace Astra.Engine;
 
 public sealed class IntegerColumnResolver(int offset, bool shouldBeHashed) : IColumnResolver, IColumnResolver<int>

@@ -1,4 +1,5 @@
 using System.Net.Sockets;
+using Astra.Common;
 using Astra.Engine;
 
 namespace Astra.Server.Authentication;

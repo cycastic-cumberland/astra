@@ -1,4 +1,4 @@
-namespace Astra.Engine;
+namespace Astra.Common;
 
 // Such dumbass names...
 public static class PredicateType

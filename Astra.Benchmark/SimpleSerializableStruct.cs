@@ -1,3 +1,4 @@
+using Astra.Common;
 using Astra.Engine;
 
 namespace Astra.Benchmark;

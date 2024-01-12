@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Text;
+using Astra.Common;
 using Astra.Engine;
 
 namespace Astra.Server.Authentication;
