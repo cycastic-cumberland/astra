@@ -7,7 +7,7 @@ using Astra.Server.Authentication;
 namespace Astra.Tests;
 
 [TestFixture]
-public class ClientTestFixture
+public class SequentialClientTestFixture
 {
     private readonly ColumnSchemaSpecifications[] _columns = {
         new()
@@ -131,5 +131,16 @@ public class ClientTestFixture
     public Task ValueTypeBulkInsertionThree()
     {
         return SimpleValueTypeInsertionTestAsync();
+    }
+
+    [Test]
+    public async Task ZDataStoreClearTest()
+    {
+        var originalAmount = await _simpleAstraClient.CountAllAsync();
+        // Assert.That(originalAmount, Is.Not.Zero);
+        var affected = await _simpleAstraClient.ClearAsync();
+        Assert.That(originalAmount, Is.EqualTo(affected));
+        var newAmount = await _simpleAstraClient.CountAllAsync();
+        Assert.That(newAmount, Is.Zero);
     }
 }

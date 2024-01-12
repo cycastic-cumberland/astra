@@ -11,17 +11,17 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
         return ((value >> 24) & 0xFF) |
                 ((value >> 8) & 0xFF00) |
                 ((value << 8) & 0xFF0000) |
-                ((value << 24) & 0xFF000000);
+                ((value << 24) & 0xFF000000U);
     }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe void WriteDWord(Stream writer, void* ptr)
+    private static unsafe void WriteDWordUnsafe<T>(Stream writer, T value) where T : unmanaged
     {
         const int size = sizeof(uint);
-        var bytes = ReverseEndianness(*(uint*)ptr);
+        var bytes = ReverseEndianness(*(uint*)&value);
         writer.Write(new ReadOnlySpan<byte>(&bytes, size));
     }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe uint ReadDWord(Stream reader)
+    private static unsafe uint ReadDWordUnsafe(Stream reader)
     {
         const int size = sizeof(uint);
         uint bytes;
@@ -38,17 +38,17 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
                 ((value << 8) & 0xFF00000000) |
                 ((value << 24) & 0xFF0000000000) |
                 ((value << 40) & 0xFF000000000000) |
-                ((value << 56) & 0xFF00000000000000);
+                ((value << 56) & 0xFF00000000000000UL);
     }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe void WriteQWord(Stream writer, void* ptr)
+    private static unsafe void WriteQWordUnsafe<T>(Stream writer, T value) where T : unmanaged
     {
         const int size = sizeof(ulong);
-        var bytes = ReverseEndianness(*(ulong*)ptr);
+        var bytes = ReverseEndianness(*(ulong*)&value);
         writer.Write(new ReadOnlySpan<byte>(&bytes, size));
     }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe ulong ReadQWord(Stream reader)
+    private static unsafe ulong ReadQWordUnsafe(Stream reader)
     {
         const int size = sizeof(ulong);
         ulong bytes;
@@ -57,10 +57,7 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
     }
     public void SaveValue(int value)
     {
-        unsafe
-        {
-            WriteDWord(stream, &value);
-        }
+        WriteDWordUnsafe(stream, value);
     }
 
     public ValueTask SaveValueAsync(int value, CancellationToken cancellationToken = default)
@@ -74,10 +71,7 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
 
     public void SaveValue(uint value)
     {
-        unsafe
-        {
-            WriteDWord(stream, &value);
-        }
+        WriteDWordUnsafe(stream, value);
     }
 
     public ValueTask SaveValueAsync(uint value, CancellationToken cancellationToken = default)
@@ -91,10 +85,7 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
 
     public void SaveValue(long value)
     {
-        unsafe
-        {
-            WriteQWord(stream, &value);
-        }
+        WriteQWordUnsafe(stream, value);
     }
 
     public ValueTask SaveValueAsync(long value, CancellationToken cancellationToken = default)
@@ -108,10 +99,7 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
 
     public void SaveValue(ulong value)
     {
-        unsafe
-        {
-            WriteQWord(stream, &value);
-        }
+        WriteQWordUnsafe(stream, value);
     }
 
     public ValueTask SaveValueAsync(ulong value, CancellationToken cancellationToken = default)
@@ -129,10 +117,7 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
         // TLDR: The max number of bytes per UTF-8 character is 4 
         Span<byte> bytes = stackalloc byte[value.Length * 4];
         var written = Encoding.UTF8.GetBytes(value.AsSpan(), bytes);
-        unsafe
-        {
-            WriteDWord(stream, &written);
-        }
+        SaveValue(written);
         stream.Write(bytes[..written]);
     }
     
@@ -182,22 +167,22 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
 
     public int LoadInt()
     {
-        return unchecked((int)ReadDWord(stream));
+        return unchecked((int)ReadDWordUnsafe(stream));
     }
 
     public uint LoadUInt()
     {
-        return ReadDWord(stream);
+        return ReadDWordUnsafe(stream);
     }
 
     public long LoadLong()
     {
-        return unchecked((long)ReadQWord(stream));
+        return unchecked((long)ReadQWordUnsafe(stream));
     }
 
     public ulong LoadULong()
     {
-        return ReadQWord(stream);
+        return ReadQWordUnsafe(stream);
     }
 
     public string LoadString()

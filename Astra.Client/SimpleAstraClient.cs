@@ -434,4 +434,38 @@ public class SimpleAstraClient : IAstraClient
     {
         return ConditionalDeleteInternalAsync(predicate.DumpMemory(), cancellationToken);
     }
+
+    public async Task<int> ClearAsync(CancellationToken cancellationToken = default)
+    {
+        var (client, clientStream, _) = _client ?? throw new NotConnectedException();
+        await clientStream.WriteValueAsync(HeaderSize, cancellationToken);
+        await clientStream.WriteValueAsync(Command.CreateWriteHeader(1U), cancellationToken); // 1 command
+        await clientStream.WriteValueAsync(Command.Clear, cancellationToken); // Command type (count all)
+        var timer = Stopwatch.StartNew();
+        while (client.Available < sizeof(long))
+        {
+#if DEBUG
+                await Task.Delay(100, cancellationToken);
+#endif
+            if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
+                throw new TimeoutException();
+        }
+
+        var outStreamSize = await clientStream.ReadLongAsync(cancellationToken);
+        timer.Restart();
+        while (client.Available < outStreamSize)
+        {
+#if DEBUG
+                await Task.Delay(100, cancellationToken);
+#endif
+            if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
+                throw new TimeoutException();
+        }
+        var outCluster = BytesCluster.Rent((int)outStreamSize);
+        await clientStream.ReadExactlyAsync(outCluster.WriterMemory, cancellationToken);
+        using var stream = outCluster.Promote();
+        var faulted = (byte)stream.ReadByte();
+        if (faulted != 0) throw new FaultedRequestException();
+        return stream.ReadInt();
+    }
 }

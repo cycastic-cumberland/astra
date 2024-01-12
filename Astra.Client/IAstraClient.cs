@@ -78,4 +78,10 @@ public interface IAstraClient : IDisposable
     /// <returns>A task representing the asynchronous operation, returning the total number of affected rows.</returns>
     public Task<int> ConditionalDeleteAsync<TA>(TA predicate, CancellationToken cancellationToken = default) 
         where TA : IAstraQueryBranch;
+
+    /// <summary>
+    /// Asynchronously delete all rows
+    /// </summary>
+    /// /// <returns>A task representing the asynchronous operation, returning the total number of affected rows.</returns>
+    public Task<int> ClearAsync(CancellationToken cancellationToken = default);
 }

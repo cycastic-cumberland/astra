@@ -83,6 +83,22 @@ public sealed class AutoIndexer :
         {
             return GetEnumerator();
         }
+
+        public IEnumerable<ImmutableDataRow> ClearSequence()
+        {
+            foreach (var row in Repository.Data)
+            {
+                yield return row;
+            }
+            Repository.Data.Clear();
+        }
+
+        public int Clear()
+        {
+            var deleted = Repository.Data.Count;
+            Repository.Data.Clear();
+            return deleted;
+        }
         
         public void Commit()
         {

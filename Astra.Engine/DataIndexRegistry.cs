@@ -532,6 +532,12 @@ public sealed class DataIndexRegistry : IDisposable
                 dataOut.WriteValue(count);
                 break;
             }
+            case Command.Clear:
+            {
+                var deleted = Clear(autoIndexerLock);
+                dataOut.WriteValue(deleted);
+                break;
+            }
             default:
                 throw new CommandNotSupported($"Command code not found: {command}");
         }
@@ -562,6 +568,7 @@ public sealed class DataIndexRegistry : IDisposable
             }
             case Command.UnsortedInsert:
             case Command.ConditionalDelete:
+            case Command.Clear:
                 throw new WriteOperationsNotAllowed("This frame can only execute read commands");
             default:
                 throw new CommandNotSupported($"Command code not found: {command}");
@@ -625,7 +632,7 @@ public sealed class DataIndexRegistry : IDisposable
         }
         finally
         {
-            if (inStream.Length > Common.CommonProtocol.ThreadLocalStreamDisposalThreshold)
+            if (inStream.Length > CommonProtocol.ThreadLocalStreamDisposalThreshold)
             {
                 LocalBulkInsertStream.Value = null;
                 inStream.Dispose();
@@ -636,5 +643,29 @@ public sealed class DataIndexRegistry : IDisposable
                 LocalBulkInsertStream.Value = inStream;
             }
         }
+    }
+
+    private int Clear(AutoIndexer.WriteHandler autoIndexerLock)
+    {
+        if (_destructibleColumnResolvers.Count == 0) return autoIndexerLock.Clear();
+        var count = 0;
+        foreach (var row in autoIndexerLock.ClearSequence())
+        {
+            foreach (var resolver in _destructibleColumnResolvers)
+            {
+                resolver.Destroy(row);
+            }
+            count++;
+        }
+
+        return count;
+    }
+    
+    public int Clear()
+    {
+        using var autoIndexerLock = _autoIndexer.Write();
+        var ret = Clear(autoIndexerLock);
+        autoIndexerLock.Commit();
+        return ret;
     }
 }
