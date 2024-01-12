@@ -4,11 +4,15 @@ Astra is a lightweight, tabular database for fast and effective caching of struc
 
 ## Requirements
 
-Requires .NET 8 for both client and server (there is no good reason for this, I just don't know how to install .NET 6 on Arch Linux)
+(Currently) requires .NET 8 for both client and server.
+## Motivation
 
-## Background
+The motivation behind Astra stems from my need for a cache server that can not only stores and aggregates data but also allows for the conditional deletion of multiple "unit of data". 
+First, I chose Redis for its speed; however, it fell short in fulfilling the latter condition as it could only delete pairs that exactly matched the supplied key.
 
-Homeworks are boring as hell so I'm making a database instead
+I then attempted to create a Redis clone that also support regular expressions (which works well for a while), but as the predicates became more complex, 
+it became apparent that a dedicated solution for this very niche problem was needed. 
+The result is Astra, a caching database that supports the insertion, aggregation, and deletion of structured data.
 
 ## Running Astra.Server
 
@@ -85,6 +89,7 @@ There are currently 3 supported data types, with more on the way:
 - [x] Insertion/Bulk insertion
 - [x] Conditional deletion
 - [x] ORM (partially finished)
+- [ ] .NET 6 supports for `Astra.Client`
 - [ ] More data types
 - [ ] Ranged query
 - [ ] Multiple tables
@@ -92,7 +97,7 @@ There are currently 3 supported data types, with more on the way:
 - [ ] More feature?
 - [ ] Fix more bugs?
 - [ ] Run faster?
- 
+
 ## Benchmark results (January 10th, 2024)
 
 ```

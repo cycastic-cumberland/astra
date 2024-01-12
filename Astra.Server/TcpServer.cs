@@ -295,7 +295,9 @@ public class TcpServer : IDisposable
     // 1. Send a 32-bit integer to check for endianness
     // 2. Send a 64-bit integer as identification
     // 3. Wait for the client to send back another corresponding 64-bit integer to complete handshake
-    // 4. If the integer match, allow further procedures
+    // 4. If the integer does not match, stop communication
+    // 5. Send the version of this server to the client
+    // 6. Send authentication instruction and continue
     private async Task AuthenticateClient(TcpClient client, IPAddress address)
     {
         var cancellationToken = _cancellationTokenSource.Token;
@@ -323,6 +325,8 @@ public class TcpServer : IDisposable
                 client.Close();
                 return;
             }
+
+            await stream.WriteValueAsync(CommonProtocol.AstraCommonVersion, token: cancellationToken);
             using var authHandler = _authenticationSpawner();
             var authResult = await authHandler.Authenticate(client, cancellationToken);
             if (authResult != IAuthenticationHandler.AuthenticationState.AllowConnection)

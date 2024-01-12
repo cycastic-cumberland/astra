@@ -4,7 +4,6 @@ namespace Astra.Common;
 
 public readonly struct ForwardStreamWrapper(Stream stream) : IStreamWrapper
 {
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SaveValue(int value)
     {
         stream.WriteValue(value);
@@ -15,7 +14,6 @@ public readonly struct ForwardStreamWrapper(Stream stream) : IStreamWrapper
         return stream.WriteValueAsync(value, cancellationToken);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SaveValue(uint value)
     {
         stream.WriteValue(value);
@@ -26,7 +24,6 @@ public readonly struct ForwardStreamWrapper(Stream stream) : IStreamWrapper
         return stream.WriteValueAsync(value, cancellationToken);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SaveValue(long value)
     {
         stream.WriteValue(value);
@@ -37,7 +34,6 @@ public readonly struct ForwardStreamWrapper(Stream stream) : IStreamWrapper
         return stream.WriteValueAsync(value, cancellationToken);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SaveValue(ulong value)
     {
         stream.WriteValue(value);
@@ -48,7 +44,6 @@ public readonly struct ForwardStreamWrapper(Stream stream) : IStreamWrapper
         return stream.WriteValueAsync(value, cancellationToken);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SaveValue(string value)
     {
         stream.WriteValue(value);
@@ -59,7 +54,6 @@ public readonly struct ForwardStreamWrapper(Stream stream) : IStreamWrapper
         return stream.WriteValueAsync(value, cancellationToken);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SaveValue(byte[] value)
     {
         stream.WriteValue(value);
@@ -70,7 +64,6 @@ public readonly struct ForwardStreamWrapper(Stream stream) : IStreamWrapper
         return stream.WriteAsync(value.AsMemory(), cancellationToken);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void SaveValue(BytesCluster value)
     {
         stream.WriteValue(value);
@@ -81,43 +74,36 @@ public readonly struct ForwardStreamWrapper(Stream stream) : IStreamWrapper
         return stream.WriteAsync(value.ReaderMemory, cancellationToken);
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int LoadInt()
     {
         return stream.ReadInt();
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public uint LoadUInt()
     {
         return stream.ReadUInt();
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public long LoadLong()
     {
         return stream.ReadLong();
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ulong LoadULong()
     {
         return stream.ReadULong();
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public string LoadString()
     {
         return stream.ReadString();
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public byte[] LoadBytes()
     {
         return stream.ReadSequence();
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public BytesCluster LoadBytesCluster()
     {
         return stream.ReadCluster();

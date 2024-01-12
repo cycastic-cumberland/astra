@@ -1,3 +1,4 @@
+using System.Data;
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
@@ -14,6 +15,7 @@ public class SimpleAstraClient : IAstraClient
 {
     public class EndianModeNotSupportedException(string? msg = null) : NotSupportedException(msg);
     public class HandshakeFailedException(string? msg = null) : Exception(msg);
+    public class VersionNotSupportedException(string? msg = null) : NotSupportedException(msg);
     public class AuthenticationMethodNotSupportedException(string? msg = null) : Exception(msg);
     public class AuthenticationInfoNotProvidedException(string? msg = null) : Exception(msg);
     public class AuthenticationAttemptRejectedException(string? msg = null) : Exception(msg);
@@ -112,7 +114,19 @@ public class SimpleAstraClient : IAstraClient
                 if (timer.ElapsedMilliseconds <= settings.Timeout) continue;
                 throw new TimeoutException($"Timed out: {settings.Timeout} ms");
             }
-            await networkStream.ReadExactlyAsync(outBuffer.WriterMemory[..sizeof(int)], cancellationToken);
+            await networkStream.ReadExactlyAsync(outBuffer.WriterMemory[..sizeof(uint)], cancellationToken);
+            var serverVersion = BitConverter.ToUInt32(outBuffer.Reader[..sizeof(uint)]);
+            if (serverVersion != CommonProtocol.AstraCommonVersion) throw new VersionNotFoundException($"Astra.Server version not supported: {serverVersion}");
+            timer.Restart();
+            while (networkClient.Available < sizeof(uint))
+            {
+#if DEBUG
+                await Task.Delay(100, cancellationToken);
+#endif
+                if (timer.ElapsedMilliseconds <= settings.Timeout) continue;
+                throw new TimeoutException($"Timed out: {settings.Timeout} ms");
+            }
+            await networkStream.ReadExactlyAsync(outBuffer.WriterMemory[..sizeof(uint)], cancellationToken);
             var authMethod = BitConverter.ToUInt32(outBuffer.Reader[..sizeof(uint)]);
             switch (authMethod)
             {
@@ -212,13 +226,25 @@ public class SimpleAstraClient : IAstraClient
         var (client, clientStream, reversed) = _client ?? throw new NotConnectedException();
         _inStream.Position = 0;
         var count = 0;
-        foreach (var value in values)
+        if (reversed)
         {
-            if (reversed)
-                value.SerializeStream(new ReverseStreamWrapper(_inStream));
-            else value.SerializeStream(new ForwardStreamWrapper(_inStream));
-            count++;
+            var wrapper = new ReverseStreamWrapper(_inStream);
+            foreach (var value in values)
+            {
+                value.SerializeStream(wrapper);
+                count++;
+            }
         }
+        else
+        {
+            var wrapper = new ForwardStreamWrapper(_inStream);
+            foreach (var value in values)
+            {
+                value.SerializeStream(wrapper);
+                count++;
+            }
+        }
+
         await clientStream.WriteValueAsync(InsertHeaderSize + _inStream.Position, cancellationToken);
         await clientStream.WriteValueAsync(Command.CreateWriteHeader(1U), cancellationToken); // 1 command
         await clientStream.WriteValueAsync(Command.UnsortedInsert, cancellationToken); // Command type (insert)
