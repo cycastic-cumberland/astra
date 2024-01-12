@@ -18,6 +18,24 @@ public static class HexHelper
         }
         return new string(target);
     }
+    public static string ToHexStringUpperSeparated(this ReadOnlySpan<byte> span, char separator = '.')
+    {
+        Span<char> target = stackalloc char[span.Length * 2 + span.Length - 1];
+        var i = 0;
+        foreach (var b in span)
+        {
+            // Bit-shift magic
+            target[i] = HexDigitsUpper[(b >> 4) & 0x0F];
+            target[i + 1] = HexDigitsUpper[b & 0x0F];
+            if (i + 3 < target.Length)
+            {
+                target[i + 2] = separator;
+                i++;
+            }
+            i += 2;
+        }
+        return new string(target);
+    }
     public static string ToHexStringLower(this ReadOnlySpan<byte> span)
     {
         Span<char> target = stackalloc char[span.Length * 2];

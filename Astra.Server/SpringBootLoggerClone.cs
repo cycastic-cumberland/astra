@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Runtime.Versioning;
+using Astra.Common;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
@@ -55,7 +56,8 @@ public sealed class SpringBootLoggerClone(
         Console.ForegroundColor = ConsoleColor.Green;
         Console.Write("  :: Astra.Server ::");
         Console.ForegroundColor = originalColor;
-        Console.WriteLine("                                (v0.1-latest)");
+        Console.Write("                                ");
+        Console.WriteLine($"(v{CommonProtocol.GetCommonVersionString()})");
     }
 
     public IDisposable BeginScope<TState>(TState state) where TState : notnull => default!;
