@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Astra.Common;
@@ -122,32 +121,6 @@ public static class StreamWriteAddons
         writer.WriteValue(kind == DateTimeKind.Local);
         writer.WriteValue(span.Ticks);
     }
-    
-    public static void WriteValue<T>(this Stream writer, T value) where T : struct
-    {
-        var size = Marshal.SizeOf(value);
-        unsafe
-        {
-            var ptr = stackalloc byte[size];
-            var arr = new Span<byte>(ptr, size);
-            Marshal.StructureToPtr(value, (nint)ptr, true);
-            writer.Write(arr);
-        }
-    }
-    
-    // public static void WriteValue<T>(this Stream writer, T? value) where T : struct
-    // {
-    //     if (value != null)
-    //     {
-    //         writer.WriteValue(true);
-    //         WriteValue(writer, value.Value);
-    //     }
-    //     else
-    //     {
-    //         writer.WriteValue(false);
-    //     }
-    // }
-    
     public static void WriteValue(this Stream writer, BytesCluster array)
     {
         writer.WriteValue(array.LongLength);
@@ -158,6 +131,12 @@ public static class StreamWriteAddons
     {
         writer.WriteValue(array.LongLength);
         writer.Write(array);
+    }
+
+    public static async ValueTask WriteValueAsync(this Stream writer, byte[] value, CancellationToken token = default)
+    {
+        await writer.WriteValueAsync(value.LongLength, token);
+        await writer.WriteAsync(value, token);
     }
 
     public static void WriteValue(this Stream writer, Hash128 hash)

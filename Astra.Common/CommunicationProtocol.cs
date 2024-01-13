@@ -9,8 +9,6 @@ public static class CommunicationProtocol
     public const uint PasswordAuthentication    = 0x50415353U;
     public const uint PubKeyAuthentication      = 0x505542U;
 
-    public const ulong PubKeyPayload            = 0x41535441UL;
-
     public const uint AllowedConnection         = 0x4F4BU;
     public const uint RejectedConnection        = 0x4E4148U;
 }

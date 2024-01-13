@@ -105,36 +105,30 @@ public sealed class SpringBootLoggerClone(
         var time = DateTime.Now;
 
         if (config.ColoredOutput)
-            Task.Run(() =>
+            lock (Lock)
             {
-                lock (Lock)
-                {
-                    var originalColor = Console.ForegroundColor;
-                    Console.Write($"\n{time,-24:yyyy-MM-dd HH:mm:ss.fff} ");
-                    Console.ForegroundColor = config.LogLevelToColorMap[logLevel];
-                    Console.Write($"{StringifyLogLevel(logLevel),5} ");
-                    Console.ForegroundColor = ConsoleColor.DarkMagenta;
-                    Console.Write($"{eventId.Id,-5} ");
-                    Console.ForegroundColor = originalColor;
-                    Console.Write(
-                        $"--- [{Thread.CurrentThread.Name ?? Environment.CurrentManagedThreadId.ToString(),24}] " +
-                        $"{WrapName(name, 50)}: {formatter(state, exception)}");
-                    if (exception != null)
-                        Console.Write("\n {0}", exception);
-                }
-            });
+                var originalColor = Console.ForegroundColor;
+                Console.Write($"\n{time,-24:yyyy-MM-dd HH:mm:ss.fff} ");
+                Console.ForegroundColor = config.LogLevelToColorMap[logLevel];
+                Console.Write($"{StringifyLogLevel(logLevel),5} ");
+                Console.ForegroundColor = ConsoleColor.DarkMagenta;
+                Console.Write($"{eventId.Id,-5} ");
+                Console.ForegroundColor = originalColor;
+                Console.Write(
+                    $"--- [{Thread.CurrentThread.Name ?? Environment.CurrentManagedThreadId.ToString(),24}] " +
+                    $"{WrapName(name, 50)}: {formatter(state, exception)}");
+                if (exception != null)
+                    Console.Write("\n {0}", exception);
+            }
         else
-            Task.Run(() =>
+            lock (Lock)
             {
-                lock (Lock)
-                {
-                    Console.Write($"\n{time,-24:yyyy-MM-dd HH:mm:ss.fff} {StringifyLogLevel(logLevel),5} {eventId.Id,-5} " +
-                                  $"--- [{Thread.CurrentThread.Name ?? Environment.CurrentManagedThreadId.ToString(),24}] " +
-                                  $"{WrapName(name, 50)}: {formatter(state, exception)}");
-                    if (exception != null)
-                        Console.Write("\n {0}", exception);
-                }
-            });
+                Console.Write($"\n{time,-24:yyyy-MM-dd HH:mm:ss.fff} {StringifyLogLevel(logLevel),5} {eventId.Id,-5} " +
+                              $"--- [{Thread.CurrentThread.Name ?? Environment.CurrentManagedThreadId.ToString(),24}] " +
+                              $"{WrapName(name, 50)}: {formatter(state, exception)}");
+                if (exception != null)
+                    Console.Write("\n {0}", exception);
+            }
     }
 }
 

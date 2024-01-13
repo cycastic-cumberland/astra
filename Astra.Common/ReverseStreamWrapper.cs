@@ -6,7 +6,7 @@ namespace Astra.Common;
 public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static uint ReverseEndianness(uint value)
+    public static uint ReverseEndianness(uint value)
     {
         return ((value >> 24) & 0xFF) |
                 ((value >> 8) & 0xFF00) |

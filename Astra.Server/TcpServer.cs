@@ -98,7 +98,7 @@ public class TcpServer : IDisposable
         SpringBootLoggerClone.PrintBanner();
         using var tmpLogger = LoggerFactory.Create(builder =>
         {
-            builder.SetMinimumLevel(LogLevel.Error);
+            builder.SetMinimumLevel(LogLevel.Trace);
             builder.AddSpringBootLoggerClone(configure =>
             {
                 configure.ColoredOutput = true;
@@ -204,12 +204,19 @@ public class TcpServer : IDisposable
 
     private static bool IsConnected(TcpClient client)
     {
-        var tcpConnection = IpProperties
-            .GetActiveTcpConnections()
-            .FirstOrDefault(x => x.LocalEndPoint.Equals(client.Client.LocalEndPoint) &&
-                                 x.RemoteEndPoint.Equals(client.Client.RemoteEndPoint));
-        var stateOfConnection = tcpConnection?.State;
-        return stateOfConnection == TcpState.Established;
+        try
+        {
+            var tcpConnection = IpProperties
+                .GetActiveTcpConnections()
+                .FirstOrDefault(x => x.LocalEndPoint.Equals(client.Client.LocalEndPoint) &&
+                                     x.RemoteEndPoint.Equals(client.Client.RemoteEndPoint));
+            var stateOfConnection = tcpConnection?.State;
+            return stateOfConnection == TcpState.Established;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
     
     private async Task ResolveClientAsync(TcpClient client)
@@ -221,16 +228,23 @@ public class TcpServer : IDisposable
         var waiting = true;
         var timer = Stopwatch.StartNew();
         var writeStream = MemoryStreamPool.Allocate();
+        var lastCheck = 0L;
         try
         {
             while (!cancellationToken.IsCancellationRequested)
             {
+                var elapsed = timer.ElapsedMilliseconds;
+                if (elapsed - lastCheck > 60_000)
+                {
+                    lastCheck = elapsed;
+                    if (!IsConnected(client)) return;
+                }
                 if (client.Available < threshold)
                 {
 #if DEBUG
                     await Task.Delay(100, cancellationToken);
 #endif
-                    if (!waiting && timer.ElapsedMilliseconds > _timeout)
+                    if (!waiting && elapsed > _timeout)
                     {
                         _logger.LogInformation("Client timed out");
                         return;
@@ -242,6 +256,7 @@ public class TcpServer : IDisposable
                     threshold = await stream.ReadLongAsync(cancellationToken);
                     waiting = false;
                     timer.Restart();
+                    lastCheck = 0;
                     continue;
                 }
                 stopwatch.Start();
@@ -294,9 +309,9 @@ public class TcpServer : IDisposable
     // Handshake procedure:
     // 1. Send a 32-bit integer to check for endianness
     // 2. Send a 64-bit integer as identification
-    // 3. Wait for the client to send back another corresponding 64-bit integer to complete handshake
-    // 4. If the integer does not match, stop communication
-    // 5. Send the version of this server to the client
+    // 3. Send the version of this server to the client
+    // 4. Wait for the client to send back another corresponding 64-bit integer to complete handshake
+    // 5. If the integer does not match, stop communication
     // 6. Send authentication instruction and continue
     private async Task AuthenticateClient(TcpClient client, IPAddress address)
     {
@@ -306,6 +321,7 @@ public class TcpServer : IDisposable
         {
             await stream.WriteValueAsync(1, cancellationToken);
             await stream.WriteValueAsync(CommunicationProtocol.ServerIdentification, cancellationToken);
+            await stream.WriteValueAsync(CommonProtocol.AstraCommonVersion, token: cancellationToken);
             var timer = Stopwatch.StartNew();
             while (client.Available < sizeof(ulong))
             {
@@ -325,8 +341,6 @@ public class TcpServer : IDisposable
                 client.Close();
                 return;
             }
-
-            await stream.WriteValueAsync(CommonProtocol.AstraCommonVersion, token: cancellationToken);
             using var authHandler = _authenticationSpawner();
             var authResult = await authHandler.Authenticate(client, cancellationToken);
             if (authResult != IAuthenticationHandler.AuthenticationState.AllowConnection)

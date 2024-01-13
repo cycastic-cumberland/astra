@@ -8,8 +8,8 @@ namespace Astra.Server.Authentication;
 
 public class PublicKeyAuthenticationHandler : IAuthenticationHandler
 {
-    private static readonly byte[] PayloadBytes = BitConverter.GetBytes(CommunicationProtocol.PubKeyPayload);
-    private readonly RSA _rsa = new RSACryptoServiceProvider();
+    private readonly byte[] _challenge = new byte[CommonProtocol.PublicKeyChallengeLength];
+    private readonly RSA _rsa = new RSACryptoServiceProvider(2048);
     private readonly int _timeout;
     
     public PublicKeyAuthenticationHandler(string base64PubKey, int timeout)
@@ -22,6 +22,12 @@ public class PublicKeyAuthenticationHandler : IAuthenticationHandler
     {
         var stream = client.GetStream();
         await stream.WriteValueAsync(CommunicationProtocol.PubKeyAuthentication, token: cancellationToken);
+        using (var rng = RandomNumberGenerator.Create())
+        {
+            rng.GetBytes(_challenge);
+        }
+
+        await stream.WriteValueAsync(_challenge, cancellationToken);
         var timer = Stopwatch.StartNew();
         while (client.Available < sizeof(long))
         {
@@ -45,8 +51,8 @@ public class PublicKeyAuthenticationHandler : IAuthenticationHandler
 
         var signatureBytes = new byte[privateKeySize];
         await stream.ReadExactlyAsync(signatureBytes, cancellationToken);
-        var verified = _rsa.VerifyData(PayloadBytes, signatureBytes,
-            HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+        var verified = _rsa.VerifyData(_challenge, signatureBytes,
+            HashAlgorithmName.SHA512, RSASignaturePadding.Pkcs1);
         return verified
             ? IAuthenticationHandler.AuthenticationState.AllowConnection
             : IAuthenticationHandler.AuthenticationState.RejectConnection;

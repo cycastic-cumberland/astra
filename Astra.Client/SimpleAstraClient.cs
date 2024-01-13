@@ -84,7 +84,7 @@ public class SimpleAstraClient : IAstraClient
         {
             var timer = Stopwatch.StartNew();
             // Wait for endian check and handshake signal
-            while (networkClient.Available < sizeof(int) + sizeof(ulong))
+            while (networkClient.Available < sizeof(int) + sizeof(ulong) + sizeof(uint))
             {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
@@ -103,6 +103,9 @@ public class SimpleAstraClient : IAstraClient
             {
                 throw new HandshakeFailedException();
             }
+            await networkStream.ReadExactlyAsync(outBuffer.WriterMemory[..sizeof(uint)], cancellationToken);
+            var serverVersion = BitConverter.ToUInt32(outBuffer.Reader[..sizeof(uint)]);
+            if (serverVersion != CommonProtocol.AstraCommonVersion) throw new VersionNotFoundException($"Astra.Server version not supported: {serverVersion}");
 
             await networkStream.WriteValueAsync(CommunicationProtocol.HandshakeResponse, cancellationToken);
             timer.Restart();
@@ -114,9 +117,6 @@ public class SimpleAstraClient : IAstraClient
                 if (timer.ElapsedMilliseconds <= settings.Timeout) continue;
                 throw new TimeoutException($"Timed out: {settings.Timeout} ms");
             }
-            await networkStream.ReadExactlyAsync(outBuffer.WriterMemory[..sizeof(uint)], cancellationToken);
-            var serverVersion = BitConverter.ToUInt32(outBuffer.Reader[..sizeof(uint)]);
-            if (serverVersion != CommonProtocol.AstraCommonVersion) throw new VersionNotFoundException($"Astra.Server version not supported: {serverVersion}");
             timer.Restart();
             while (networkClient.Available < sizeof(uint))
             {
@@ -145,12 +145,32 @@ public class SimpleAstraClient : IAstraClient
                 }
                 case CommunicationProtocol.PubKeyAuthentication:
                 {
-                    using RSA rsa = new RSACryptoServiceProvider();
+                    while (networkClient.Available < sizeof(long))
+                    {
+#if DEBUG
+                        await Task.Delay(100, cancellationToken);
+#endif
+                        if (timer.ElapsedMilliseconds <= settings.Timeout) continue;
+                        throw new TimeoutException($"Timed out: {settings.Timeout} ms");
+                    }
+                    await networkStream.ReadExactlyAsync(outBuffer.WriterMemory[..sizeof(long)], cancellationToken);
+                    var challengeLength = BitConverter.ToUInt32(outBuffer.Reader[..sizeof(long)]);
+                    var challenge = new byte[challengeLength];
+                    while (networkClient.Available < challengeLength)
+                    {
+#if DEBUG
+                        await Task.Delay(100, cancellationToken);
+#endif
+                        if (timer.ElapsedMilliseconds <= settings.Timeout) continue;
+                        throw new TimeoutException($"Timed out: {settings.Timeout} ms");
+                    }
+
+                    await networkStream.ReadExactlyAsync(challenge, cancellationToken);
+                    using RSA rsa = new RSACryptoServiceProvider(2048);
                     if (string.IsNullOrEmpty(settings.PrivateKey))
                         throw new AuthenticationInfoNotProvidedException(nameof(settings.PrivateKey));
                     rsa.ImportRSAPrivateKey(Convert.FromBase64String(settings.PrivateKey), out _);
-                    var dataBytes = BitConverter.GetBytes(CommunicationProtocol.PubKeyPayload);
-                    var signatureBytes = rsa.SignData(new ReadOnlySpan<byte>(dataBytes), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+                    var signatureBytes = rsa.SignData(new ReadOnlySpan<byte>(challenge), HashAlgorithmName.SHA512, RSASignaturePadding.Pkcs1);
                     await networkStream.WriteValueAsync(signatureBytes.LongLength, token: cancellationToken);
                     await networkStream.WriteAsync(signatureBytes, cancellationToken);
                     break;
