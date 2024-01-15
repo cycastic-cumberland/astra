@@ -420,6 +420,16 @@ public sealed class DataIndexRegistry : IDisposable
         using var writeLock = AcquireWriteLock();
         return DeleteRows(predicateStream, autoIndexerLock, writeLock);
     }
+    
+    public int Delete(ReadOnlyMemory<byte> predicateStream)
+    {
+        var buffer = LocalBuffer.Value ?? new(); 
+        buffer.Buffer = predicateStream;
+        LocalBuffer.Value = buffer;
+        using var autoIndexerLock = _autoIndexer.Write();
+        using var writeLock = AcquireWriteLock();
+        return DeleteRows(buffer, autoIndexerLock, writeLock);
+    }
 
     private void SerializeInternal<T>(Stream writer, T autoIndexerLock)
         where T : struct, IIndexer.IIndexerReadHandler
@@ -534,7 +544,7 @@ public sealed class DataIndexRegistry : IDisposable
             }
             case Command.Clear:
             {
-                var deleted = Clear(autoIndexerLock);
+                var deleted = Clear(autoIndexerLock, writeLock);
                 dataOut.WriteValue(deleted);
                 break;
             }
@@ -645,16 +655,17 @@ public sealed class DataIndexRegistry : IDisposable
         }
     }
 
-    private int Clear(AutoIndexer.WriteHandler autoIndexerLock)
+    private int Clear(AutoIndexer.WriteHandler autoIndexerLock, IndexersWriteLock writeLock)
     {
         if (_destructibleColumnResolvers.Count == 0) return autoIndexerLock.Clear();
         var count = 0;
         foreach (var row in autoIndexerLock.ClearSequence())
         {
-            foreach (var resolver in _destructibleColumnResolvers)
+            foreach (var write in writeLock)
             {
-                resolver.Destroy(row);
+                write.handler?.RemoveExact(row);
             }
+            row.SelectiveDispose(_destructibleColumnResolvers);
             count++;
         }
 
@@ -664,7 +675,8 @@ public sealed class DataIndexRegistry : IDisposable
     public int Clear()
     {
         using var autoIndexerLock = _autoIndexer.Write();
-        var ret = Clear(autoIndexerLock);
+        using var writeLock = AcquireWriteLock();
+        var ret = Clear(autoIndexerLock, writeLock);
         autoIndexerLock.Commit();
         return ret;
     }

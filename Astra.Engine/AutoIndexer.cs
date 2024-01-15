@@ -70,8 +70,7 @@ public sealed class AutoIndexer :
         public bool RemoveExact(ImmutableDataRow row)
         {
             var hadSomething = Contains(row);
-            if (!hadSomething) return false;
-            return Repository.Data.Remove(row);
+            return hadSomething && Repository.Data.Remove(row);
         }
         
         public IEnumerator<ImmutableDataRow> GetEnumerator()
