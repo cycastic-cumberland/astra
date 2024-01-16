@@ -139,6 +139,13 @@ public static class StreamWriteAddons
         await writer.WriteAsync(value, token);
     }
 
+    public static async ValueTask WriteValueAsync(this Stream writer, Hash256 value, CancellationToken token = default)
+    {
+        using var buffer = BytesCluster.Rent(Hash256.Size);
+        value.CopyTo(buffer.Writer);
+        await writer.WriteAsync(buffer.ReaderMemory, token);
+    }
+
     public static void WriteValue(this Stream writer, Hash128 hash)
     {
         unsafe

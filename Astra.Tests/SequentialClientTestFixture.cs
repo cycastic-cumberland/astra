@@ -62,7 +62,7 @@ public class SequentialClientTestFixture
             {
                 Columns = _columns
             }
-        }, AuthenticationHelper.Sha256Authentication(Hash256.HashSha256(password)));
+        }, AuthenticationHelper.SaltedSha256Authentication(password));
         _serverTask = _server.RunAsync();
         await Task.Delay(100);
         _simpleAstraClient = new SimpleAstraClient();

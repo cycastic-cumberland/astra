@@ -36,10 +36,9 @@ public readonly struct ImmutableDataRow(BytesCluster raw, Hash128 hash) : IImmut
     {
         try
         {
-            using var enumerator = resolvers.GetEnumerator();
-            while (enumerator.MoveNext())
+            foreach (var resolver in resolvers)
             {
-                enumerator.Current.Destroy(this);
+                resolver.Destroy(this);
             }
         }
         finally

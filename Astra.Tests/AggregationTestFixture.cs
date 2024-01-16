@@ -21,7 +21,7 @@ public class AggregationTestFixture
         {
             Name = "col2",
             DataType = DataType.StringMask,
-            Indexed = false,
+            Indexed = false, 
         },
         new()
         {
@@ -64,7 +64,7 @@ public class AggregationTestFixture
             {
                 Columns = _columns
             }
-        }, AuthenticationHelper.Sha256Authentication(Hash256.HashSha256(password)));
+        }, AuthenticationHelper.SaltedSha256Authentication(password));
         _serverTask = _server.RunAsync();
         _table = new();
         await Task.Delay(100);

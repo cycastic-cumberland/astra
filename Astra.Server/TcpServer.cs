@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Security.Cryptography;
+using System.Text;
 using Astra.Common;
 using Astra.Engine;
 using Astra.Server.Authentication;
@@ -138,29 +139,21 @@ public class TcpServer : IDisposable
                 break;
             case CommunicationProtocol.PasswordAuthentication:
             {
-                if (string.IsNullOrEmpty(config.HashedPasswordPath))
+                logger.LogError("{} is deprecated, please use {}", 
+                    nameof(CommunicationProtocol.PasswordAuthentication),
+                    nameof(CommunicationProtocol.SaltedPasswordAuthentication));
+                return null;
+            }
+            case CommunicationProtocol.SaltedPasswordAuthentication:
+            {
+                if (string.IsNullOrEmpty(config.Password))
                 {
-                    logger.LogError("Password authentication required but no hashed password path specified");
+                    logger.LogError("Password authentication required but no password provided");
                     return null;
                 }
 
-                if (!File.Exists(config.HashedPasswordPath))
-                {
-                    logger.LogError("Hashed password path is invalid");
-                    return null;
-                }
-
-                var pwd = await File.ReadAllBytesAsync(config.HashedPasswordPath);
-                
-                if (pwd.Length != Hash256.Size)
-                {
-                    logger.LogError("SHA-256 hashed password is of incorrect length: {}", pwd.Length);
-                    return null;
-                }
-
-                var hash = Hash256.CreateUnsafe(pwd);
                 var timeout = config.Timeout;
-                authSpawner = () => new PasswordAuthenticationHandler(hash, Hash256.HashSha256, Hash256.Compare, timeout);
+                authSpawner = AuthenticationHelper.SaltedSha256Authentication(config.Password, timeout);
                 break;
             }
             case CommunicationProtocol.PubKeyAuthentication:

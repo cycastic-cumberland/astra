@@ -1,4 +1,3 @@
-using System.Data;
 using System.Diagnostics;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
@@ -105,7 +104,8 @@ public class SimpleAstraClient : IAstraClient
             }
             await networkStream.ReadExactlyAsync(outBuffer.WriterMemory[..sizeof(uint)], cancellationToken);
             var serverVersion = BitConverter.ToUInt32(outBuffer.Reader[..sizeof(uint)]);
-            if (serverVersion != CommonProtocol.AstraCommonVersion) throw new VersionNotFoundException($"Astra.Server version not supported: {serverVersion}");
+            if (serverVersion != CommonProtocol.AstraCommonVersion) 
+                throw new VersionNotSupportedException($"Astra.Server version not supported: {serverVersion.ToAstraCommonVersion()}");
 
             await networkStream.WriteValueAsync(CommunicationProtocol.HandshakeResponse, cancellationToken);
             timer.Restart();
@@ -134,13 +134,25 @@ public class SimpleAstraClient : IAstraClient
                 {
                     break;
                 }
-                case CommunicationProtocol.PasswordAuthentication:
+                case CommunicationProtocol.SaltedPasswordAuthentication:
                 {
                     if (string.IsNullOrEmpty(settings.Password))
                         throw new AuthenticationInfoNotProvidedException(nameof(settings.Password));
+                    var salt = new byte[CommonProtocol.SaltLength];
+                    while (networkClient.Available < CommonProtocol.SaltLength)
+                    {
+#if DEBUG
+                        await Task.Delay(100, cancellationToken);
+#endif
+                        if (timer.ElapsedMilliseconds <= settings.Timeout) continue;
+                        throw new TimeoutException($"Timed out: {settings.Timeout} ms");
+                    }
+
+                    await networkStream.ReadExactlyAsync(salt, cancellationToken);
                     var pwdBytes = Encoding.UTF8.GetBytes(settings.Password);
-                    await networkStream.WriteValueAsync(pwdBytes.Length, token: cancellationToken);
-                    await networkStream.WriteAsync(pwdBytes, cancellationToken);
+                    var combined = CommonProtocol.CombineSalt(pwdBytes, salt);
+                    var hashed = Hash256.HashSha256(combined);
+                    await networkStream.WriteValueAsync(hashed, cancellationToken);
                     break;
                 }
                 case CommunicationProtocol.PubKeyAuthentication:

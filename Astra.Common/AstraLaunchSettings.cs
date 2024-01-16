@@ -9,7 +9,7 @@ public struct AstraLaunchSettings
     public int? Port { get; set; }
     public int Timeout { get; set; }
     public uint AuthenticationMethod { get; set; }
-    public string? HashedPasswordPath { get; set; }
+    public string? Password { get; set; }
     public string? PublicKeyPath { get; set; }
 }
 
@@ -25,8 +25,8 @@ public struct RepresentableAstraLaunchSettings
     public int Timeout { get; set; }
     [JsonProperty("authenticationMethod")]
     public string AuthenticationMethod { get; set; }
-    [JsonProperty("hashedPasswordPath")]
-    public string? HashedPasswordPath { get; set; }
+    [JsonProperty("password")]
+    public string? Password { get; set; }
     [JsonProperty("publicKeyPath")]
     public string? PublicKeyPath { get; set; }
 
@@ -38,6 +38,8 @@ public struct RepresentableAstraLaunchSettings
             "NO_AUTHENTICATION" => CommunicationProtocol.NoAuthentication,
             "password" => CommunicationProtocol.PasswordAuthentication,
             "PASSWORD" => CommunicationProtocol.PasswordAuthentication,
+            "salted_password" => CommunicationProtocol.PasswordAuthentication,
+            "SALTED_PASSWORD" => CommunicationProtocol.SaltedPasswordAuthentication,
             "public_key" => CommunicationProtocol.PubKeyAuthentication,
             "PUBLIC_KEY" => CommunicationProtocol.PubKeyAuthentication,
             _ => throw new NotSupportedException($"Authentication method not supported: {AuthenticationMethod}")
@@ -48,7 +50,7 @@ public struct RepresentableAstraLaunchSettings
             LogLevel = LogLevel,
             Timeout = Timeout,
             AuthenticationMethod = method,
-            HashedPasswordPath = HashedPasswordPath,
+            Password = Password,
             PublicKeyPath = PublicKeyPath
         };
     }

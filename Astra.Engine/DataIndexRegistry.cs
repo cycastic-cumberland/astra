@@ -199,6 +199,7 @@ public sealed class DataIndexRegistry : IDisposable
     private readonly ILogger<AutoReadLock> _readLogger;
     private readonly int _rowSize;
     private readonly int _hashSize;
+    private readonly int _indexerCount;
     private readonly AbstractRegistryDump _dump;
     private readonly AutoIndexer _autoIndexer = new();
     private readonly ColumnSynthesizer[] _synthesizers;
@@ -234,6 +235,7 @@ public sealed class DataIndexRegistry : IDisposable
         var i = 0;
         var offset = 0;
         var hashSize = 0;
+        var indexerCount = 0;
         foreach (var column in schema.Columns)
         {
             var shouldBeHashed = column.ShouldBeHashed ?? column.Indexed;
@@ -282,15 +284,18 @@ public sealed class DataIndexRegistry : IDisposable
             _logger.LogDebug("Column {}: found type: {}, indexed: {}, should be hashed: {}",
                 i, dataType, column.Indexed, shouldBeHashed);
 
-            if (indexer != null && !column.Indexed)
+            if (indexer != null)
             {
-                _logger.LogWarning("Schema requires column {} to be indexed, but data type does not support indexing",
-                    column.Name);
+                indexerCount++;
+                if (!column.Indexed)
+                    _logger.LogWarning("Schema requires column {} to be indexed, but data type does not support indexing",
+                        column.Name);
             }
             _synthesizers[i++] = ColumnSynthesizer.Create(indexer, resolver);
         }
         _rowSize = offset;
         _hashSize = hashSize;
+        _indexerCount = indexerCount;
         _logger.LogInformation("Row length: {} byte(s)", _rowSize);
         _logger.LogInformation("Hash stream length: {} byte(s)", _hashSize);
     }
@@ -657,7 +662,8 @@ public sealed class DataIndexRegistry : IDisposable
 
     private int Clear(AutoIndexer.WriteHandler autoIndexerLock, IndexersWriteLock writeLock)
     {
-        if (_destructibleColumnResolvers.Count == 0) return autoIndexerLock.Clear();
+        if (_destructibleColumnResolvers.Count == 0 && _indexerCount == 0) 
+            return autoIndexerLock.Clear();
         var count = 0;
         foreach (var row in autoIndexerLock.ClearSequence())
         {
@@ -678,6 +684,7 @@ public sealed class DataIndexRegistry : IDisposable
         using var writeLock = AcquireWriteLock();
         var ret = Clear(autoIndexerLock, writeLock);
         autoIndexerLock.Commit();
+        writeLock.Commit();
         return ret;
     }
 }

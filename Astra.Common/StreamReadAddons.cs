@@ -13,17 +13,17 @@ public static class StreamReadAddons
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe T ReadUnmanagedStruct<T>(this Stream reader, int size) where T : unmanaged
+    private static unsafe T ReadUnmanagedStruct<T>(this Stream reader) where T : unmanaged
     {
-        void* ptr = stackalloc byte[size];
-        reader.ReadExactly(new Span<byte>(ptr, size));
+        void* ptr = stackalloc byte[sizeof(T)];
+        reader.ReadExactly(new Span<byte>(ptr, sizeof(T)));
         // Type punning magic
         return *(T*)ptr;
     }
     
     public static int ReadInt(this Stream reader)
     {
-        return ReadUnmanagedStruct<int>(reader, sizeof(int));
+        return ReadUnmanagedStruct<int>(reader);
     }
     
     public static async ValueTask<int> ReadIntAsync(this Stream reader, CancellationToken token = default)
@@ -35,17 +35,17 @@ public static class StreamReadAddons
     
     public static uint ReadUInt(this Stream reader)
     {
-        return ReadUnmanagedStruct<uint>(reader, sizeof(uint));
+        return ReadUnmanagedStruct<uint>(reader);
     }
     
     public static double ReadDouble(this Stream reader)
     {
-        return ReadUnmanagedStruct<double>(reader, sizeof(double));
+        return ReadUnmanagedStruct<double>(reader);
     }
     
     public static long ReadLong(this Stream reader)
     {
-        return ReadUnmanagedStruct<long>(reader, sizeof(long));
+        return ReadUnmanagedStruct<long>(reader);
     }
     
     public static async ValueTask<long> ReadLongAsync(this Stream reader, CancellationToken token = default)
@@ -57,7 +57,7 @@ public static class StreamReadAddons
     
     public static ulong ReadULong(this Stream reader)
     {
-        return ReadUnmanagedStruct<ulong>(reader, sizeof(ulong));
+        return ReadUnmanagedStruct<ulong>(reader);
     }
     
     public static async ValueTask<ulong> ReadULongAsync(this Stream reader, CancellationToken token = default)

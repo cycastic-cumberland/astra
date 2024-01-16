@@ -24,7 +24,20 @@ public readonly struct Hash256 : IEquatable<Hash256>
     public static Hash256 HashSha256Fast(string str) => HashSha256(MemoryMarshal.AsBytes(str.AsSpan()));
     
     public static Hash256 HashSha256(ReadOnlySpan<byte> array) => CreateUnsafe(SHA256.HashData(array));
+    public static Hash256 HashSha256(byte[] array) => CreateUnsafe(SHA256.HashData(array));
 
+    public void CopyTo(Span<byte> buffer)
+    {
+        if (buffer.Length < Size) throw new ArgumentException(nameof(buffer));
+        unsafe
+        {
+            fixed (void* bPtr = &buffer[0])
+            {
+                *(Hash256*)bPtr = this;
+            }
+        }
+    }
+    
     public bool Equals(Hash256 other)
     {
         return _vector.Equals(other._vector);
