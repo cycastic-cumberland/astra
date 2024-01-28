@@ -219,9 +219,9 @@ public class TcpServer : IDisposable
         var stopwatch = new Stopwatch();
         var threshold = (long)sizeof(long);
         var waiting = true;
-        var timer = Stopwatch.StartNew();
         var writeStream = MemoryStreamPool.Allocate();
         var lastCheck = 0L;
+        var timer = Stopwatch.StartNew();
         try
         {
             while (!cancellationToken.IsCancellationRequested)

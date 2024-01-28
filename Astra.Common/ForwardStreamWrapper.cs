@@ -61,7 +61,7 @@ public readonly struct ForwardStreamWrapper(Stream stream) : IStreamWrapper
 
     public ValueTask SaveValueAsync(byte[] value, CancellationToken cancellationToken = default)
     {
-        return stream.WriteAsync(value.AsMemory(), cancellationToken);
+        return stream.WriteValueAsync(value, cancellationToken);
     }
 
     public void SaveValue(BytesCluster value)
@@ -71,7 +71,7 @@ public readonly struct ForwardStreamWrapper(Stream stream) : IStreamWrapper
 
     public ValueTask SaveValueAsync(BytesCluster value, CancellationToken cancellationToken = default)
     {
-        return stream.WriteAsync(value.ReaderMemory, cancellationToken);
+        return stream.WriteValueAsync(value, cancellationToken);
     }
 
     public int LoadInt()

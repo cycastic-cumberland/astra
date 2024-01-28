@@ -16,6 +16,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Astra.Experiments", "Astra.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Astra.Common", "Astra.Common\Astra.Common.csproj", "{B1B08032-B42C-4E58-A2C2-512EF11E078B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Astra.Collections.RangeDictionaries", "Astra.Collections.RangeDictionaries\Astra.Collections.RangeDictionaries.csproj", "{0F26B364-056A-478C-83D0-1408B77696F1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -54,5 +56,9 @@ Global
 		{B1B08032-B42C-4E58-A2C2-512EF11E078B}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{B1B08032-B42C-4E58-A2C2-512EF11E078B}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{B1B08032-B42C-4E58-A2C2-512EF11E078B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0F26B364-056A-478C-83D0-1408B77696F1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0F26B364-056A-478C-83D0-1408B77696F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0F26B364-056A-478C-83D0-1408B77696F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0F26B364-056A-478C-83D0-1408B77696F1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

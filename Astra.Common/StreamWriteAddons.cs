@@ -138,6 +138,12 @@ public static class StreamWriteAddons
         await writer.WriteValueAsync(value.LongLength, token);
         await writer.WriteAsync(value, token);
     }
+    
+    public static async ValueTask WriteValueAsync(this Stream writer, BytesCluster value, CancellationToken token = default)
+    {
+        await writer.WriteValueAsync(value.LongLength, token);
+        await writer.WriteAsync(value.ReaderMemory, token);
+    }
 
     public static async ValueTask WriteValueAsync(this Stream writer, Hash256 value, CancellationToken token = default)
     {

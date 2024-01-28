@@ -151,6 +151,7 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
     public async ValueTask SaveValueAsync(byte[] value, CancellationToken cancellationToken = default)
     {
         await SaveValueAsync(value.LongLength, cancellationToken);
+        await stream.WriteAsync(value, cancellationToken);
     }
 
     public void SaveValue(BytesCluster value)

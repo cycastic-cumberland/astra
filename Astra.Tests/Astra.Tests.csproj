@@ -20,6 +20,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\Astra.Client\Astra.Client.csproj" />
+      <ProjectReference Include="..\Astra.Collections.RangeDictionaries\Astra.Collections.RangeDictionaries.csproj" />
       <ProjectReference Include="..\Astra.Server\Astra.Server.csproj" />
     </ItemGroup>
 
