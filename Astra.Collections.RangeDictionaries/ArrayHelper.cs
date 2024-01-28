@@ -13,18 +13,4 @@ internal static class ArrayHelper
 #endif
         }
     }
-    
-    public static void DoubleShiftElements<T1, T2>(this (T1[] left, T2[] right) tuple, int fromBound, int toBound, int unitCount)
-    {
-        // Perform the shift
-        for (var i = toBound; i >= fromBound; i--)
-        {
-            tuple.left[i + unitCount] = tuple.left[i];
-            tuple.right[i + unitCount] = tuple.right[i];
-#if DEBUG
-            tuple.left[i] = default!;
-            tuple.right[i] = default!;
-#endif
-        }
-    }
 }

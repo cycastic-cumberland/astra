@@ -3,6 +3,11 @@ using System.Numerics;
 
 namespace Astra.Collections.RangeDictionaries.BTree;
 
+public static class BTreeMap
+{
+    public const int MinDegree = 3;
+}
+
 public sealed partial class BTreeMap<TKey, TValue> : IRangeDictionary<TKey, TValue>, IReadOnlyRangeDictionary<TKey, TValue>
     where TKey : INumber<TKey>
 {

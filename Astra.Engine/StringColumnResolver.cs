@@ -43,6 +43,11 @@ public sealed class StringColumnResolver(int offset, bool shouldBeHashed) : ICol
         _serial.Remove(id, out _);
     }
 
+    public void Clear()
+    {
+        _serial.Clear();
+    }
+
     public void Serialize<T>(Stream writer, T row) where T : struct, IImmutableDataRow
     {
         writer.WriteValue(Dump(row));

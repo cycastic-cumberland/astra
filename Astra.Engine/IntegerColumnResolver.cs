@@ -54,4 +54,9 @@ public sealed class IntegerColumnResolver(int offset, bool shouldBeHashed) : ICo
     {
         throw new NotImplementedException();
     }
+
+    public void Clear()
+    {
+        
+    }
 }

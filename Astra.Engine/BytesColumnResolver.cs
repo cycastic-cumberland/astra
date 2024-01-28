@@ -49,6 +49,11 @@ public sealed class BytesColumnResolver(int offset, bool shouldBeHashed) :
         }
     }
 
+    public void Clear()
+    {
+        _serial.Clear();
+    }
+
     public void Serialize<T>(Stream writer, T row) where T : struct, IImmutableDataRow
     {
         var bytes = Dump(row);

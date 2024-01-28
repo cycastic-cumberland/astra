@@ -13,6 +13,7 @@ public struct ColumnSchemaSpecifications
 public struct SchemaSpecifications
 {
     public ColumnSchemaSpecifications[] Columns { get; set; }
+    public int BinaryTreeDegree { get; set; }
 }
 
 public struct RepresentableColumnSchemaSpecifications
@@ -55,12 +56,15 @@ public struct RepresentableSchemaSpecifications
 {
     [JsonProperty("columns")]
     public RepresentableColumnSchemaSpecifications[] Columns { get; set; }
+    [JsonProperty("binaryTreeDegree")]
+    public int BinaryTreeDegree { get; set; }
 
     public SchemaSpecifications ToInternal()
     {
         return new()
         {
-            Columns = Columns.Select(o => o.ToInternal()).ToArray()
+            Columns = Columns.Select(o => o.ToInternal()).ToArray(),
+            BinaryTreeDegree = BinaryTreeDegree
         };
     }
 }

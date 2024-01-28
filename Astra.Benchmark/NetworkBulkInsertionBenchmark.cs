@@ -51,7 +51,7 @@ public class NetworkBulkInsertionBenchmark
         _server = new(new()
         {
             LogLevel = "Critical",
-            Schema = Schema
+            Schema = Schema with { BinaryTreeDegree = (int)(BulkInsertAmount / 10) }
         }, AuthenticationHelper.NoAuthentication());
         _serverTask = _server.RunAsync();
         await Task.Delay(100);

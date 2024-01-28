@@ -5,6 +5,7 @@ Astra is a lightweight, tabular database for fast and effective caching of struc
 ## Requirements
 
 (Currently) requires .NET 8 for both client and server.
+
 ## Motivation
 
 The motivation behind Astra stems from my need for a cache server that can not only stores and aggregates data but also allows for the conditional deletion of multiple "unit of data". 
@@ -91,7 +92,7 @@ There are currently 3 supported data types, with more on the way:
 - [x] ORM (partially finished)
 - [ ] .NET 6 supports for `Astra.Client`
 - [ ] More data types
-- [ ] Ranged query
+- [x] Ranged query (No test written)
 - [ ] Regex supports
 - [ ] Multiple tables
 - [ ] Strict schema check
@@ -128,23 +129,21 @@ UnrollFactor=1
 
 | Method                 | BulkInsertAmount |         Mean |      Error |       Median |       StdDev |
 |:-----------------------|-----------------:|-------------:|-----------:|-------------:|-------------:|
-| BulkInsertionBenchmark |               10 |     41.82 us |   1.597 us |     40.33 us |     4.558 us |
-| BulkInsertionBenchmark |              100 |    392.22 us |  36.804 us |    337.27 us |   106.776 us |
-| BulkInsertionBenchmark |             1000 |  2,904.04 us | 511.442 us |  2,711.17 us | 1,507.998 us |
-| BulkInsertionBenchmark |            10000 | 12,181.79 us | 242.028 us | 12,127.98 us |   654.336 us |
+| BulkInsertionBenchmark |               10 |     45.81 us |   1.171 us |     3.304 us |     44.63 us |
+| BulkInsertionBenchmark |              100 |    399.48 us |   9.866 us |    27.504 us |    399.63 us |
+| BulkInsertionBenchmark |             1000 |  3,473.38 us | 612.822 us | 1,806.920 us |  3,222.82 us |
+| BulkInsertionBenchmark |            10000 | 15,241.17 us | 293.565 us |   788.642 us | 15,218.37 us |
+
   
 - NetworkBulkInsertionBenchmark:
 
-| Method                 | BulkInsertAmount |      Mean |     Error |     StdDev |    Median |
-|:-----------------------|-----------------:|----------:|----------:|-----------:|----------:|
-| BulkInsertionBenchmark |               10 | 87.910 ms | 1.6549 ms |  1.4670 ms | 88.577 ms |
-| BulkInsertionBenchmark |              100 | 86.504 ms | 1.6421 ms |  1.6864 ms | 87.688 ms |
-| BulkInsertionBenchmark |             1000 | 22.668 ms | 7.5089 ms | 22.1402 ms |  3.340 ms |
-| BulkInsertionBenchmark |             2000 |  6.081 ms | 0.0550 ms |  0.1307 ms |  6.038 ms |
+| Method                 | BulkInsertAmount |      Mean |     Error |    StdDev |    Median |
+|:-----------------------|-----------------:|----------:|----------:|----------:|----------:|
+| BulkInsertionBenchmark |               10 | 86.471 ms | 1.7137 ms |  1.603 ms | 85.437 ms |
+| BulkInsertionBenchmark |              100 | 86.837 ms | 1.6495 ms |  1.620 ms | 87.924 ms |
+| BulkInsertionBenchmark |             1000 | 23.575 ms | 7.5799 ms | 22.350 ms |  3.625 ms |
+| BulkInsertionBenchmark |             2000 |  6.954 ms | 0.6734 ms |  1.750 ms |  6.504 ms |
 
-
-
-(benchmarkDotNet gets stuck at preparation step when bulk inserting more than 3000 rows - at least on my device)
 
 - LocalSimpleAggregationBenchmark
 
@@ -159,20 +158,27 @@ UnrollFactor=1
 
 - IntegerBTreeInsertionBenchmark
 
-| Method    | Degree | InsertionAmount | Mean        |     Error |      StdDev |
-|:----------|-------:|----------------:|-------------|----------:|------------:|
-| BTree     |     10 |            1000 |    642.2 us |  12.67 us |    13.56 us |
-| Reference |     10 |            1000 |    702.3 us |  13.92 us |    13.68 us |
-| BTree     |     10 |           10000 |  1,417.9 us |  37.96 us |    99.99 us |
-| Reference |     10 |           10000 |  6,021.8 us |  84.08 us |    78.65 us |
-| BTree     |     10 |          100000 | 20,309.5 us | 340.60 us |   318.60 us |
-| Reference |     10 |          100000 | 28,894.1 us | 572.51 us | 1,642.64 us |
-| BTree     |    100 |            1000 |    753.9 us |  16.47 us |    47.53 us |
-| Reference |    100 |            1000 |    622.2 us |  13.01 us |    37.94 us |
-| BTree     |    100 |           10000 |  1,518.3 us |  15.81 us |    29.31 us |
-| Reference |    100 |           10000 |  5,854.6 us | 116.87 us |   185.38 us |
-| BTree     |    100 |          100000 | 18,731.7 us | 163.05 us |   136.15 us |
-| Reference |    100 |          100000 | 29,008.7 us | 308.67 us |   288.73 us |
+| Method    | Degree | InsertionAmount |        Mean |     Error |      StdDev |      Median |
+|:----------|-------:|----------------:|------------:|----------:|------------:|------------:|
+| BTree     |     10 |            1000 |    609.7 us |  11.73 us |    11.52 us |    609.9 us |
+| Reference |     10 |            1000 |    731.8 us |  14.43 us |    15.44 us |    731.9 us |
+| BTree     |     10 |           10000 |  6,954.4 us |  90.37 us |    84.53 us |  6,954.3 us |
+| Reference |     10 |           10000 |  2,376.7 us |  34.98 us |    67.40 us |  2,370.2 us |
+| BTree     |     10 |          100000 | 21,218.2 us | 417.41 us |   463.95 us | 21,108.4 us |
+| Reference |     10 |          100000 | 32,807.2 us | 253.85 us |   211.97 us | 32,848.2 us |
+| BTree     |    100 |            1000 |    606.8 us |  11.82 us |    15.37 us |    607.6 us |
+| Reference |    100 |            1000 |    735.6 us |  13.99 us |    12.40 us |    740.1 us |
+| BTree     |    100 |           10000 |  7,129.6 us | 101.04 us |    94.52 us |  7,142.9 us |
+| Reference |    100 |           10000 |  3,825.1 us | 682.50 us | 2,012.37 us |  2,309.6 us |
+| BTree     |    100 |          100000 | 20,298.8 us | 306.42 us |   255.87 us | 20,243.6 us |
+| Reference |    100 |          100000 | 33,223.0 us | 359.07 us |   318.30 us | 33,238.1 us |
+| BTree     |   1000 |            1000 |  2,119.1 us |  41.85 us |    78.60 us |  2,128.8 us |
+| Reference |   1000 |            1000 |    662.0 us |  13.24 us |    28.22 us |    661.0 us |
+| BTree     |   1000 |           10000 |  4,191.9 us |  40.72 us |    34.01 us |  4,191.8 us |
+| Reference |   1000 |           10000 |  2,240.5 us |  60.09 us |   158.30 us |  2,231.1 us |
+| BTree     |   1000 |          100000 | 46,173.7 us | 558.70 us |   466.54 us | 46,073.5 us |
+| Reference |   1000 |          100000 | 30,244.3 us | 626.17 us | 1,836.46 us | 30,255.2 us |
+
 
 - IntegerBTreePointQueryBenchmark
 

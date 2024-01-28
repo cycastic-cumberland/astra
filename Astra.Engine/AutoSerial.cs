@@ -11,6 +11,7 @@ public interface IAutoSerial<TKey, TValue> : IReadOnlyDictionary<ulong, TValue> 
     public TKey Save(TValue value);
     public bool Remove(TKey id, [MaybeNullWhen(false)] out TValue ret);
     public TKey Exchange(TKey oldItermId, TValue newItem, out TValue? oldItem);
+    public void Clear();
 }
 
 public class AutoSerial<T> : IAutoSerial<ulong, T>
@@ -37,6 +38,11 @@ public class AutoSerial<T> : IAutoSerial<ulong, T>
     {
         Remove(oldItermId, out oldItem);
         return Save(newItem);
+    }
+
+    public void Clear()
+    {
+        _dict.Clear();
     }
 
     public bool ContainsKey(ulong key)
@@ -88,6 +94,11 @@ public class ConcurrentAutoSerial<T> : IAutoSerial<ulong, T>
     {
         Remove(oldItermId, out oldItem);
         return Save(newItem);
+    }
+
+    public void Clear()
+    {
+        _dict.Clear();
     }
 
     public bool ContainsKey(ulong key)

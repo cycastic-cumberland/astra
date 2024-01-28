@@ -36,7 +36,7 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
             get => _primaryKey;
             set
             {
-                if (Parent != null && Parent.PrimaryKey == _primaryKey)
+                if (Parent != null && Parent.PrimaryKey.Equals(_primaryKey))
                     Parent.PrimaryKey = value;
                 _primaryKey = value;
             }

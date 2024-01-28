@@ -17,7 +17,7 @@ public class DoubleBTreeMapTestFixture
     public void SetUp()
     {
         _rng = new();
-        _tree = new(_rng.Next(2, 20));
+        _tree = new(_rng.Next(BTreeMap.MinDegree, 20));
         _correspondingDict = new();
     }
     
@@ -55,9 +55,17 @@ public class DoubleBTreeMapTestFixture
         }
     }
 
-    private static void AssertSortedDictionary<T1, T2>(ImmutableSortedDictionary<T1, T2> d1,
-        ImmutableSortedDictionary<T1, T2> d2) where T1 : notnull
+    private static void AssertSortedDictionary(ImmutableSortedDictionary<double, double> d1,
+        IEnumerable<KeyValuePair<double, double>> query)
     {
+        var d2 = new SortedDictionary<double, double>();
+        var last = double.MinValue;
+        foreach (var (k, v) in query)
+        {
+            Assert.That(k, Is.GreaterThanOrEqualTo(last));
+            last = k;
+            d2[k] = v;
+        }
         Assert.That(d1, Has.Count.EqualTo(d2.Count));
         foreach (var (key, value) in d1)
         {
@@ -84,8 +92,7 @@ public class DoubleBTreeMapTestFixture
         var model = _correspondingDict.Where(o => o.Key >= left && o.Key <= right)
             .ToImmutableSortedDictionary();
         var fromTree = _tree
-            .Collect(left, right, CollectionMode.ClosedInterval)
-            .ToImmutableSortedDictionary();
+            .Collect(left, right, CollectionMode.ClosedInterval);
         AssertSortedDictionary(model, fromTree);
     }
 
@@ -135,8 +142,7 @@ public class DoubleBTreeMapTestFixture
             .ToImmutableSortedDictionary();
         if (NumericHelper.GetMax<double>() < bound)
             _ = 2;
-        var fromTree = _tree.CollectFrom(bound, false)
-            .ToImmutableSortedDictionary();
+        var fromTree = _tree.CollectFrom(bound, false);
         AssertSortedDictionary(model, fromTree);
     }
 
@@ -152,8 +158,7 @@ public class DoubleBTreeMapTestFixture
         var bound = ClampedRandom;
         var model = _correspondingDict.Where(o => o.Key >= bound)
             .ToImmutableSortedDictionary();
-        var fromTree = _tree.CollectFrom(bound)
-            .ToImmutableSortedDictionary();
+        var fromTree = _tree.CollectFrom(bound);
         AssertSortedDictionary(model, fromTree);
     }
     
@@ -169,8 +174,7 @@ public class DoubleBTreeMapTestFixture
         var bound = ClampedRandom;
         var model = _correspondingDict.Where(o => o.Key < bound)
             .ToImmutableSortedDictionary();
-        var fromTree = _tree.CollectTo(bound, false)
-            .ToImmutableSortedDictionary();
+        var fromTree = _tree.CollectTo(bound, false);
         AssertSortedDictionary(model, fromTree);
     }
     
@@ -186,8 +190,7 @@ public class DoubleBTreeMapTestFixture
         var bound = ClampedRandom;
         var model = _correspondingDict.Where(o => o.Key <= bound)
             .ToImmutableSortedDictionary();
-        var fromTree = _tree.CollectTo(bound)
-            .ToImmutableSortedDictionary();
+        var fromTree = _tree.CollectTo(bound);
         AssertSortedDictionary(model, fromTree);
     }
     

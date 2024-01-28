@@ -7,12 +7,11 @@ namespace Astra.Collections.RangeDictionaries.BTree;
 
 public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
 {
-    [DebuggerDisplay("PrimaryKey = {PrimaryKey}, KeyCount = {KeyCount}, Keys = {Keys}")]
+    [DebuggerDisplay("PrimaryKey = {PrimaryKey}, KeyCount = {KeyCount}, Pairs = {Pairs}")]
     private partial class LeafNode(int degree)
     {
         private readonly int _splitSize = degree / 2;
-        private readonly TKey[] _keys = new TKey[degree + 1];
-        private readonly TValue[] _values = new TValue[degree + 1];
+        private readonly KeyValuePair<TKey, TValue>[] _pairs = new KeyValuePair<TKey, TValue>[degree + 1];
         
         public InternalNode? Parent { get; set; }
         public bool IsInternal => false;
@@ -21,7 +20,7 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
         public bool IsFull => KeyCount >= degree;
         public int KeyCount { get; private set; }
         public int Degree => degree;
-        public Span<TKey> Keys => new(_keys, 0, KeyCount);
+        private Span<KeyValuePair<TKey, TValue>> Pairs => new(_pairs, 0, KeyCount);
 
         IEnumerable<TKey> INode.Keys
         {
@@ -29,14 +28,13 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
             {
                 for (var i = 0; i < KeyCount; i++)
                 {
-                    yield return _keys[i];
+                    yield return _pairs[i].Key;
                 }
             }
         }
-        public TKey PrimaryKey => Keys[0];
-        public TKey AutoFirstKey => Keys[0];
+        public TKey PrimaryKey => _pairs[0].Key;
+        public TKey AutoFirstKey => _pairs[0].Key;
         public int AutoKeyCount => KeyCount;
-        public Span<TValue> Values => new(_values, 0, KeyCount);
 
         IEnumerable<TValue> INode.Values
         {
@@ -44,7 +42,7 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
             {
                 for (var i = 0; i < KeyCount; i++)
                 {
-                    yield return _values[i];
+                    yield return _pairs[i].Value;
                 }
             }
         }
@@ -55,14 +53,14 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
             KeyCount++;
         }
 
-        private static int BinarySearch(Span<TKey> span, TKey target)
+        private static int BinarySearch(Span<KeyValuePair<TKey, TValue>> span, TKey target)
         {
             var left = 0;
             var right = span.Length - 1;
             while (left <= right)
             {
                 var mid = left + (right - left) / 2;
-                var comparison = span[mid].CompareTo(target);
+                var comparison = span[mid].Key.CompareTo(target);
                 switch (comparison)
                 {
                     case 0: // Equal
@@ -79,17 +77,16 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
             return -1;
         }
         
-        private static (int index, bool isExact) NearestBinarySearch(Span<TKey> span, TKey target)
+        private static (int index, bool isExact) NearestBinarySearch(Span<KeyValuePair<TKey, TValue>> span, TKey target)
         {
             var left = 0;
             var ceil = span.Length - 1;
             var right = ceil;
             var result = -1;
-            // var finalized = false;
             while (left <= right)
             {
                 var mid = left + (right - left) / 2;
-                var comparison = span[mid].CompareTo(target);
+                var comparison = span[mid].Key.CompareTo(target);
                 switch (comparison)
                 {
                     case 0: // Equal
@@ -109,12 +106,8 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
 
         private KeyValuePair<TKey, TValue> this[int index]
         {
-            get => new(_keys[index], _values[index]);
-            set
-            {
-                _keys[index] = value.Key;
-                _values[index] = value.Value;
-            }
+            get => _pairs[index];
+            set => _pairs[index] = value;
         }
         // The new node is always at the right side
         private LeafNode Split()
@@ -134,7 +127,7 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
         }
         public InsertionResultPayload Insert(TKey key, TValue value)
         {
-            var (index, isExactMatch) = NearestBinarySearch(Keys, key);
+            var (index, isExactMatch) = NearestBinarySearch(Pairs, key);
             // if (index == -1) // Empty
             // {
             //     throw new UnreachableException();
@@ -142,14 +135,14 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
 
             if (isExactMatch)
             {
-                _values[index] = value;
+                _pairs[index] = new (key, value);
                 return new(InsertionResult.NoSizeChange, null);
             }
 
             var oldFirst = AutoFirstKey;
             if (index == -1)
             {
-                index = key.CompareTo(_keys[0]) < 0 ? 0 : KeyCount;
+                index = key.CompareTo(_pairs[0].Key) < 0 ? 0 : KeyCount;
             }
             // if (key.CompareTo(_keys[index]) > 0) 
             //     index++;
@@ -170,9 +163,9 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
 
         public RemovalResultPayload Remove(TKey key)
         {
-            var index = BinarySearch(Keys, key);
+            var index = BinarySearch(Pairs, key);
             if (index == -1) return new(RemovalResult.NoSizeChange, default);
-            var value = _values[index];
+            var value = _pairs[index].Value;
             var oldFirst = AutoFirstKey;
             for (var i = index; i < KeyCount - 1; i++)
             {
@@ -199,7 +192,7 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
             var targetSize = target.KeyCount;
             var oldSize = KeyCount;
             var newSize = oldSize + targetSize;
-            (_keys, _values).DoubleShiftElements(0, oldSize - 1, targetSize);
+            _pairs.ShiftElements(0, oldSize - 1, targetSize);
             for (var i = 0; i < targetSize; i++)
             {
                 this[i] = target[i];
@@ -226,26 +219,26 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
 
         public bool Contains(TKey key)
         {
-            return BinarySearch(Keys, key) != -1;
+            return BinarySearch(Pairs, key) != -1;
         }
 
         public bool TryGetValue(TKey key, [MaybeNullWhen(false)] out TValue value)
         {
-            var index = BinarySearch(Keys, key);
+            var index = BinarySearch(Pairs, key);
             if (index == -1)
             {
                 value = default;
                 return false;
             }
 
-            value = _values[index];
+            value = _pairs[index].Value;
             return true;
         }
 
         public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
         {
             for (var i = 0; i < KeyCount; i++)
-                yield return new(_keys[i], _values[i]);
+                yield return _pairs[i];
         }
 
         IEnumerator IEnumerable.GetEnumerator()
@@ -259,14 +252,14 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
             {
                 case CollectionMode.ClosedInterval:
                 {
-                    var (index, _) = NearestBinarySearch(Keys, leftBound);
+                    var (index, _) = NearestBinarySearch(Pairs, leftBound);
                     if (index == -1)
                     {
-                        index = leftBound.CompareTo(_keys[0]) < 0 ? 0 : KeyCount;
+                        index = leftBound.CompareTo(_pairs[0].Key) < 0 ? 0 : KeyCount;
                     }
-                    while (index < KeyCount && _keys[index].CompareTo(rightBound) <= 0)
+                    while (index < KeyCount && _pairs[index].Key.CompareTo(rightBound) <= 0)
                     {
-                        if (_keys[index].CompareTo(leftBound) >= 0)
+                        if (_pairs[index].Key.CompareTo(leftBound) >= 0)
                             yield return this[index];
                         index++;
                     }
@@ -297,7 +290,6 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
                 default:
                     throw new ArgumentOutOfRangeException(nameof(mode), mode, null);
             }
-            yield break;
         }
     }
 }

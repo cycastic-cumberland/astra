@@ -18,9 +18,6 @@ public class LocalSimpleAggregationBenchmark
 
     private uint GibberishRows => AggregatedRows / 2;
 
-    private static int Stuff(uint a) => unchecked((int)a);
-    private static uint Stuff(int a) => unchecked((uint)a);
-    
     [IterationSetup]
     public void SetUp()
     {
@@ -46,7 +43,8 @@ public class LocalSimpleAggregationBenchmark
                     DataType = DataType.StringMask,
                     Indexed = true,
                 }
-            }
+            },
+            BinaryTreeDegree = (int)(AggregatedRows / 10)
         });
         var data = new SimpleSerializableStruct[AggregatedRows + GibberishRows];
         for (var i = 0; i < AggregatedRows; i++)

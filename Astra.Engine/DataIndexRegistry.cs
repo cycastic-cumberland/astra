@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Runtime.CompilerServices;
+using Astra.Collections.RangeDictionaries.BTree;
 using Astra.Common;
 using Microsoft.Extensions.Logging;
 using Microsoft.IO;
@@ -190,6 +191,7 @@ public sealed class DataIndexRegistry : IDisposable
         }
     }
 
+    private const int DefaultBinaryTreeDegree = 100;
     private static readonly ThreadLocal<ReadOnlyBufferStream?> LocalBuffer = new();
     private static readonly ThreadLocal<RecyclableMemoryStream?> LocalBulkInsertStream = new();
     
@@ -250,7 +252,8 @@ public sealed class DataIndexRegistry : IDisposable
                     var cResolver = new IntegerColumnResolver(offset, shouldBeHashed);
                     offset += cResolver.Occupying;
                     resolver = cResolver;
-                    indexer = column.Indexed ? new IntegerIndexer(cResolver) : null;
+                    indexer = column.Indexed ? new IntegerIndexer(cResolver, schema.BinaryTreeDegree < BTreeMap.MinDegree  
+                        ? DefaultBinaryTreeDegree : schema.BinaryTreeDegree) : null;
                     break;
                 }
                 case DataType.StringMask:
@@ -660,21 +663,18 @@ public sealed class DataIndexRegistry : IDisposable
         }
     }
 
-    private int Clear(AutoIndexer.WriteHandler autoIndexerLock, IndexersWriteLock writeLock)
+    private static int Clear(AutoIndexer.WriteHandler autoIndexerLock, IndexersWriteLock writeLock)
     {
-        if (_destructibleColumnResolvers.Count == 0 && _indexerCount == 0) 
-            return autoIndexerLock.Clear();
-        var count = 0;
-        foreach (var row in autoIndexerLock.ClearSequence())
+        var count = autoIndexerLock.Clear();
+        foreach (var (indexer, resolver) in writeLock)
         {
-            foreach (var write in writeLock)
+            if (indexer != null)
             {
-                write.handler?.RemoveExact(row);
+                indexer.Clear();
+                continue;
             }
-            row.SelectiveDispose(_destructibleColumnResolvers);
-            count++;
+            resolver.Clear();
         }
-
         return count;
     }
     

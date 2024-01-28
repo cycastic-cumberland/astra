@@ -63,7 +63,7 @@ public sealed class StringIndexer(StringColumnResolver resolver) :
             return Repository.Data.TryGetValue(index, out var set) && set.Contains(row);
         }
         
-        public HashSet<ImmutableDataRow>? Fetch(Stream predicateStream)
+        public IEnumerable<ImmutableDataRow>? Fetch(Stream predicateStream)
         {
             var op = predicateStream.ReadUInt();
             return op switch
@@ -119,7 +119,7 @@ public sealed class StringIndexer(StringColumnResolver resolver) :
             return Repository.Data.TryGetValue(index, out var set) && set.Contains(row);
         }
         
-        public HashSet<ImmutableDataRow>? Fetch(Stream predicateStream)
+        public IEnumerable<ImmutableDataRow>? Fetch(Stream predicateStream)
         {
             var op = predicateStream.ReadUInt();
             return op switch
@@ -152,6 +152,12 @@ public sealed class StringIndexer(StringColumnResolver resolver) :
         {
             var index = Repository.Resolver.Dump(row);
             return Repository.Data.TryGetValue(index, out var set) && set.Remove(row);
+        }
+
+        public void Clear()
+        {
+            Repository.Resolver.Clear();
+            Repository.Data.Clear();
         }
 
         public HashSet<ImmutableDataRow>? Remove(string match)

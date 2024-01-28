@@ -37,7 +37,7 @@ public sealed class AutoIndexer :
             return GetEnumerator();
         }
         
-        public HashSet<ImmutableDataRow> Fetch(Stream predicateStream)
+        public IEnumerable<ImmutableDataRow> Fetch(Stream predicateStream)
         {
             throw new NotSupportedException();
         }
@@ -98,6 +98,11 @@ public sealed class AutoIndexer :
             Repository.Data.Clear();
             return deleted;
         }
+
+        void IIndexer.IIndexerWriteHandler.Clear()
+        {
+            _ = Clear();
+        }
         
         public void Commit()
         {
@@ -109,7 +114,7 @@ public sealed class AutoIndexer :
             Dispose();
         }
         
-        public HashSet<ImmutableDataRow> Fetch(Stream predicateStream)
+        public IEnumerable<ImmutableDataRow> Fetch(Stream predicateStream)
         {
             throw new NotSupportedException();
         }

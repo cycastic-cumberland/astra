@@ -15,6 +15,7 @@ public interface IColumnResolver
     public void Deserialize<T>(Stream reader, T row) where T : struct, IDataRow;
     public Task SerializeAsync<T>(Stream writer, T row) where T : struct, IImmutableDataRow;
     public Task DeserializeAsync<T>(Stream reader, T row) where T : struct, IDataRow;
+    public void Clear();
 }
 
 public interface IDestructibleColumnResolver

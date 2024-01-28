@@ -2,17 +2,34 @@ namespace Astra.Engine;
 
 public readonly struct IntersectAggregator : IAggregatorStream
 {
-    private static HashSet<ImmutableDataRow> Intersect(HashSet<ImmutableDataRow> lhs, HashSet<ImmutableDataRow> rhs)
+    private static readonly ThreadLocal<HashSet<ImmutableDataRow>?> LocalSet = new();
+    private static IEnumerable<ImmutableDataRow> Intersect(IEnumerable<ImmutableDataRow> lhs, IEnumerable<ImmutableDataRow> rhs)
     {
-        HashSet<ImmutableDataRow> ret = new();
-        foreach (var row in lhs)
+        var set = LocalSet.Value ?? new();
+        LocalSet.Value = null;
+        try
         {
-            if (rhs.Contains(row)) ret.Add(row);
-        }
+            foreach (var row in lhs)
+            {
+                set.Add(row);
+            }
 
-        return ret;
+            foreach (var row in rhs)
+            {
+                if (set.Contains(row))
+                    yield return row;
+            }
+        }
+        finally
+        {
+            if (LocalSet.Value == null)
+            {
+                set.Clear();
+                LocalSet.Value = set;
+            }
+        }
     }
-    public HashSet<ImmutableDataRow>? ParseStream<T>(Stream predicateStream, T indexersLock) where T : struct, DataIndexRegistry.IIndexersLock
+    public IEnumerable<ImmutableDataRow>? ParseStream<T>(Stream predicateStream, T indexersLock) where T : struct, DataIndexRegistry.IIndexersLock
     {
         var left = IAggregatorStream.Aggregate(predicateStream, indexersLock);
         var right = IAggregatorStream.Aggregate(predicateStream, indexersLock);

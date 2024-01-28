@@ -13,12 +13,13 @@ public interface IIndexer
     public interface IIndexerReadHandler : IDisposable, IEnumerable<ImmutableDataRow>
     {
         public bool Contains(ImmutableDataRow row);
-        public HashSet<ImmutableDataRow>? Fetch(Stream predicateStream);
+        public IEnumerable<ImmutableDataRow>? Fetch(Stream predicateStream);
     }
     public interface IIndexerWriteHandler : IIndexerReadHandler, ITransaction
     {
         public void Add(ImmutableDataRow row);
         public bool RemoveExact(ImmutableDataRow row);
+        public void Clear();
     }
     public IIndexerReadHandler Read();
     public IIndexerWriteHandler Write();

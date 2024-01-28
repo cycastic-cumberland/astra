@@ -5,7 +5,7 @@ namespace Astra.Collections.RangeDictionaries.BTree;
 
 public sealed partial class BTreeMap<TKey, TValue>
 {
-    public const int MinDegree = 2;
+    private const int MinDegree = BTreeMap.MinDegree;
     // private ulong _structureVersion;
     private readonly int _degree;
     private INode? _root;
@@ -15,11 +15,11 @@ public sealed partial class BTreeMap<TKey, TValue>
 
     public BTreeMap(int degree)
     {
-        if (degree < MinDegree) throw new NotSupportedException($"degree must be {MinDegree} or greater");
+        if (degree < MinDegree) throw new NotSupportedException($"{nameof(degree)} must be {MinDegree} or greater");
         _degree = degree;
     }
 
-    public void Insert(TKey key, TValue value)
+    private void Insert(TKey key, TValue value)
     {
         if (_root == null)
         {
@@ -143,7 +143,7 @@ public sealed partial class BTreeMap<TKey, TValue>
     public IEnumerable<KeyValuePair<TKey, TValue>> Collect(TKey fromBound, TKey toBound, CollectionMode mode)
     {
         if (toBound < fromBound)
-            throw new ArgumentException($"{nameof(fromBound)} must be lower than {nameof(toBound)}");
+            (toBound, fromBound) = (fromBound, toBound);
         return _root == null 
             ? ArraySegment<KeyValuePair<TKey, TValue>>.Empty 
             : _root.Collect(fromBound, toBound, mode);

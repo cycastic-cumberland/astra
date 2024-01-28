@@ -14,7 +14,7 @@ public class IntegerBTreeInsertionBenchmark
     private BTreeMap<int, int> _tree = null!;
     private SortedDictionary<int, int> _reference = null!;
 
-    [Params(10, 100)]
+    [Params(10, 100, 1_000)]
     public int Degree;
 
     [Params(1_000, 10_000, 100_000)]

@@ -58,7 +58,7 @@ public sealed class BytesIndexer(BytesColumnResolver resolver) :
             return Repository.Data.TryGetValue(hash, out var set) && set.Contains(row);
         }
         
-        public HashSet<ImmutableDataRow>? Fetch(Stream predicateStream)
+        public IEnumerable<ImmutableDataRow>? Fetch(Stream predicateStream)
         {
             var op = predicateStream.ReadUInt();
             return op switch
@@ -119,7 +119,7 @@ public sealed class BytesIndexer(BytesColumnResolver resolver) :
             return Repository.Data.TryGetValue(hash, out var set) && set.Contains(row);
         }
         
-        public HashSet<ImmutableDataRow>? Fetch(Stream predicateStream)
+        public IEnumerable<ImmutableDataRow>? Fetch(Stream predicateStream)
         {
             var op = predicateStream.ReadUInt();
             return op switch
@@ -152,6 +152,12 @@ public sealed class BytesIndexer(BytesColumnResolver resolver) :
         {
             var (_, hash) = Repository.Resolver.Dump(row);
             return Repository.Data.TryGetValue(hash, out var set) && set.Remove(row);
+        }
+
+        public void Clear()
+        {
+            Repository.Resolver.Clear();
+            Repository.Data.Clear();
         }
 
         public HashSet<ImmutableDataRow>? Remove(BytesCluster match)
