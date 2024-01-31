@@ -5,13 +5,19 @@ internal static class ColumnHelper
     public static readonly IReadOnlyDictionary<Type, Func<int, object>> Lookup = new Dictionary<Type, Func<int, object>>
     {
         [typeof(int)] = CreateInt,
+        [typeof(long)] = CreateLong,
+        [typeof(float)] = CreateSingle,
+        [typeof(double)] = CreateDouble,
         [typeof(string)] = CreateString,
         [typeof(byte[])] = CreateBytes,
     };
 
-    private static IntegerColumn CreateInt(int offset) => new IntegerColumn(offset);
-    private static StringColumn CreateString(int offset) => new StringColumn(offset);
-    private static BytesColumn CreateBytes(int offset) => new BytesColumn(offset);
+    private static IntegerColumn CreateInt(int offset) => new(offset);
+    private static LongColumn CreateLong(int offset) => new(offset);
+    private static SingleColumn CreateSingle(int offset) => new(offset);
+    private static DoubleColumn CreateDouble(int offset) => new(offset);
+    private static StringColumn CreateString(int offset) => new(offset);
+    private static BytesColumn CreateBytes(int offset) => new(offset);
 }
 
 public static class AstraColumns<T>

@@ -110,7 +110,35 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
         bytes = span.ToArray();
         return stream.WriteAsync(bytes, cancellationToken);
     }
-    
+
+    public void SaveValue(float value)
+    {
+        WriteDWordUnsafe(stream, value);
+    }
+
+    public ValueTask SaveValueAsync(float value, CancellationToken cancellationToken = default)
+    {
+        var bytes = BitConverter.GetBytes(value);
+        var span = bytes.AsSpan();
+        span.Reverse();
+        bytes = span.ToArray();
+        return stream.WriteAsync(bytes, cancellationToken);
+    }
+
+    public void SaveValue(double value)
+    {
+        WriteQWordUnsafe(stream, value);
+    }
+
+    public ValueTask SaveValueAsync(double value, CancellationToken cancellationToken = default)
+    {
+        var bytes = BitConverter.GetBytes(value);
+        var span = bytes.AsSpan();
+        span.Reverse();
+        bytes = span.ToArray();
+        return stream.WriteAsync(bytes, cancellationToken);
+    }
+
     private void WriteShortString(string value)
     {
         // Reference: https://www.rfc-editor.org/rfc/rfc3629 (Section 3. UTF-8 definition)
@@ -184,6 +212,24 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
     public ulong LoadULong()
     {
         return ReadQWordUnsafe(stream);
+    }
+
+    public float LoadSingle()
+    {
+        unsafe
+        {
+            var value = ReadDWordUnsafe(stream);
+            return *(float*)&value;
+        }
+    }
+
+    public double LoadDouble()
+    {
+        unsafe
+        {
+            var value = ReadQWordUnsafe(stream);
+            return *(double*)&value;
+        }
     }
 
     public string LoadString()

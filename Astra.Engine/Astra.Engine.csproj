@@ -12,7 +12,7 @@
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Astra.Collections.RangeDictionaries\Astra.Collections.RangeDictionaries.csproj" />
+      <ProjectReference Include="..\Astra.Collections\Astra.Collections.csproj" />
       <ProjectReference Include="..\Astra.Common\Astra.Common.csproj" />
     </ItemGroup>
 

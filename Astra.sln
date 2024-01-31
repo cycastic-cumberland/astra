@@ -16,7 +16,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Astra.Experiments", "Astra.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Astra.Common", "Astra.Common\Astra.Common.csproj", "{B1B08032-B42C-4E58-A2C2-512EF11E078B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Astra.Collections.RangeDictionaries", "Astra.Collections.RangeDictionaries\Astra.Collections.RangeDictionaries.csproj", "{0F26B364-056A-478C-83D0-1408B77696F1}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Astra.Collections", "Astra.Collections\Astra.Collections.csproj", "{0F26B364-056A-478C-83D0-1408B77696F1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestStuff", "TestStuff\TestStuff.csproj", "{06F25645-8E91-4D52-BABA-A0F034E1668D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -60,5 +62,9 @@ Global
 		{0F26B364-056A-478C-83D0-1408B77696F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0F26B364-056A-478C-83D0-1408B77696F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0F26B364-056A-478C-83D0-1408B77696F1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{06F25645-8E91-4D52-BABA-A0F034E1668D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{06F25645-8E91-4D52-BABA-A0F034E1668D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{06F25645-8E91-4D52-BABA-A0F034E1668D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{06F25645-8E91-4D52-BABA-A0F034E1668D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

@@ -13,7 +13,7 @@ public static class StreamReadAddons
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe T ReadUnmanagedStruct<T>(this Stream reader) where T : unmanaged
+    public static unsafe T ReadUnmanagedStruct<T>(this Stream reader) where T : unmanaged
     {
         void* ptr = stackalloc byte[sizeof(T)];
         reader.ReadExactly(new Span<byte>(ptr, sizeof(T)));
@@ -36,6 +36,11 @@ public static class StreamReadAddons
     public static uint ReadUInt(this Stream reader)
     {
         return ReadUnmanagedStruct<uint>(reader);
+    }
+    
+    public static float ReadSingle(this Stream reader)
+    {
+        return ReadUnmanagedStruct<float>(reader);
     }
     
     public static double ReadDouble(this Stream reader)

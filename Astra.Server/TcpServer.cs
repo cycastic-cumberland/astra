@@ -6,6 +6,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Astra.Common;
 using Astra.Engine;
+using Astra.Engine.Data;
 using Astra.Server.Authentication;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -328,7 +329,7 @@ public class TcpServer : IDisposable
             }
 
             var handshakeAttempt = await stream.ReadULongAsync(token: cancellationToken);
-            if (handshakeAttempt != CommunicationProtocol.HandshakeResponse)
+            if (handshakeAttempt != CommunicationProtocol.SimpleClientResponse)
             {
                 _logger.LogDebug("Client {} failed handshake attempt: incorrect message", address);
                 client.Close();

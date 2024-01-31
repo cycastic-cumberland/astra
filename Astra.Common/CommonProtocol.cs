@@ -2,7 +2,7 @@ namespace Astra.Common;
 
 public static class CommonProtocol
 {
-    public const uint AstraCommonVersion = 0x00010900U;
+    public const uint AstraCommonVersion = 0x00011000U;
     public const int LongStringThreshold = 96;
     public const uint PublicKeyChallengeLength = 64;
     public const int SaltLength = 16;

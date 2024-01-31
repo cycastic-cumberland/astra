@@ -12,18 +12,14 @@ public static class StreamWriteAddons
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static unsafe void WriteValueInternal(this Stream writer, void* ptr, int size)
+    public static unsafe void WriteUnmanagedValue<T>(this Stream writer, T value) where T : unmanaged
     {
-        writer.Write(new ReadOnlySpan<byte>(ptr, size));  
+        writer.Write(new ReadOnlySpan<byte>(&value, sizeof(T)));
     }
     
     public static void WriteValue(this Stream writer, int value)
     {
-        // writer.Write(BitConverter.GetBytes(value));
-        unsafe
-        {
-            writer.WriteValueInternal(&value, sizeof(int));
-        }
+        writer.WriteUnmanagedValue(value);
     }
     
     public static ValueTask WriteValueAsync(this Stream writer, int value, CancellationToken token = default)
@@ -33,11 +29,7 @@ public static class StreamWriteAddons
     
     public static void WriteValue(this Stream writer, uint value)
     {
-        // writer.Write(BitConverter.GetBytes(value));
-        unsafe
-        {
-            writer.WriteValueInternal(&value, sizeof(uint));
-        }
+        writer.WriteUnmanagedValue(value);
     }
     
     public static ValueTask WriteValueAsync(this Stream writer, uint value, CancellationToken token = default)
@@ -45,22 +37,29 @@ public static class StreamWriteAddons
         return writer.WriteAsync(BitConverter.GetBytes(value), token);
     }
     
+    public static void WriteValue(this Stream writer, float value)
+    {
+        writer.WriteUnmanagedValue(value);
+    }
+    
+    public static ValueTask WriteValueAsync(this Stream writer, float value, CancellationToken token = default)
+    {
+        return writer.WriteAsync(BitConverter.GetBytes(value), token);
+    }
+    
     public static void WriteValue(this Stream writer, double value)
     {
-        // writer.Write(BitConverter.GetBytes(value));
-        unsafe
-        {
-            writer.WriteValueInternal(&value, sizeof(double));
-        }
+        writer.WriteUnmanagedValue(value);
+    }
+    
+    public static ValueTask WriteValueAsync(this Stream writer, double value, CancellationToken token = default)
+    {
+        return writer.WriteAsync(BitConverter.GetBytes(value), token);
     }
     
     public static void WriteValue(this Stream writer, long value)
     {
-        // writer.Write(BitConverter.GetBytes(value));
-        unsafe
-        {
-            writer.WriteValueInternal(&value, sizeof(long));
-        }
+        writer.WriteUnmanagedValue(value);
     }
     
     public static ValueTask WriteValueAsync(this Stream writer, long value, CancellationToken token = default)
@@ -75,10 +74,7 @@ public static class StreamWriteAddons
     
     public static void WriteValue(this Stream writer, ulong value)
     {
-        unsafe
-        {
-            writer.WriteValueInternal(&value, sizeof(ulong));
-        }
+        writer.WriteUnmanagedValue(value);
     }
 
     private static void WriteShortString(this Stream writer, string value)
@@ -154,9 +150,6 @@ public static class StreamWriteAddons
 
     public static void WriteValue(this Stream writer, Hash128 hash)
     {
-        unsafe
-        {
-            writer.WriteValueInternal(&hash, Hash128.Size);
-        }
+        writer.WriteUnmanagedValue(hash);
     }
 }

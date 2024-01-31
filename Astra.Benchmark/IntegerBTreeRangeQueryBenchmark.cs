@@ -1,4 +1,3 @@
-using Astra.Collections.RangeDictionaries.BTree;
 using BenchmarkDotNet.Attributes;
 
 namespace Astra.Benchmark;
@@ -9,7 +8,7 @@ public class IntegerBTreeRangeQueryBenchmark
     
     private static int NextNumber => Rng.Next(int.MinValue, int.MaxValue);
     
-    private BTreeMap<int, int> _tree = null!;
+    private Collections.RangeDictionaries.BTree.BTreeMap<int, int> _tree = null!;
     private int _lower;
     private int _upper;
     

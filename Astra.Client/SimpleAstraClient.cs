@@ -107,7 +107,7 @@ public class SimpleAstraClient : IAstraClient
             if (serverVersion != CommonProtocol.AstraCommonVersion) 
                 throw new VersionNotSupportedException($"Astra.Server version not supported: {serverVersion.ToAstraCommonVersion()}");
 
-            await networkStream.WriteValueAsync(CommunicationProtocol.HandshakeResponse, cancellationToken);
+            await networkStream.WriteValueAsync(CommunicationProtocol.SimpleClientResponse, cancellationToken);
             timer.Restart();
             while (networkClient.Available < sizeof(uint))
             {
@@ -276,6 +276,8 @@ public class SimpleAstraClient : IAstraClient
                 count++;
             }
         }
+
+        if (count == 0) return 0;
 
         await clientStream.WriteValueAsync(InsertHeaderSize + _inStream.Position, cancellationToken);
         await clientStream.WriteValueAsync(Command.CreateWriteHeader(1U), cancellationToken); // 1 command

@@ -44,6 +44,26 @@ public readonly struct ForwardStreamWrapper(Stream stream) : IStreamWrapper
         return stream.WriteValueAsync(value, cancellationToken);
     }
 
+    public void SaveValue(float value)
+    {
+        stream.WriteValue(value);
+    }
+
+    public ValueTask SaveValueAsync(float value, CancellationToken cancellationToken = default)
+    {
+        return stream.WriteValueAsync(value, cancellationToken);
+    }
+
+    public void SaveValue(double value)
+    {
+        stream.WriteValue(value);
+    }
+
+    public ValueTask SaveValueAsync(double value, CancellationToken cancellationToken = default)
+    {
+        return stream.WriteValueAsync(value, cancellationToken);
+    }
+
     public void SaveValue(string value)
     {
         stream.WriteValue(value);
@@ -92,6 +112,16 @@ public readonly struct ForwardStreamWrapper(Stream stream) : IStreamWrapper
     public ulong LoadULong()
     {
         return stream.ReadULong();
+    }
+
+    public float LoadSingle()
+    {
+        return stream.ReadSingle();
+    }
+
+    public double LoadDouble()
+    {
+        return stream.ReadDouble();
     }
 
     public string LoadString()

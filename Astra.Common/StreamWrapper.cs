@@ -10,6 +10,10 @@ public interface IStreamWrapper
     public ValueTask SaveValueAsync(long value, CancellationToken cancellationToken = default);
     public void SaveValue(ulong value);
     public ValueTask SaveValueAsync(ulong value, CancellationToken cancellationToken = default);
+    public void SaveValue(float value);
+    public ValueTask SaveValueAsync(float value, CancellationToken cancellationToken = default);
+    public void SaveValue(double value);
+    public ValueTask SaveValueAsync(double value, CancellationToken cancellationToken = default);
     public void SaveValue(string value);
     public ValueTask SaveValueAsync(string value, CancellationToken cancellationToken = default);
     public void SaveValue(byte[] value);
@@ -20,6 +24,8 @@ public interface IStreamWrapper
     public uint LoadUInt();
     public long LoadLong();
     public ulong LoadULong();
+    public float LoadSingle();
+    public double LoadDouble();
     public string LoadString();
     public byte[] LoadBytes();
     public BytesCluster LoadBytesCluster();
