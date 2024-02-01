@@ -18,8 +18,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Astra.Common", "Astra.Commo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Astra.Collections", "Astra.Collections\Astra.Collections.csproj", "{0F26B364-056A-478C-83D0-1408B77696F1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestStuff", "TestStuff\TestStuff.csproj", "{06F25645-8E91-4D52-BABA-A0F034E1668D}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -62,9 +60,5 @@ Global
 		{0F26B364-056A-478C-83D0-1408B77696F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0F26B364-056A-478C-83D0-1408B77696F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0F26B364-056A-478C-83D0-1408B77696F1}.Release|Any CPU.Build.0 = Release|Any CPU
-		{06F25645-8E91-4D52-BABA-A0F034E1668D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{06F25645-8E91-4D52-BABA-A0F034E1668D}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{06F25645-8E91-4D52-BABA-A0F034E1668D}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{06F25645-8E91-4D52-BABA-A0F034E1668D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
