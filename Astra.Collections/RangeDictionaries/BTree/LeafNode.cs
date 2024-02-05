@@ -171,33 +171,73 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
         {
             return new(this, depth);
         }
+
+        private IEnumerable<KeyValuePair<TKey, TValue>> CollectClosedInterval(TKey leftBound, TKey rightBound)
+        {
+            var maxIndex = KeyCount;
+            var (index, _) = Pairs.NearestBinarySearch(leftBound);
+            if (index < 0)
+            {
+                index = leftBound.CompareTo(_pairs[0].Key) < 0 ? 0 : KeyCount;
+            }
+            while (index < maxIndex && _pairs[index].Key.CompareTo(rightBound) <= 0)
+            {
+                yield return this[index];
+                index++;
+            }
+        }
+
+        private IEnumerable<KeyValuePair<TKey, TValue>> CollectHalfClosedLeftInterval(TKey leftBound, TKey rightBound)
+        {
+            var maxIndex = KeyCount;
+            var (index, _) = Pairs.NearestBinarySearch(leftBound);
+            if (index < 0)
+            {
+                index = leftBound.CompareTo(_pairs[0].Key) < 0 ? 0 : KeyCount;
+            }
+            while (index < maxIndex && _pairs[index].Key.CompareTo(rightBound) < 0)
+            {
+                yield return this[index];
+                index++;
+            }
+        }
+
+        private IEnumerable<KeyValuePair<TKey, TValue>> CollectHalfClosedRightInterval(TKey leftBound, TKey rightBound)
+        {
+            var maxIndex = KeyCount;
+            var (index, _) = Pairs.NearestBinarySearch(leftBound);
+            if (index < 0)
+            {
+                index = leftBound.CompareTo(_pairs[0].Key) < 0 ? 0 : KeyCount;
+            } 
+            if (leftBound.CompareTo(_pairs[index].Key) == 0)
+            {
+                index++;
+            }
+
+            while (index < maxIndex && _pairs[index].Key.CompareTo(rightBound) <= 0)
+            {
+                yield return this[index];
+                index++;
+            }
+        }
+        
         public IEnumerable<KeyValuePair<TKey, TValue>> Collect(int _, TKey leftBound, TKey rightBound, CollectionMode mode)
         {
             switch (mode)
             {
-                case CollectionMode.ClosedInterval:
+                case CollectionMode.ClosedInterval: // [a; b]
                 {
-                    var (index, _) = Pairs.NearestBinarySearch(leftBound);
-                    if (index == -1)
-                    {
-                        index = leftBound.CompareTo(_pairs[0].Key) < 0 ? 0 : KeyCount;
-                    }
-                    while (index < KeyCount && _pairs[index].Key.CompareTo(rightBound) <= 0)
-                    {
-                        if (_pairs[index].Key.CompareTo(leftBound) >= 0)
-                            yield return this[index];
-                        index++;
-                    }
-                    break;
+                    return CollectClosedInterval(leftBound, rightBound);
                 }
-                case CollectionMode.HalfClosedLeftInterval:
-                // {
-                //     break;
-                // }
-                case CollectionMode.HalfClosedRightInterval:
-                // {
-                //     break;
-                // }
+                case CollectionMode.HalfClosedLeftInterval: // [a; b)
+                {
+                    return CollectHalfClosedLeftInterval(leftBound, rightBound);
+                }
+                case CollectionMode.HalfClosedRightInterval: // (a; b]
+                {
+                    return CollectHalfClosedRightInterval(leftBound, rightBound);
+                }
                 case CollectionMode.OpenInterval:
                 // {
                 //     break;

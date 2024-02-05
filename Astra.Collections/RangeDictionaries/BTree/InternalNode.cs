@@ -142,7 +142,11 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
             for (var i = 0; i < _splitSize; i++)
             {
                 newNode[i] = _children[moveIndex + i];
+#if DEBUG
+                _children[moveIndex + i] = null!;
+#endif
             }
+            
             ChildCount -= _splitSize;
             return newNode;
         }
@@ -155,8 +159,8 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
 
         private void ManuallyInsertChild(INode child, int index)
         {
-            var oldFirst = PrimaryKey;
-            if (child.PrimaryKey.CompareTo(_children[index].PrimaryKey) > 0) index++;
+            if (child.PrimaryKey.CompareTo(_children[index].PrimaryKey) > 0) 
+                index++;
             for (var i = ChildCount; i > index; i--)
             {
                 _children[i] = _children[i - 1];
@@ -164,8 +168,9 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
 
             Adopt(child, index);
             ChildCount++;
-            if (index == 0 && Parent != null && Parent.PrimaryKey.Equals(oldFirst))
-                Parent.PrimaryKey = child.PrimaryKey;
+            // It never insert at index 0
+            // if (index == 0)
+            //     PrimaryKey = child.PrimaryKey;
         }
 
         public InsertionResultPayload Insert(TKey key, TValue value)
@@ -230,8 +235,24 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
             {
                 case RemovalResult.Empty:
                 {
+                    if (ChildCount == 1)
+                    {
+#if DEBUG
+                        if (index != 0)
+                        {
+                            throw new UnreachableException();
+                        }
+#endif
+                        _children[0] = null!;
+                        ChildCount--;
+                        return new(RemovalResult.Empty, ret.Value);
+                    }
+
+                    if (index == 0)
+                    {
+                        PrimaryKey = _children[1].PrimaryKey;
+                    }
                     RemoveNode(index);
-                    if (ChildCount == 0) return new(RemovalResult.Empty, ret.Value);
                     return new(RemovalResult.SizeChanged, ret.Value);
                 }
                 case RemovalResult.NoSizeChange:
@@ -398,6 +419,8 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
                 }
                 switch (tray.Mode)
                 {
+                    case CollectionMode.HalfClosedLeftInterval:
+                    case CollectionMode.HalfClosedRightInterval:
                     case CollectionMode.ClosedInterval:
                     {
                         var index = NearestBinarySearch(tray.Node.Children, tray.FromBound);
@@ -411,14 +434,6 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
                         stack.Push(tray with { Index = index });
                         break;
                     }
-                    case CollectionMode.HalfClosedLeftInterval:
-                    // {
-                    //     break;
-                    // }
-                    case CollectionMode.HalfClosedRightInterval:
-                    // {
-                    //     break;
-                    // }
                     case CollectionMode.OpenInterval:
                     // {
                     //     break;

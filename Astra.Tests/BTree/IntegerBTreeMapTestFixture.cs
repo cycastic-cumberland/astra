@@ -135,6 +135,8 @@ public class IntegerBTreeMapTestFixture
     private void GreaterTestInternal()
     {
         var bound = ClampedRandom;
+        _tree[bound] = 42;
+        _correspondingDict[bound] = 42;
         var model = _correspondingDict.Where(o => o.Key > bound)
             .ToImmutableSortedDictionary();
         var fromTree = _tree.CollectFrom(bound, false);
@@ -151,6 +153,8 @@ public class IntegerBTreeMapTestFixture
     private void GreaterOrEqualTestInternal()
     {
         var bound = ClampedRandom;
+        _tree[bound] = 42;
+        _correspondingDict[bound] = 42;
         var model = _correspondingDict.Where(o => o.Key >= bound)
             .ToImmutableSortedDictionary();
         var fromTree = _tree.CollectFrom(bound);
@@ -167,6 +171,8 @@ public class IntegerBTreeMapTestFixture
     private void LowerTestInternal()
     {
         var bound = ClampedRandom;
+        _tree[bound] = 42;
+        _correspondingDict[bound] = 42;
         var model = _correspondingDict.Where(o => o.Key < bound)
             .ToImmutableSortedDictionary();
         var fromTree = _tree.CollectTo(bound, false);
@@ -183,6 +189,8 @@ public class IntegerBTreeMapTestFixture
     private void LowerOrEqualTestInternal()
     {
         var bound = ClampedRandom;
+        _tree[bound] = 42;
+        _correspondingDict[bound] = 42;
         var model = _correspondingDict.Where(o => o.Key <= bound)
             .ToImmutableSortedDictionary();
         var fromTree = _tree.CollectTo(bound);

@@ -5,7 +5,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace Astra.Collections.RangeDictionaries.BTree;
 
 [DebuggerTypeProxy(typeof(BTreeDebugView<,>))]
-[DebuggerDisplay("Count = {Count}, Degree = {Degree}")]
+[DebuggerDisplay("Count = {LongCount}, Degree = {Degree}, Depth = {Depth}")]
 public sealed partial class BTreeMap<TKey, TValue>
 {
     private const int MinDegree = BTreeMap.MinDegree;
@@ -167,20 +167,14 @@ public sealed partial class BTreeMap<TKey, TValue>
 
     public IEnumerable<KeyValuePair<TKey, TValue>> CollectFrom(TKey fromBound, bool inclusive = true)
     {
-        return inclusive
-            ? Collect(fromBound, NumericHelper.GetMax<TKey>(), CollectionMode.ClosedInterval)
-            : Collect(fromBound == NumericHelper.GetMax<TKey>() 
-                ? fromBound 
-                : fromBound + NumericHelper.GetEpsilon<TKey>(), NumericHelper.GetMax<TKey>(), CollectionMode.ClosedInterval);
+        var mode = inclusive ? CollectionMode.ClosedInterval : CollectionMode.HalfClosedRightInterval;
+        return Collect(fromBound, NumericHelper.GetMax<TKey>(), mode);
     }
 
     public IEnumerable<KeyValuePair<TKey, TValue>> CollectTo(TKey toBound, bool inclusive = true)
     {
-        return inclusive
-            ? Collect(NumericHelper.GetMin<TKey>(), toBound, CollectionMode.ClosedInterval)
-            : Collect(NumericHelper.GetMin<TKey>(), toBound == NumericHelper.GetMin<TKey>()
-                ? toBound
-                : toBound - NumericHelper.GetEpsilon<TKey>(), CollectionMode.ClosedInterval);
+        var mode = inclusive ? CollectionMode.ClosedInterval : CollectionMode.HalfClosedLeftInterval;
+        return Collect(NumericHelper.GetMin<TKey>(), toBound, mode);
     }
     
     public void Add(KeyValuePair<TKey, TValue> item)
@@ -277,5 +271,10 @@ public sealed partial class BTreeMap<TKey, TValue>
         }
 
         return collected;
+    }
+
+    public bool StructuralCompare(BTreeMap<TKey, TValue> tree)
+    {
+        return StructuralComparer.Compare(this, tree);
     }
 }
