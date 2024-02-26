@@ -9,6 +9,8 @@ public readonly struct BytesCluster : IReadOnlyCollection<byte>, IDisposable
     private readonly byte[] _raw;
     private readonly long _usableSize;
 
+    public bool IsNull => _raw == null!;
+
     public Span<byte> Writer
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

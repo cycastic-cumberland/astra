@@ -5,6 +5,7 @@ using System.Text;
 
 namespace Astra.Common;
 
+[StructLayout(LayoutKind.Sequential)]
 public readonly struct Hash128 : IEquatable<Hash128>
 {
     public const int Size = 16;
@@ -36,6 +37,18 @@ public readonly struct Hash128 : IEquatable<Hash128>
     public static Hash128 HashMd5Fast(string str) => HashMd5(MemoryMarshal.AsBytes(str.AsSpan()));
 
     public static Hash128 HashXx128(ReadOnlySpan<byte> array) => Create(System.IO.Hashing.XxHash128.HashToUInt128(array));
+
+    private static unsafe ReadOnlySpan<byte> GetBytes(Hash128 hash)
+    {
+        return new(&hash, Size);
+    }
+
+    public unsafe void CopyTo(Stream stream)
+    {
+        var vector = _vector;
+        var span = new ReadOnlySpan<byte>(&vector, Size);
+        stream.Write(span);
+    }
     
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public bool Equals(Hash128 other)

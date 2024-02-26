@@ -26,6 +26,8 @@ public class SaltedPasswordAuthenticationHandler(
         {
 #if DEBUG
             await Task.Delay(100, cancellationToken);
+#else
+            Thread.Yield();
 #endif
             if (timer.ElapsedMilliseconds > timeout)
                 return IAuthenticationHandler.AuthenticationState.Timeout;
@@ -33,7 +35,7 @@ public class SaltedPasswordAuthenticationHandler(
 
         var bytes = new byte[Hash256.Size];
         await stream.ReadExactlyAsync(bytes, cancellationToken);
-        var userHash = Hash256.CreateUnsafe(bytes);
+        var userHash = Hash256.Create(bytes);
         var correctHash = hasher(CommonProtocol.CombineSalt(rawPassword, salt));
         return comparer(userHash, correctHash) ? IAuthenticationHandler.AuthenticationState.AllowConnection : IAuthenticationHandler.AuthenticationState.RejectConnection;
     }

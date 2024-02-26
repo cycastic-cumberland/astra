@@ -1,4 +1,3 @@
-using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 
 namespace Astra.Collections.WideDictionary;
@@ -7,9 +6,10 @@ public interface IHasher<in T>
 {
     protected const long Seed = 42L;
     public ulong Hash(T item);
+    public bool Equals(T lhs, T rhs);
 }
 
-public abstract class UnmanagedTypeHasher<T> : IHasher<T> where T : unmanaged
+public abstract class UnmanagedTypeHasher<T> : IHasher<T> where T : unmanaged, IEquatable<T>
 {
     public ulong Hash(T item)
     {
@@ -18,6 +18,8 @@ public abstract class UnmanagedTypeHasher<T> : IHasher<T> where T : unmanaged
             return System.IO.Hashing.XxHash64.HashToUInt64(new ReadOnlySpan<byte>(&item, sizeof(T)), IHasher<T>.Seed);
         }
     }
+
+    public bool Equals(T lhs, T rhs) => lhs.Equals(rhs);
 }
 
 public sealed class U8Hasher : UnmanagedTypeHasher<byte>;
@@ -39,6 +41,8 @@ public sealed class U64Hasher : IHasher<ulong>
     {
         return item;
     }
+    
+    public bool Equals(ulong lhs, ulong rhs) => lhs.Equals(rhs);
 }
 
 public sealed class I64Hasher : IHasher<long>
@@ -47,6 +51,8 @@ public sealed class I64Hasher : IHasher<long>
     {
         return unchecked((ulong)item);
     }
+    
+    public bool Equals(long lhs, long rhs) => lhs.Equals(rhs);
 }
 
 public sealed class U128Hasher : UnmanagedTypeHasher<UInt128>;
@@ -67,6 +73,8 @@ public sealed class StringHasher : IHasher<string>
     {
         return System.IO.Hashing.XxHash64.HashToUInt64(MemoryMarshal.Cast<char, byte>(item.AsSpan()), IHasher<string>.Seed);
     }
+
+    public bool Equals(string lhs, string rhs) => lhs == rhs;
 }
 
 public sealed class BytesHasher : IHasher<byte[]>
@@ -75,13 +83,24 @@ public sealed class BytesHasher : IHasher<byte[]>
     {
         return System.IO.Hashing.XxHash64.HashToUInt64(item, IHasher<byte[]>.Seed);
     }
+
+    public bool Equals(byte[] lhs, byte[] rhs)
+    {
+        return BytesComparisonHelper.Equals(lhs, rhs);
+    }
 }
 
 public sealed class BytesMemoryHasher : IHasher<ReadOnlyMemory<byte>>
 {
+    public static readonly BytesMemoryHasher Default = new();
     public ulong Hash(ReadOnlyMemory<byte> item)
     {
         return System.IO.Hashing.XxHash64.HashToUInt64(item.Span, IHasher<byte[]>.Seed);
+    }
+    
+    public bool Equals(ReadOnlyMemory<byte> lhs, ReadOnlyMemory<byte> rhs)
+    {
+        return BytesComparisonHelper.Equals(lhs, rhs);
     }
 }
 
@@ -93,6 +112,8 @@ public sealed class FallbackHasher<T> : IHasher<T>
     {
         return item == null ? 0UL : I32Hasher.Default.Hash(EqualityComparer<T>.Default.GetHashCode(item));
     }
+
+    public bool Equals(T lhs, T rhs) => EqualityComparer<T>.Default.Equals(lhs, rhs);
 }
 
 file static class HasherHelper
@@ -125,7 +146,7 @@ file static class HasherHelper
         [typeof(string)]     = new StringHasher(),
         [typeof(byte[])]     = new BytesHasher(),
         
-        [typeof(ReadOnlyMemory<byte>)] = new BytesMemoryHasher(),
+        [typeof(ReadOnlyMemory<byte>)] = BytesMemoryHasher.Default,
     };
 
     public static IHasher<T> GetHasher<T>()

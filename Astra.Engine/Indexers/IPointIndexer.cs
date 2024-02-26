@@ -1,3 +1,4 @@
+using Astra.Common;
 using Astra.Engine.Data;
 
 namespace Astra.Engine.Indexers;
@@ -20,8 +21,8 @@ public interface IPointIndexer
 }
 
 public interface IPointIndexer<out TR, out TW> : IPointIndexer
-    where TR : struct, IPointIndexer.IPointIndexerReadHandler
-    where TW : struct, IPointIndexer.IPointIndexerWriteHandler
+    where TR : IPointIndexer.IPointIndexerReadHandler
+    where TW : IPointIndexer.IPointIndexerWriteHandler
 {
     public new TR Read();
     public new TW Write();
@@ -42,9 +43,14 @@ public interface IPointIndexer<in T>
 }
 
 public interface IPointIndexer<in T, out TR, out TW> : IPointIndexer<T>
-    where TR : struct, IPointIndexer.IPointIndexerReadHandler
-    where TW : struct, IPointIndexer.IPointIndexerWriteHandler
+    where TR : IPointIndexer.IPointIndexerReadHandler
+    where TW : IPointIndexer.IPointIndexerWriteHandler
 {
     public new TR Read();
     public new TW Write();
+    
+    public uint Priority { get; }
+    public DataType Type { get; }
+    public FeaturesList SupportedReadOperations { get; }
+    public FeaturesList SupportedWriteOperations { get; }
 }

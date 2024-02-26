@@ -16,4 +16,10 @@
       <ProjectReference Include="..\Astra.Common\Astra.Common.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Compile Remove="Indexers\SingleThreadedNumericIndexers.cs" />
+      <Compile Remove="Indexers\SingleThreadedBytesIndexer.cs" />
+      <Compile Remove="Data\SingleThreadedAstraRegistry.cs" />
+    </ItemGroup>
+
 </Project>

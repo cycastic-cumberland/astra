@@ -18,4 +18,6 @@ public static class Operation
     public const uint GreaterOrEqualsTo = FetchFromLeft | IncludeLeft;
     public const uint LesserThan = FetchToRight;
     public const uint LesserOrEqualsTo = FetchToRight | IncludeRight;
+
+    public const uint FuzzySearch = 64;
 }

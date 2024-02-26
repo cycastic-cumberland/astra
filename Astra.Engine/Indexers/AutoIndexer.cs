@@ -1,4 +1,5 @@
 using System.Collections;
+using Astra.Common;
 using Astra.Engine.Data;
 
 namespace Astra.Engine.Indexers;
@@ -38,6 +39,11 @@ public sealed class AutoIndexer :
         }
         
         public IEnumerable<ImmutableDataRow> Fetch(Stream predicateStream)
+        {
+            throw new NotSupportedException();
+        }
+
+        public IEnumerable<ImmutableDataRow>? Fetch(uint operation, Stream predicateStream)
         {
             throw new NotSupportedException();
         }
@@ -118,6 +124,11 @@ public sealed class AutoIndexer :
         {
             throw new NotSupportedException();
         }
+
+        public IEnumerable<ImmutableDataRow>? Fetch(uint operation, Stream predicateStream)
+        {
+            throw new NotSupportedException();
+        }
     }
 
     private readonly Storage _storage = new();
@@ -127,6 +138,11 @@ public sealed class AutoIndexer :
     {
         return Write();
     }
+
+    public FeaturesList SupportedReadOperations => FeaturesList.None;
+    public FeaturesList SupportedWriteOperations => FeaturesList.None;
+    public uint Priority => 0;
+    public DataType Type => DataType.None;
 
     IIndexer.IIndexerReadHandler IIndexer.Read()
     {

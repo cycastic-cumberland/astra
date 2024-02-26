@@ -5,37 +5,48 @@ using System.Text;
 
 namespace Astra.Common;
 
+[StructLayout(LayoutKind.Sequential)]
 public readonly struct Hash256 : IEquatable<Hash256>
 {
     public const int Size = 32;
     private readonly Vector256<ulong> _vector;
+
+    private Hash256(Vector256<ulong> vector) => _vector = vector;
     
-    public static unsafe Hash256 CreateUnsafe(ReadOnlySpan<byte> array)
+    private static unsafe ReadOnlySpan<byte> GetBytes(Hash256 hash)
     {
-        if (array.Length != Size) throw new ArgumentException(nameof(array));
-        fixed (void* ptr = &array[0])
+        return new(&hash, Size);
+    }
+
+    private static unsafe Hash256 CreateUnsafe(ReadOnlySpan<byte> array)
+    {
+        fixed (byte* ptr = &array[0])
         {
-            // Maybe this would cause some problems with alignment...
             return *(Hash256*)ptr;
-        }
+        } 
+    }
+    
+    public static Hash256 Create(ReadOnlySpan<byte> array)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(array.Length, Size, nameof(array));
+        return CreateUnsafe(array);
     }
 
     public static Hash256 HashSha256(string str) => HashSha256(Encoding.UTF8.GetBytes(str));
-    public static Hash256 HashSha256Fast(string str) => HashSha256(MemoryMarshal.AsBytes(str.AsSpan()));
-    
-    public static Hash256 HashSha256(ReadOnlySpan<byte> array) => CreateUnsafe(SHA256.HashData(array));
-    public static Hash256 HashSha256(byte[] array) => CreateUnsafe(SHA256.HashData(array));
 
-    public void CopyTo(Span<byte> buffer)
+    public static Hash256 HashSha256(ReadOnlySpan<byte> array)
     {
-        if (buffer.Length < Size) throw new ArgumentException(nameof(buffer));
-        unsafe
-        {
-            fixed (void* bPtr = &buffer[0])
-            {
-                *(Hash256*)bPtr = this;
-            }
-        }
+        Span<byte> span = stackalloc byte[Size];
+        SHA256.HashData(array, span);
+        return CreateUnsafe(span);
+    }
+    public static Hash256 HashSha256(byte[] array) => HashSha256((ReadOnlySpan<byte>)array);
+
+    public unsafe void CopyTo(Span<byte> buffer)
+    {
+        var vec = _vector;
+        var span = new ReadOnlySpan<byte>(&vec, Size);
+        span.CopyTo(buffer);
     }
     
     public bool Equals(Hash256 other)
@@ -65,15 +76,10 @@ public readonly struct Hash256 : IEquatable<Hash256>
         return !(left == right);
     }
 
-    public override string ToString()
+    public override unsafe string ToString()
     {
-        unsafe
-        {
-            fixed (Hash256* self = &this)
-            {
-                var span = new ReadOnlySpan<byte>(&self->_vector, Size);
-                return span.ToHexStringUpper();
-            }
-        }
+        var vec = _vector;
+        var span = new ReadOnlySpan<byte>(&vec, Size);
+        return span.ToHexString();
     }
 }

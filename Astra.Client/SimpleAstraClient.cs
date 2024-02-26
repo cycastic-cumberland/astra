@@ -87,6 +87,8 @@ public class SimpleAstraClient : IAstraClient
             {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
+#else
+                Thread.Yield();
 #endif
                 if (timer.ElapsedMilliseconds <= settings.Timeout) continue;
                 throw new TimeoutException($"Timed out: {settings.Timeout} ms");
@@ -113,6 +115,8 @@ public class SimpleAstraClient : IAstraClient
             {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
+#else
+                Thread.Yield();
 #endif
                 if (timer.ElapsedMilliseconds <= settings.Timeout) continue;
                 throw new TimeoutException($"Timed out: {settings.Timeout} ms");
@@ -122,6 +126,8 @@ public class SimpleAstraClient : IAstraClient
             {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
+#else
+                Thread.Yield();
 #endif
                 if (timer.ElapsedMilliseconds <= settings.Timeout) continue;
                 throw new TimeoutException($"Timed out: {settings.Timeout} ms");
@@ -143,6 +149,8 @@ public class SimpleAstraClient : IAstraClient
                     {
 #if DEBUG
                         await Task.Delay(100, cancellationToken);
+#else
+                        Thread.Yield();
 #endif
                         if (timer.ElapsedMilliseconds <= settings.Timeout) continue;
                         throw new TimeoutException($"Timed out: {settings.Timeout} ms");
@@ -161,6 +169,8 @@ public class SimpleAstraClient : IAstraClient
                     {
 #if DEBUG
                         await Task.Delay(100, cancellationToken);
+#else
+                        Thread.Yield();
 #endif
                         if (timer.ElapsedMilliseconds <= settings.Timeout) continue;
                         throw new TimeoutException($"Timed out: {settings.Timeout} ms");
@@ -172,9 +182,11 @@ public class SimpleAstraClient : IAstraClient
                     {
 #if DEBUG
                         await Task.Delay(100, cancellationToken);
+#else
+                        Thread.Yield();
 #endif
                         if (timer.ElapsedMilliseconds <= settings.Timeout) continue;
-                        throw new TimeoutException($"Timed out: {settings.Timeout} ms");
+                        throw new TimeoutException($"Timed out: {  settings.Timeout} ms");
                     }
 
                     await networkStream.ReadExactlyAsync(challenge, cancellationToken);
@@ -195,6 +207,8 @@ public class SimpleAstraClient : IAstraClient
             {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
+#else
+                Thread.Yield();
 #endif
                 if (timer.ElapsedMilliseconds <= settings.Timeout) continue;
                 throw new TimeoutException($"Timed out: {settings.Timeout} ms");
@@ -230,6 +244,8 @@ public class SimpleAstraClient : IAstraClient
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
+#else
+            Thread.Yield();
 #endif
             if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
                 throw new TimeoutException();
@@ -241,6 +257,8 @@ public class SimpleAstraClient : IAstraClient
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
+#else
+            Thread.Yield();
 #endif
             if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
                 throw new TimeoutException();
@@ -290,6 +308,8 @@ public class SimpleAstraClient : IAstraClient
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
+#else
+            Thread.Yield();
 #endif
             if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
                 throw new TimeoutException();
@@ -301,6 +321,8 @@ public class SimpleAstraClient : IAstraClient
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
+#else
+            Thread.Yield();
 #endif
             if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
                 throw new TimeoutException();
@@ -324,6 +346,8 @@ public class SimpleAstraClient : IAstraClient
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
+#else
+            Thread.Yield();
 #endif
             if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
                 throw new TimeoutException();
@@ -335,6 +359,8 @@ public class SimpleAstraClient : IAstraClient
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
+#else
+            Thread.Yield();
 #endif
             if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
                 throw new TimeoutException();
@@ -364,6 +390,8 @@ public class SimpleAstraClient : IAstraClient
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
+#else
+            Thread.Yield();
 #endif
             if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
                 throw new TimeoutException();
@@ -375,6 +403,8 @@ public class SimpleAstraClient : IAstraClient
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
+#else
+            Thread.Yield();
 #endif
             if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
                 throw new TimeoutException();
@@ -399,6 +429,8 @@ public class SimpleAstraClient : IAstraClient
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
+#else
+            Thread.Yield();
 #endif
             if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
                 throw new TimeoutException();
@@ -410,6 +442,8 @@ public class SimpleAstraClient : IAstraClient
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
+#else
+            Thread.Yield();
 #endif
             if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
                 throw new TimeoutException();
@@ -440,6 +474,8 @@ public class SimpleAstraClient : IAstraClient
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
+#else
+            Thread.Yield();
 #endif
             if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
                 throw new TimeoutException();
@@ -451,6 +487,8 @@ public class SimpleAstraClient : IAstraClient
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
+#else
+            Thread.Yield();
 #endif
             if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
                 throw new TimeoutException();
@@ -480,6 +518,8 @@ public class SimpleAstraClient : IAstraClient
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
+#else
+            Thread.Yield();
 #endif
             if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
                 throw new TimeoutException();
@@ -491,6 +531,8 @@ public class SimpleAstraClient : IAstraClient
         {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
+#else
+            Thread.Yield();
 #endif
             if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
                 throw new TimeoutException();

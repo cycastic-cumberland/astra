@@ -208,11 +208,9 @@ public sealed class DataIndexRegistry : IDisposable
     private readonly AbstractRegistryDump _dump;
     private readonly AutoIndexer _autoIndexer = new();
     private readonly ColumnSynthesizer[] _synthesizers;
-    private readonly List<IDestructibleColumnResolver> _destructibleColumnResolvers = new();
 
     public int ColumnCount => _synthesizers.Length;
     public int IndexedColumnCount => _synthesizers.Length;
-    public int ReferenceTypeColumnCount => _destructibleColumnResolvers.Count;
 
     public int RowsCount
     {
@@ -291,8 +289,7 @@ public sealed class DataIndexRegistry : IDisposable
                 case DataType.StringMask:
                 {
                     dataType = nameof(DataType.String);
-                    var cResolver = new StringColumnResolver(offset, shouldBeHashed);
-                    _destructibleColumnResolvers.Add(cResolver);
+                    var cResolver = new StringColumnResolver(offset, i, shouldBeHashed);
                     offset += cResolver.Occupying;
                     resolver = cResolver;
                     indexer = column.Indexed ? new StringIndexer(cResolver) : null;
@@ -301,8 +298,7 @@ public sealed class DataIndexRegistry : IDisposable
                 case DataType.BytesMask:
                 {
                     dataType = nameof(DataType.Bytes);
-                    var cResolver = new BytesColumnResolver(offset, shouldBeHashed);
-                    _destructibleColumnResolvers.Add(cResolver);
+                    var cResolver = new BytesColumnResolver(offset, i, shouldBeHashed);
                     offset += cResolver.Occupying;
                     resolver = cResolver;
                     indexer = column.Indexed ? new BytesIndexer(cResolver) : null;
@@ -447,7 +443,7 @@ public sealed class DataIndexRegistry : IDisposable
                 {
                     write.handler?.RemoveExact(row);
                 }
-                row.SelectiveDispose(_destructibleColumnResolvers);
+                row.Dispose();
             }
         }
         _logger.LogDebug("{} row(s) deleted", count);
@@ -494,14 +490,14 @@ public sealed class DataIndexRegistry : IDisposable
 
     private bool InsertOne(Stream reader, AutoIndexer.WriteHandler autoIndexerLock, IndexersWriteLock writeLock)
     {
-        var immutableDataRow = DataRow.CreateImmutable(reader, _synthesizers, _rowSize, _hashSize);
+        var immutableDataRow = DataRow.CreateImmutable(reader, _synthesizers, _rowSize, _hashSize, _synthesizers.Length);
     
         try
         {
             if (autoIndexerLock.Contains(immutableDataRow))
             {
                 _logger.LogDebug("Row with hash '{}' existed", immutableDataRow.Hash);
-                immutableDataRow.SelectiveDispose(_destructibleColumnResolvers);
+                immutableDataRow.Dispose();
                 return false;
             }
             autoIndexerLock.Add(immutableDataRow);
@@ -515,7 +511,7 @@ public sealed class DataIndexRegistry : IDisposable
         {
             var hash = immutableDataRow.Hash;
             _logger.LogError(e, "Exception caught while adding row '{}'", hash);
-            immutableDataRow.SelectiveDispose(_destructibleColumnResolvers);
+            immutableDataRow.Dispose();
             throw;
         }
 

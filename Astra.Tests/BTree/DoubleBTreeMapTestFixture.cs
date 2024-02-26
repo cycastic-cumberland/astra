@@ -230,7 +230,6 @@ public class DoubleBTreeMapTestFixture
     {
         _correspondingDict.Clear();
         _tree.Clear();
-        _tracer.Clear();
         Assert.That(_tree, Is.Empty);
         Assert.That(_tree, Has.Count.EqualTo(_correspondingDict.Count));
     }
@@ -242,7 +241,7 @@ public class DoubleBTreeMapTestFixture
         ClearTestInternal();
     }
 
-    [Test, Repeat(short.MaxValue)]
+    [Test, Repeat(RepeatCount)]
     public void CombinedTest()
     {
         InsertRandom();

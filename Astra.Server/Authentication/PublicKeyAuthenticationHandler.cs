@@ -33,6 +33,8 @@ public class PublicKeyAuthenticationHandler : IAuthenticationHandler
         {
 #if DEBUG
             await Task.Delay(100, cancellationToken);
+#else
+            Thread.Yield();
 #endif
             if (timer.ElapsedMilliseconds > _timeout)
                 return IAuthenticationHandler.AuthenticationState.Timeout;
@@ -43,6 +45,8 @@ public class PublicKeyAuthenticationHandler : IAuthenticationHandler
         {
 #if DEBUG
             await Task.Delay(100, cancellationToken);
+#else
+            Thread.Yield();
 #endif
             if (timer.ElapsedMilliseconds > _timeout)
                 return IAuthenticationHandler.AuthenticationState.Timeout;

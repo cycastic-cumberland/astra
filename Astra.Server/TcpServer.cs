@@ -3,9 +3,7 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Security.Cryptography;
-using System.Text;
 using Astra.Common;
-using Astra.Engine;
 using Astra.Engine.Data;
 using Astra.Server.Authentication;
 using Microsoft.Extensions.Logging;
@@ -86,11 +84,10 @@ public class TcpServer : IDisposable
             e.Cancel = true;
             Kill();
         };
-        _logger.LogInformation("Initialization completed: {} = {}, {} = {}, {} = {}, {} = {}, {} = {}, {} = {})",
+        _logger.LogInformation("Initialization completed: {} = {}, {} = {}, {} = {}, {} = {}, {} = {})",
                 nameof(settings.LogLevel), logLevel.ToString(), 
                 nameof(_registry.ColumnCount), _registry.ColumnCount, 
                 nameof(_registry.IndexedColumnCount), _registry.IndexedColumnCount, 
-                nameof(_registry.ReferenceTypeColumnCount), _registry.ReferenceTypeColumnCount,
                 nameof(settings.AuthenticationMethod), settings.AuthenticationMethod,
                 nameof(settings.Timeout), TimeSpan.FromMilliseconds(_timeout));
     }
@@ -237,6 +234,8 @@ public class TcpServer : IDisposable
                 {
 #if DEBUG
                     await Task.Delay(100, cancellationToken);
+#else
+                    Thread.Yield();
 #endif
                     if (!waiting && elapsed > _timeout)
                     {
@@ -321,6 +320,8 @@ public class TcpServer : IDisposable
             {
 #if DEBUG
                 await Task.Delay(100, cancellationToken);
+#else
+                Thread.Yield();
 #endif
                 if (timer.ElapsedMilliseconds <= _timeout) continue;
                 _logger.LogInformation("Client {} failed handshake attempt: timed out", address);

@@ -1,22 +1,24 @@
+using System.Buffers;
 using System.Runtime.CompilerServices;
 using Astra.Common;
-using Astra.Engine.Resolvers;
 
 namespace Astra.Engine.Data;
 
-public interface IImmutableDataRow
+public interface IImmutableDataRow : IDisposable
 {
     public ReadOnlySpan<byte> Read { get; }
     public bool IsImmutable { get; }
-    public void SelectiveDispose<T>(T resolvers) where T : IEnumerable<IDestructibleColumnResolver>;
+    public ReadOnlyMemory<byte> ReadPeripheral(int index);
 }
 
 public interface IDataRow : IImmutableDataRow
 {
     public Span<byte> Write { get; }
+    public Memory<byte> WritePeripheral(int index);
+    public void SetPeripheral(int index, BytesCluster cluster);
 }
 
-public readonly struct ImmutableDataRow(BytesCluster raw, Hash128 hash) : IImmutableDataRow, IEquatable<ImmutableDataRow>
+public readonly struct ImmutableDataRow(BytesCluster raw, BytesCluster[] peripherals, int peripheralCount, Hash128 hash) : IImmutableDataRow, IEquatable<ImmutableDataRow>
 {
     public Hash128 Hash
     {
@@ -30,20 +32,20 @@ public readonly struct ImmutableDataRow(BytesCluster raw, Hash128 hash) : IImmut
         get => raw.Reader;
     }
     public bool IsImmutable => true;
-    
-    public void SelectiveDispose<T>(T resolvers) where T : IEnumerable<IDestructibleColumnResolver>
+
+    public ReadOnlyMemory<byte> ReadPeripheral(int index)
     {
-        try
+        return peripherals[index].ReaderMemory;
+    }
+
+    public void Dispose()
+    {
+        raw.Dispose();
+        foreach (var peripheral in new ReadOnlySpan<BytesCluster>(peripherals, 0, peripheralCount))
         {
-            foreach (var resolver in resolvers)
-            {
-                resolver.Destroy(this);
-            }
+            if (!peripheral.IsNull) peripheral.Dispose();
         }
-        finally
-        {
-            raw.Dispose();
-        }
+        ArrayPool<BytesCluster>.Shared.Return(peripherals);
     }
 
     public bool Equals(ImmutableDataRow other)
@@ -75,27 +77,25 @@ public readonly struct ImmutableDataRow(BytesCluster raw, Hash128 hash) : IImmut
 public struct DataRow : IDataRow
 {
     private readonly BytesCluster _raw;
+    private readonly BytesCluster[] _peripherals;
+    private readonly int _peripheralCount;
     private BytesClusterStream? _hashStream;
     private bool _disposed;
 
     public bool Disposed => _disposed;
     
-    public void SelectiveDispose<T>(T resolvers) where T : IEnumerable<IDestructibleColumnResolver>
+    public void Dispose()
     {
         if (_disposed) return;
-        try
+        _raw.Dispose();
+        _hashStream?.Dispose();
+        foreach (var peripheral in new ReadOnlySpan<BytesCluster>(_peripherals, 0, _peripheralCount))
         {
-            foreach (var resolver in resolvers)
-            {
-                resolver.Destroy(this);
-            }
+            if (peripheral.IsNull) continue; 
+            peripheral.Dispose();
         }
-        finally
-        {
-            _raw.Dispose();
-            _hashStream?.Dispose();
-            _disposed = true;
-        }
+        ArrayPool<BytesCluster>.Shared.Return(_peripherals);
+        _disposed = true;
     }
 
     public ImmutableDataRow Consume<T>(T synthesizers) where T : IEnumerable<ColumnSynthesizer>
@@ -107,7 +107,7 @@ public struct DataRow : IDataRow
             try
             {
                 var sBuffer = _hashStream.AsSpan();
-                var ret = new ImmutableDataRow(_raw, Hash128.HashXx128(sBuffer));
+                var ret = new ImmutableDataRow(_raw, _peripherals, _peripheralCount, Hash128.HashXx128(sBuffer));
                 _hashStream.Dispose();
                 _hashStream = null;
                 return ret;
@@ -124,21 +124,23 @@ public struct DataRow : IDataRow
             synthesizer.Resolver.BeginHash(stream, this);
         }
         var buffer = stream.GetBuffer();
-        return new(_raw, Hash128.HashMd5(new ReadOnlySpan<byte>(buffer, 0, (int)stream.Length)));
+        return new(_raw, _peripherals, _peripheralCount, Hash128.HashMd5(new ReadOnlySpan<byte>(buffer, 0, (int)stream.Length)));
     }
 
-    private DataRow(BytesCluster raw, BytesClusterStream? hashStream = null)
+    private DataRow(BytesCluster raw, BytesCluster[] peripherals, int peripheralCount, BytesClusterStream? hashStream = null)
     {
         _raw = raw;
+        _peripherals = peripherals;
+        _peripheralCount = peripheralCount;
         _hashStream = hashStream;
     }
 
-    public static DataRow Create<T>(Stream reader, T synthesizers, int rawSize, int hashSize) where T : IEnumerable<ColumnSynthesizer>
+    public static DataRow Create<T>(Stream reader, T synthesizers, int rawSize, int hashSize, int columnCount) where T : IEnumerable<ColumnSynthesizer>
     {
         var hashStream = BytesCluster.Rent(hashSize).Promote();
         try
         {
-            var row = new DataRow(BytesCluster.Rent(rawSize), hashStream);
+            var row = new DataRow(BytesCluster.Rent(rawSize), ArrayPool<BytesCluster>.Shared.Rent(columnCount), columnCount, hashStream);
             foreach (var synthesizer in synthesizers)
             {
                 // DataRow only hold a single reference so no need to worry
@@ -156,7 +158,7 @@ public struct DataRow : IDataRow
 
     private static readonly ThreadLocal<BytesClusterStream?> LocalHashStream = new();
     
-    public static ImmutableDataRow CreateImmutable<T>(Stream reader, T synthesizers, int rawSize, int hashSize) where T : IEnumerable<ColumnSynthesizer>
+    public static ImmutableDataRow CreateImmutable<T>(Stream reader, T synthesizers, int rawSize, int hashSize, int columnCount) where T : IEnumerable<ColumnSynthesizer>
     {
         var hashStream = LocalHashStream.Value;
         if (hashStream == null)
@@ -175,7 +177,7 @@ public struct DataRow : IDataRow
         var rowBuffer = BytesCluster.Rent(rawSize);
         try
         {
-            var row = new DataRow(rowBuffer, hashStream);
+            var row = new DataRow(rowBuffer, ArrayPool<BytesCluster>.Shared.Rent(columnCount), columnCount, hashStream);
             foreach (var synthesizer in synthesizers)
             {
                 // DataRow only hold a single reference so no need to worry
@@ -183,7 +185,7 @@ public struct DataRow : IDataRow
             }
 
             var sBuffer = hashStream.AsSpan()[..hashSize];
-            var ret = new ImmutableDataRow(rowBuffer, Hash128.HashXx128(sBuffer));
+            var ret = new ImmutableDataRow(rowBuffer, row._peripherals, columnCount, Hash128.HashXx128(sBuffer));
 
             return ret;
         }
@@ -199,15 +201,6 @@ public struct DataRow : IDataRow
         }
     }
 
-    public void Load<T>(Stream reader, T synthesizers) where T : IEnumerable<ColumnSynthesizer>
-    {
-        _hashStream?.Dispose();
-        _hashStream = null;
-        foreach (var synthesizer in synthesizers)
-        {
-            synthesizer.Resolver.Deserialize(reader, this);
-        }
-    }
 
     public ReadOnlySpan<byte> Read
     {
@@ -215,6 +208,12 @@ public struct DataRow : IDataRow
         get => _raw.Reader;
     }
     public bool IsImmutable => false;
+    public ReadOnlyMemory<byte> ReadPeripheral(int index)
+    {
+        var peripheral = _peripherals[index];
+        if (peripheral.IsNull) return new ReadOnlyMemory<byte>();
+        return peripheral.ReaderMemory;
+    }
 
     public void Save<T>(Stream writer, T synthesizers) where T : IEnumerable<ColumnSynthesizer>
     {
@@ -233,5 +232,16 @@ public struct DataRow : IDataRow
             ? _raw.Writer
             : throw new ObjectDisposedException($"{nameof(DataRow)} consumed");
     }
-        
+
+    public Memory<byte> WritePeripheral(int index)
+    {
+        var peripheral = _peripherals[index];
+        if (peripheral.IsNull) return new Memory<byte>();
+        return peripheral.WriterMemory;
+    }
+
+    public void SetPeripheral(int index, BytesCluster cluster)
+    {
+        _peripherals[index] = cluster;
+    }
 }
