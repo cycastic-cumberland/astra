@@ -85,7 +85,6 @@ public abstract class ComposableFuzzyIndexer<TUnit, T, TColumnResolver, TStreamR
 
         public void Reset()
         {
-            _stage = 0;
             _stage = -1;
             _current = new();
             _dictEnumerator.Dispose();
@@ -110,7 +109,44 @@ public abstract class ComposableFuzzyIndexer<TUnit, T, TColumnResolver, TStreamR
         
         IEnumerator<(ImmutableDataRow row, int matchedLength)> IEnumerable<(ImmutableDataRow row, int matchedLength)>.GetEnumerator()
         {
-            throw new NotImplementedException();
+            return GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+    }
+
+    private struct ReducedFuzzySearchEnumerator(FuzzySearchEnumerable matches) : IEnumerator<ImmutableDataRow>
+    {
+        private FuzzySearchEnumerator _enumerator = matches.GetEnumerator();
+        public void Dispose()
+        {
+            _enumerator.Dispose();
+        }
+
+        public bool MoveNext() => _enumerator.MoveNext();
+
+        public void Reset() => _enumerator.Reset();
+
+        public ImmutableDataRow Current => _enumerator.Current.row;
+
+        object IEnumerator.Current => Current;
+    }
+
+    private readonly struct ReducedFuzzySearchEnumerable(
+        FuzzySearchEnumerable matches) :
+        IEnumerable<ImmutableDataRow>
+    {
+        public ReducedFuzzySearchEnumerator GetEnumerator()
+        {
+            return new(matches);
+        }
+        
+        IEnumerator<ImmutableDataRow> IEnumerable<ImmutableDataRow>.GetEnumerator()
+        {
+            return GetEnumerator();
         }
 
         IEnumerator IEnumerable.GetEnumerator()
@@ -161,8 +197,7 @@ public abstract class ComposableFuzzyIndexer<TUnit, T, TColumnResolver, TStreamR
 
     public FuzzySearchEnumerable FuzzySearch(T key, int minLength)
     {
-        var result = _data.FuzzySearch(key, minLength);
-        return new(result);
+        return new(_data.FuzzySearch(key, minLength));
     }
 
     IEnumerable<(ImmutableDataRow row, int matchLength)> IFuzzyIndexer<TUnit, T>.IFuzzyIndexerHandler.FuzzySearch(
@@ -171,16 +206,17 @@ public abstract class ComposableFuzzyIndexer<TUnit, T, TColumnResolver, TStreamR
         return FuzzySearch(key, minLength);
     }
 
-    private IEnumerable<ImmutableDataRow> ReducedFuzzySearch(T key, int minLength)
+    private ReducedFuzzySearchEnumerable ReducedFuzzySearch(T key, int minLength)
     {
-        foreach (var (row, _) in FuzzySearch(key, minLength))
-        {
-            yield return row;
-        }
+        return new(FuzzySearch(key, minLength));
     }
-    
 
-    private IEnumerable<ImmutableDataRow> ReducedFuzzySearch(Stream predicateStream)
+    IEnumerable<ImmutableDataRow> IFuzzyIndexer<TUnit, T>.IFuzzyIndexerHandler.ReducedFuzzySearch(T key, int minLength)
+    {
+        return ReducedFuzzySearch(key, minLength);
+    }
+
+    private ReducedFuzzySearchEnumerable ReducedFuzzySearch(Stream predicateStream)
     {
         var key = TStreamResolver.ConsumeStream(predicateStream);
         var minLength = predicateStream.ReadInt();

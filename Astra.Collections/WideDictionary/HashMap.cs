@@ -52,7 +52,7 @@ public class HashMap<TKey, TValue> : IDictionary<TKey, TValue> where TKey : notn
 
     IEnumerator<KeyValuePair<TKey, TValue>> IEnumerable<KeyValuePair<TKey, TValue>>.GetEnumerator()
     {
-        throw new NotImplementedException();
+        return GetEnumerator();
     }
 
     public StaticHashMap<TKey, TValue>.Iterator GetEnumerator()

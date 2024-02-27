@@ -9,6 +9,7 @@ public interface IFuzzyIndexer<TUnit, TSequence>
     public interface IFuzzyIndexerHandler : IDisposable
     {
         public IEnumerable<(ImmutableDataRow row, int matchLength)> FuzzySearch(TSequence sequence, int minLength);
+        public IEnumerable<ImmutableDataRow> ReducedFuzzySearch(TSequence sequence, int minLength);
     }
     
     public IFuzzyIndexerHandler Read();
