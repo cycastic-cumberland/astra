@@ -9,10 +9,10 @@ public class AggregatorNotSupported(string? msg = null) : NotSupportedException(
 public interface IAggregatorStream
 {
     public IEnumerable<ImmutableDataRow>? ParseStream<T>(Stream predicateStream, T indexersLock)
-        where T : struct, DataIndexRegistry.IIndexersLock;
+        where T : struct, DataRegistry.IIndexersLock;
 
     public static IEnumerable<ImmutableDataRow>? Aggregate<T>(Stream predicateStream, T indexersLock)
-        where T : struct, DataIndexRegistry.IIndexersLock
+        where T : struct, DataRegistry.IIndexersLock
     {
         var type = predicateStream.ReadUInt();
         var ret = type switch
@@ -31,11 +31,11 @@ public static class AstraAggregatorHelper
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static HashSet<ImmutableDataRow>? Aggregate<T>(this Stream predicateStream, T indexersLock)
-        where T : struct, DataIndexRegistry.IIndexersLock
+        where T : struct, DataRegistry.IIndexersLock
     => IAggregatorStream.Aggregate(predicateStream, indexersLock)?.ToHashSet();
 
     public static void AggregateStream<T>(this Stream predicateStream, Stream outStream, T indexersLock)
-        where T : struct, DataIndexRegistry.IIndexersLock
+        where T : struct, DataRegistry.IIndexersLock
     {
         var result = predicateStream.Aggregate(indexersLock);
         if (result == null)

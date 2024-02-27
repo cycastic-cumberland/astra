@@ -146,6 +146,18 @@ public abstract class ComposableStandardIndexer<T, TColumnResolver, TStreamResol
     public DataType Type => _type;
 }
 
+public sealed class ComposableIntegerIndexer(IntegerColumnResolver resolver) :
+    ComposableStandardIndexer<int, IntegerColumnResolver, IntegerStreamResolver>(resolver);
+
+public sealed class ComposableLongIndexer(LongColumnResolver resolver) :
+    ComposableStandardIndexer<long, LongColumnResolver, LongStreamResolver>(resolver);
+
+public sealed class ComposableSingleIndexer(SingleColumnResolver resolver) :
+    ComposableStandardIndexer<float, SingleColumnResolver, SingleStreamResolver>(resolver);
+
+public sealed class ComposableDoubleIndexer(DoubleColumnResolver resolver) :
+    ComposableStandardIndexer<double, DoubleColumnResolver, DoubleStreamResolver>(resolver);
+
 public sealed class ComposableBytesIndexer(BytesColumnResolver resolver) :
     ComposableStandardIndexer<ComparableBytesMemory, BytesColumnResolver, BytesStreamResolver>(resolver);
 

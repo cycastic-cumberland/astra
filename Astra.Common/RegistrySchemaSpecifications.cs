@@ -6,11 +6,11 @@ public struct ColumnSchemaSpecifications
 {
     public string Name { get; set; }
     public uint DataType { get; set; }
-    public bool Indexed { get; set; }
+    public IndexerType Indexer { get; set; }
     public bool? ShouldBeHashed { get; set; }
 }
 
-public struct SchemaSpecifications
+public struct RegistrySchemaSpecifications
 {
     public ColumnSchemaSpecifications[] Columns { get; set; }
     public int BinaryTreeDegree { get; set; }
@@ -22,8 +22,8 @@ public struct RepresentableColumnSchemaSpecifications
     public string Name { get; set; }
     [JsonProperty("dataType")]
     public string DataType { get; set; }
-    [JsonProperty("indexed")]
-    public bool Indexed { get; set; }
+    [JsonProperty("indexer")]
+    public string Indexer { get; set; }
     [JsonProperty("shouldBeHashed")]
     public bool? ShouldBeHashed { get; set; }
 
@@ -55,7 +55,20 @@ public struct RepresentableColumnSchemaSpecifications
         {
             Name = Name,
             DataType = dataType,
-            Indexed = Indexed,
+            Indexer = Indexer switch
+            {
+                "generic" => IndexerType.Generic,
+                "GENERIC" => IndexerType.Generic,
+                "range" => IndexerType.Range,
+                "RANGE" => IndexerType.Range,
+                "fuzzy" => IndexerType.Fuzzy,
+                "FUZZY" => IndexerType.Fuzzy,
+                "none" => IndexerType.None,
+                "NONE" => IndexerType.None,
+                "" => IndexerType.None,
+                null => IndexerType.None,
+                _ => throw new NotSupportedException($"Indexer not supported: {Indexer}")
+            },
             ShouldBeHashed = ShouldBeHashed
         };
     }
@@ -68,7 +81,7 @@ public struct RepresentableSchemaSpecifications
     [JsonProperty("binaryTreeDegree")]
     public int BinaryTreeDegree { get; set; }
 
-    public SchemaSpecifications ToInternal()
+    public RegistrySchemaSpecifications ToInternal()
     {
         return new()
         {

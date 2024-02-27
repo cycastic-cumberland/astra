@@ -255,15 +255,15 @@ public abstract class ComposableNumericIndexer<T, TR> :
     public DataType Type => _type;
 }
 
-public sealed class ComposableIntegerIndexer(IntegerColumnResolver resolver, int degree)
-    : ComposableNumericIndexer<int, IntegerColumnResolver>(resolver, degree);
+public sealed class ComposableIntegerRangeIndexer(UnmanagedColumnResolver<int> resolver, int degree)
+    : ComposableNumericIndexer<int, UnmanagedColumnResolver<int>>(resolver, degree);
 
-public sealed class ComposableLongIndexer(LongColumnResolver resolver, int degree)
-    : ComposableNumericIndexer<long, LongColumnResolver>(resolver, degree);
+public sealed class ComposableLongRangeIndexer(UnmanagedColumnResolver<long> resolver, int degree)
+    : ComposableNumericIndexer<long, UnmanagedColumnResolver<long>>(resolver, degree);
 
-public sealed class ComposableSingleIndexer(SingleColumnResolver resolver, int degree)
-    : ComposableNumericIndexer<float, SingleColumnResolver>(resolver, degree);
+public sealed class ComposableSingleRangeIndexer(UnmanagedColumnResolver<float> resolver, int degree)
+    : ComposableNumericIndexer<float, UnmanagedColumnResolver<float>>(resolver, degree);
 
-public sealed class ComposableDoubleIndexer(DoubleColumnResolver resolver, int degree)
-    : ComposableNumericIndexer<double, DoubleColumnResolver>(resolver, degree);
+public sealed class ComposableDoubleRangeIndexer(UnmanagedColumnResolver<double> resolver, int degree)
+    : ComposableNumericIndexer<double, UnmanagedColumnResolver<double>>(resolver, degree);
 

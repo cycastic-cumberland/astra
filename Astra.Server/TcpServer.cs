@@ -45,7 +45,7 @@ public class TcpServer : IDisposable
     };
     private static readonly IPAddress Address = IPAddress.Parse("0.0.0.0");
     private static readonly IPGlobalProperties IpProperties = IPGlobalProperties.GetIPGlobalProperties();
-    private readonly DataIndexRegistry _registry;
+    private readonly DataRegistry _registry;
     private readonly TcpListener _listener;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<TcpServer> _logger;
@@ -59,7 +59,7 @@ public class TcpServer : IDisposable
     public ILogger<TL> GetLogger<TL>() => _loggerFactory.CreateLogger<TL>();
     
 #if DEBUG
-    public DataIndexRegistry ProbeRegistry() => _registry;
+    public DataRegistry ProbeRegistry() => _registry;
 #endif
     
     public TcpServer(AstraLaunchSettings settings, Func<IAuthenticationHandler> authenticationSpawner)

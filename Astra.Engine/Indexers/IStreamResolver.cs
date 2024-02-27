@@ -7,6 +7,38 @@ public interface IStreamResolver<out T>
     public static abstract T ConsumeStream(Stream stream);
 }
 
+public readonly struct IntegerStreamResolver : IStreamResolver<int>
+{
+    public static int ConsumeStream(Stream stream)
+    {
+        return stream.ReadInt();
+    }
+}
+
+public readonly struct LongStreamResolver : IStreamResolver<long>
+{
+    public static long ConsumeStream(Stream stream)
+    {
+        return stream.ReadLong();
+    }
+}
+
+public readonly struct SingleStreamResolver : IStreamResolver<float>
+{
+    public static float ConsumeStream(Stream stream)
+    {
+        return stream.ReadSingle();
+    }
+}
+
+public readonly struct DoubleStreamResolver : IStreamResolver<double>
+{
+    public static double ConsumeStream(Stream stream)
+    {
+        return stream.ReadDouble();
+    }
+}
+
 public readonly struct BytesStreamResolver : IStreamResolver<ComparableBytesMemory>
 {
     public static ComparableBytesMemory ConsumeStream(Stream stream)

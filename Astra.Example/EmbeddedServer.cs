@@ -2,7 +2,6 @@
 using Astra.Client;
 using Astra.Client.Aggregator;
 using Astra.Common;
-using Astra.Engine;
 using Astra.Server;
 using Astra.Server.Authentication;
 using Microsoft.Extensions.Logging;
@@ -49,25 +48,25 @@ public class EmbeddedServer
             {
                 Name = "col1",
                 DataType = DataType.DWordMask,
-                Indexed = true,
+                Indexer = IndexerType.Range,
             },
             new()
             {
                 Name = "col2",
                 DataType = DataType.StringMask,
-                Indexed = false,
+                Indexer = IndexerType.None,
             },
             new()
             {
                 Name = "col3",
                 DataType = DataType.StringMask,
-                Indexed = true,
+                Indexer = IndexerType.Generic,
             },
             new()
             {
                 Name = "col4",
                 DataType = DataType.BytesMask,
-                Indexed = true,
+                Indexer = IndexerType.Generic,
             },
         };
         string publicKey;
@@ -105,44 +104,45 @@ public class EmbeddedServer
         
         using var client = new SimpleAstraClient();
         await client.ConnectAsync(connectionSettings);
-        await client.BulkInsertSerializableAsync(new SimpleSerializableStruct[]
+        var inserted = await client.BulkInsertSerializableAsync(new SimpleSerializableStruct[]
         {
             new()
             {
                 Value1 = 1,
                 Value2 = "test1",
                 Value3 = "𝄞",
-                Value4 = new byte[] { 1, 2, 3, 4 }
+                Value4 = [1, 2, 3, 4]
             },
             new()
             {
                 Value1 = 1,
                 Value2 = "test1",
                 Value3 = "🇵🇱",
-                Value4 = new byte[] { 1, 2, 3, 4 }
+                Value4 = [1, 2, 3, 4]
             },
             new()
             {
                 Value1 = 2,
                 Value2 = "𝄞",
                 Value3 = "🇵🇱",
-                Value4 = new byte[] { 1, 2, 3, 4 }
+                Value4 = [1, 2, 3, 4]
             },
             new()
             {
                 Value1 = 2,
                 Value2 = "test4",
                 Value3 = "🇵🇱",
-                Value4 = new byte[] { 1, 2, 3, 4 }
+                Value4 = [1, 2, 3, 4]
             },
             new()
             {
                 Value1 = 2,
                 Value2 = "𝄞",
                 Value3 = "test4",
-                Value4 = new byte[] { 1, 2, 3, 4 }
+                Value4 = [1, 2, 3, 4]
             },
         });
+        logger.LogInformation("Inserted: {}", inserted);
         var fetch1 = await client.AggregateAsync<SimpleSerializableStruct>(
             table.Column1.EqualsLiteral(2));
         var count1 = 0;
@@ -154,7 +154,7 @@ public class EmbeddedServer
         }
         logger.LogInformation("Fetched rows count: {}", count1);
         
-        logger.LogInformation("Fetch 2: col1 == 2 AND col3 == 'test3'");
+        logger.LogInformation("Fetch 2: col1 == 2 AND col3 == '🇵🇱'");
         var fetch2 = await client.AggregateAsync<SimpleSerializableStruct>(
             table.Column1.EqualsLiteral(2).And(table.Column3.EqualsLiteral("🇵🇱")));
         var count2 = 0;
@@ -165,7 +165,7 @@ public class EmbeddedServer
         }
         logger.LogInformation("Fetched rows count: {}", count2);
         
-        logger.LogInformation("Fetch 3: col1 == 2 OR col3 == 'test3'");
+        logger.LogInformation("Fetch 3: col1 == 2 OR col3 == '🇵🇱'");
         var fetch3 = await client.AggregateAsync<SimpleSerializableStruct>(
             table.Column1.EqualsLiteral(2).Or(table.Column3.EqualsLiteral("🇵🇱")));
         var count3 = 0;

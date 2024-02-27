@@ -10,7 +10,7 @@ public struct AstraConnectionSettings
     [JsonProperty("port")]
     public int Port { get; set; }
     [JsonProperty("schema")]
-    public SchemaSpecifications Schema { get; set; }
+    public RegistrySchemaSpecifications Schema { get; set; }
     [JsonProperty("timeout")]
     public int Timeout { get; set; }
     [JsonProperty("password")]

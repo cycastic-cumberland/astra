@@ -15,31 +15,31 @@ public class AggregationTestFixture
         {
             Name = "col1",
             DataType = DataType.DWordMask,
-            Indexed = true,
+            Indexer = IndexerType.Range,
         },
         new()
         {
             Name = "col2",
             DataType = DataType.StringMask,
-            Indexed = false, 
+            Indexer = IndexerType.None, 
         },
         new()
         {
             Name = "col3",
             DataType = DataType.StringMask,
-            Indexed = true,
+            Indexer = IndexerType.Generic,
         },
         new()
         {
             Name = "col4",
             DataType = DataType.BytesMask,
-            Indexed = true,
+            Indexer = IndexerType.Generic,
         },
         new()
         {
             Name = "col5",
             DataType = DataType.SingleMask,
-            Indexed = true,
+            Indexer = IndexerType.Range,
         },
     ];
     private AstraConnectionSettings _connectionSettings;

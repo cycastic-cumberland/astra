@@ -161,7 +161,7 @@ file static class IntrinsicsBytesMemoryComparer
 }
 
 
-file abstract class BytesSpanComparator
+file abstract class BytesSpanComparator : IDefault<BytesSpanComparator>
 {
     public abstract bool Compare(ReadOnlySpan<byte> lhs, ReadOnlySpan<byte> rhs);
 
@@ -172,7 +172,7 @@ file abstract class BytesSpanComparator
         return new XmmBytesSpanComparator();
     }
 
-    public static readonly BytesSpanComparator Default = SelectComparator();
+    public static BytesSpanComparator Default { get; } = SelectComparator();
 }
 
 file class XmmBytesSpanComparator : BytesSpanComparator

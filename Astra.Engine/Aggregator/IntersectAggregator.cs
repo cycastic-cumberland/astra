@@ -48,7 +48,7 @@ public readonly struct IntersectAggregator : IAggregatorStream
             return IntersectInternal(rSet, lhs);
         return IntersectInternal(lhs, rhs);
     }
-    public IEnumerable<ImmutableDataRow>? ParseStream<T>(Stream predicateStream, T indexersLock) where T : struct, DataIndexRegistry.IIndexersLock
+    public IEnumerable<ImmutableDataRow>? ParseStream<T>(Stream predicateStream, T indexersLock) where T : struct, DataRegistry.IIndexersLock
     {
         var left = IAggregatorStream.Aggregate(predicateStream, indexersLock);
         var right = IAggregatorStream.Aggregate(predicateStream, indexersLock);

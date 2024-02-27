@@ -12,27 +12,27 @@ namespace Astra.Benchmark;
 [SimpleJob(RuntimeMoniker.Net80)]
 public class NetworkBulkInsertionBenchmark
 {
-    private static readonly SchemaSpecifications Schema = new()
+    private static readonly RegistrySchemaSpecifications Schema = new()
     {
-        Columns = new ColumnSchemaSpecifications[]
+        Columns = new ColumnSchemaSpecifications[] 
         {
             new()
             {
                 Name = "col1",
                 DataType = DataType.DWordMask,
-                Indexed = true,
+                Indexer = IndexerType.Range,
             },
             new()
             {
                 Name = "col2",
                 DataType = DataType.StringMask,
-                Indexed = false,
+                Indexer = IndexerType.None,
             },
             new()
             {
                 Name = "col3",
                 DataType = DataType.StringMask,
-                Indexed = true,
+                Indexer = IndexerType.Generic,
             }
         }
     };

@@ -4,7 +4,7 @@ namespace Astra.Common;
 
 public struct AstraLaunchSettings
 {
-    public SchemaSpecifications Schema { get; set; }
+    public RegistrySchemaSpecifications Schema { get; set; }
     public string? LogLevel { get; set; }
     public int? Port { get; set; }
     public int Timeout { get; set; }

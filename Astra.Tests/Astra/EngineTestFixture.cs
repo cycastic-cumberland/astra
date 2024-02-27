@@ -28,26 +28,26 @@ public class EngineTestFixture
         }
     }
     private ILoggerFactory _loggerFactory = null!;
-    private DataIndexRegistry _registry = null!;
+    private DataRegistry _registry = null!;
 
     private readonly ColumnSchemaSpecifications[] _columns = {
         new()
         {
             Name = "col1",
             DataType = DataType.DWordMask,
-            Indexed = true,
+            Indexer = IndexerType.Range,
         },
         new()
         {
             Name = "col2",
             DataType = DataType.StringMask,
-            Indexed = false,
+            Indexer = IndexerType.None,
         },
         new()
         {
             Name = "col3",
             DataType = DataType.StringMask,
-            Indexed = true,
+            Indexer = IndexerType.Generic,
         }
     };
     [OneTimeSetUp]
@@ -80,7 +80,7 @@ public class EngineTestFixture
     //     var totalTime = 0.0;
     //     var stopwatch = new Stopwatch();
     //     var primaryStopwatch = new Stopwatch();
-    //     using var registry = new DataIndexRegistry(new()
+    //     using var registry = new DataRegistry(new()
     //     {
     //         Columns = new ColumnSchemaSpecifications[]
     //         {

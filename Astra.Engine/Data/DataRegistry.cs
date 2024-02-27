@@ -5,6 +5,7 @@ using Astra.Common;
 using Astra.Engine.Aggregator;
 using Astra.Engine.Indexers;
 using Astra.Engine.Resolvers;
+using Astra.Engine.Types;
 using Microsoft.Extensions.Logging;
 using Microsoft.IO;
 
@@ -40,7 +41,7 @@ public abstract class AbstractRegistryDump
     public static AbstractRegistryDump Empty => new EmptyDump();
 }
 
-public sealed class DataIndexRegistry : IDisposable
+public sealed class DataRegistry : IDisposable
 {
     public interface IIndexersLock : IDisposable
     {
@@ -133,7 +134,7 @@ public sealed class DataIndexRegistry : IDisposable
         }
     }
 
-    private readonly struct AutoReadLock(DataIndexRegistry registry, ILogger<AutoReadLock> logger) : IIndexersLock
+    private readonly struct AutoReadLock(DataRegistry registry, ILogger<AutoReadLock> logger) : IIndexersLock
     {
         public int Count => registry._synthesizers.Length;
         public void Dispose()
@@ -193,13 +194,11 @@ public sealed class DataIndexRegistry : IDisposable
             }
         }
     }
-
-    private const int DefaultBinaryTreeDegree = 100;
     private static readonly ThreadLocal<ReadOnlyBufferStream?> LocalBuffer = new();
     private static readonly ThreadLocal<RecyclableMemoryStream?> LocalBulkInsertStream = new();
     
     private readonly ILoggerFactory? _loggerFactory;
-    private readonly ILogger<DataIndexRegistry> _logger;
+    private readonly ILogger<DataRegistry> _logger;
     private readonly ILogger<IndexersWriteLock> _writeLogger;
     private readonly ILogger<AutoReadLock> _readLogger;
     private readonly int _rowSize;
@@ -208,6 +207,7 @@ public sealed class DataIndexRegistry : IDisposable
     private readonly AbstractRegistryDump _dump;
     private readonly AutoIndexer _autoIndexer = new();
     private readonly ColumnSynthesizer[] _synthesizers;
+    private readonly IReadOnlyDictionary<uint, ITypeHandler> _handlers;
 
     public int ColumnCount => _synthesizers.Length;
     public int IndexedColumnCount => _synthesizers.Length;
@@ -220,8 +220,9 @@ public sealed class DataIndexRegistry : IDisposable
             return autoIndexerLock.Count;
         }
     }
-    public DataIndexRegistry(SchemaSpecifications schema, ILoggerFactory? loggerFactory = null, AbstractRegistryDump? dump = null)
+    public DataRegistry(RegistrySchemaSpecifications schema, ILoggerFactory? loggerFactory = null, IReadOnlyDictionary<uint, ITypeHandler>? handlers = null, AbstractRegistryDump? dump = null)
     {
+        _handlers = handlers ?? TypeHandler.Default;
         if (loggerFactory == null)
         {
             _loggerFactory = LoggerFactory.Create(_ =>
@@ -230,7 +231,7 @@ public sealed class DataIndexRegistry : IDisposable
             });
             loggerFactory = _loggerFactory;
         }
-        _logger = loggerFactory.CreateLogger<DataIndexRegistry>();
+        _logger = loggerFactory.CreateLogger<DataRegistry>();
         _writeLogger = loggerFactory.CreateLogger<IndexersWriteLock>();
         _readLogger = loggerFactory.CreateLogger<AutoReadLock>();
         _dump = dump ?? AbstractRegistryDump.Empty;
@@ -239,88 +240,31 @@ public sealed class DataIndexRegistry : IDisposable
         var offset = 0;
         var hashSize = 0;
         var indexerCount = 0;
-        var degree = schema.BinaryTreeDegree < BTreeMap.MinDegree
-            ? DefaultBinaryTreeDegree
-            : schema.BinaryTreeDegree;
         foreach (var column in schema.Columns)
         {
-            var shouldBeHashed = column.ShouldBeHashed ?? column.Indexed;
+            bool shouldBeHashed;
             string dataType;
             IColumnResolver resolver;
             IIndexer? indexer;
-            switch (column.DataType)
-            {
-                case DataType.DWordMask:
-                {
-                    dataType = nameof(DataType.DWord);
-                    var cResolver = new IntegerColumnResolver(offset, shouldBeHashed);
-                    offset += cResolver.Occupying;
-                    resolver = cResolver;
-                    indexer = column.Indexed ? new IntegerIndexer(cResolver, degree) : null;
-                    break;
-                }
-                case DataType.QWordMask:
-                {
-                    dataType = nameof(DataType.QWord);
-                    var cResolver = new LongColumnResolver(offset, shouldBeHashed);
-                    offset += cResolver.Occupying;
-                    resolver = cResolver;
-                    indexer = column.Indexed ? new LongIndexer(cResolver, degree) : null;
-                    break;
-                }
-                case DataType.SingleMask:
-                {
-                    dataType = nameof(DataType.Single);
-                    var cResolver = new SingleColumnResolver(offset, shouldBeHashed);
-                    offset += cResolver.Occupying;
-                    resolver = cResolver;
-                    indexer = column.Indexed ? new SingleIndexer(cResolver, degree) : null;
-                    break;
-                }
-                case DataType.DoubleMask:
-                {
-                    dataType = nameof(DataType.Double);
-                    var cResolver = new DoubleColumnResolver(offset, shouldBeHashed);
-                    offset += cResolver.Occupying;
-                    resolver = cResolver;
-                    indexer = column.Indexed ? new DoubleIndexer(cResolver, degree) : null;
-                    break;
-                }
-                case DataType.StringMask:
-                {
-                    dataType = nameof(DataType.String);
-                    var cResolver = new StringColumnResolver(offset, i, shouldBeHashed);
-                    offset += cResolver.Occupying;
-                    resolver = cResolver;
-                    indexer = column.Indexed ? new StringIndexer(cResolver) : null;
-                    break;
-                }
-                case DataType.BytesMask:
-                {
-                    dataType = nameof(DataType.Bytes);
-                    var cResolver = new BytesColumnResolver(offset, i, shouldBeHashed);
-                    offset += cResolver.Occupying;
-                    resolver = cResolver;
-                    indexer = column.Indexed ? new BytesIndexer(cResolver) : null;
-                    break;
-                }
-                default:
-                    throw new DataTypeNotSupportedException();
-            }
+
+            var handler = _handlers[column.DataType];
+            var result = handler.Process(column, schema, i, offset);
+            offset = result.NewOffset;
+            shouldBeHashed = result.IsHashed;
+            dataType = result.TypeName;
+            resolver = result.Resolver;
+            indexer = result.Indexer;
 
             if (shouldBeHashed)
             {
                 hashSize += resolver.HashSize;
             }
-            _logger.LogDebug("Column {}: found type: {}, indexed: {}, should be hashed: {}",
-                i, dataType, column.Indexed, shouldBeHashed);
+            _logger.LogDebug("Column {}: found type: {}, indexer: {}, should be hashed: {}",
+                i, dataType, column.Indexer, shouldBeHashed);
 
             if (indexer != null)
             {
                 indexerCount++;
-                if (!column.Indexed)
-                    _logger.LogWarning("Schema requires column {} to be indexed, but data type does not support indexing",
-                        column.Name);
             }
             _synthesizers[i++] = ColumnSynthesizer.Create(indexer, resolver);
         }
@@ -410,7 +354,7 @@ public sealed class DataIndexRegistry : IDisposable
         return IAstraSerializable.DeserializeStream<T, RecyclableMemoryStream>(dataOut, false);
     }
     
-    private static int ConditionalCountInternal<T>(Stream predicateStream, T indexersLock) where T : struct, DataIndexRegistry.IIndexersLock
+    private static int ConditionalCountInternal<T>(Stream predicateStream, T indexersLock) where T : struct, DataRegistry.IIndexersLock
     {
         var set = predicateStream.Aggregate(indexersLock);
         return set?.Count ?? 0;

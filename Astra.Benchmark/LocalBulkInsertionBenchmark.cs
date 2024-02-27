@@ -9,7 +9,7 @@ namespace Astra.Benchmark;
 [SimpleJob(RuntimeMoniker.Net80)]
 public class LocalBulkInsertionBenchmark
 {
-    private DataIndexRegistry _registry = null!;
+    private DataRegistry _registry = null!;
     private SimpleSerializableStruct[] _data = null!;
     
     private int _bulkCounter = 1;
@@ -49,19 +49,19 @@ public class LocalBulkInsertionBenchmark
                 {
                     Name = "col1",
                     DataType = DataType.DWordMask,
-                    Indexed = true,
+                    Indexer = IndexerType.Range,
                 },
                 new()
                 {
                     Name = "col2",
                     DataType = DataType.StringMask,
-                    Indexed = false,
+                    Indexer = IndexerType.None,
                 },
                 new()
                 {
                     Name = "col3",
                     DataType = DataType.StringMask,
-                    Indexed = true,
+                    Indexer = IndexerType.Generic,
                 }
             }
         });

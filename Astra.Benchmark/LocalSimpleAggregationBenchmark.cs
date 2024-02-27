@@ -11,7 +11,7 @@ namespace Astra.Benchmark;
 public class LocalSimpleAggregationBenchmark
 {
     private readonly AstraTable<int, string, string> _table = new();
-    private DataIndexRegistry _registry = null!;
+    private DataRegistry _registry = null!;
     private const int Index = 1;
 
     [Params(100, 1_000, 10_000)]
@@ -30,19 +30,19 @@ public class LocalSimpleAggregationBenchmark
                 {
                     Name = "col1",
                     DataType = DataType.DWordMask,
-                    Indexed = true,
+                    Indexer = IndexerType.Range,
                 },
                 new()
                 {
                     Name = "col2",
                     DataType = DataType.StringMask,
-                    Indexed = false,
+                    Indexer = IndexerType.None,
                 },
                 new()
                 {
                     Name = "col3",
                     DataType = DataType.StringMask,
-                    Indexed = true,
+                    Indexer = IndexerType.Generic,
                 }
             },
             BinaryTreeDegree = (int)(AggregatedRows / 10)
