@@ -15,7 +15,7 @@ public class TcpServer : IDisposable
 {
     public const int DefaultPort = 8488;
     private const string ConfigPathEnvEntry = "ASTRA_CONFIG_PATH";
-    private static readonly byte[] FaultedResponse = { 1 };
+    private static readonly byte[] FaultedResponse = [ 1 ];
 
     private static readonly IReadOnlyDictionary<string, LogLevel> StringToLog = new Dictionary<string, LogLevel>
     {
@@ -415,6 +415,10 @@ public class TcpServer : IDisposable
 #pragma warning disable CS4014
                 Task.Run(() => ResolveClientWrappedAsync(client), _cancellationTokenSource.Token);
 #pragma warning restore CS4014
+            }
+            catch (TaskCanceledException)
+            {
+                // Ignored
             }
             catch (OperationCanceledException)
             {

@@ -80,6 +80,7 @@ file static class IntrinsicsBytesComparer
     public static unsafe bool Compare(ReadOnlySpan<byte> lhs, ReadOnlySpan<byte> rhs)
     {
         if (lhs.Length != rhs.Length) return false;
+        if (lhs.Length == 0) return true;
         fixed (byte* l = &lhs[0], r = &rhs[0])
         {
             return Equals(l, r, lhs.Length);

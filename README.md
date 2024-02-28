@@ -38,17 +38,17 @@ Here is an example configuration file:
             {
                 "name": "col1",
                 "dataType" : "dword",
-                "indexed": true
+                "indexer": "none"
             },
             {
                 "name": "col2",
                 "dataType" : "string",
-                "indexed": true
+                "indexer": "fuzzy"
             },
             {
                 "name": "col3",
                 "dataType" : "string",
-                "indexed": true
+                "indexer": "none"
             }
         ]
     }
@@ -83,7 +83,7 @@ There are currently 3 supported data types, with more on the way:
 - `string`: Variable-length string with a maximum length of `2147483647` characters.
 - `bytes`: Variable-length byte array with a maximum length of `2147483647` bytes.
 
-## Roadmap
+## Feature
 
 - [x] Embeddable engine
 - [x] TCP server
@@ -93,10 +93,10 @@ There are currently 3 supported data types, with more on the way:
 - [x] Insertion/Bulk insertion
 - [x] Conditional deletion
 - [x] ORM (partially finished)
-- [ ] .NET 6 supports for `Astra.Client`
+- [x] Fuzzy string search supports
 - [x] Supports for qword, single and double
 - [x] Ranged query
-- [ ] Regex/string matching supports
+- [ ] .NET 6 supports for `Astra.Client`
 - [ ] Multiple tables
 - [ ] Strict schema check
 

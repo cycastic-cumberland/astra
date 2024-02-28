@@ -1,4 +1,5 @@
 using System.Collections;
+using System.IO.Hashing;
 using Astra.Collections;
 using Astra.Common;
 
@@ -7,11 +8,13 @@ namespace Astra.Engine.Indexers;
 public readonly struct ComparableBytesMemory : IEquatable<ComparableBytesMemory>, IReadOnlyList<byte>
 {
     private readonly ReadOnlyMemory<byte> _bytes;
+    private readonly int _hash;
     public ReadOnlyMemory<byte> Memory => _bytes;
     
     public ComparableBytesMemory(ReadOnlyMemory<byte> bytes)
     {
         _bytes = bytes;
+        _hash = unchecked((int)XxHash32.HashToUInt32(_bytes.Span));
     }
     
     public bool Equals(ComparableBytesMemory other)
@@ -32,10 +35,7 @@ public readonly struct ComparableBytesMemory : IEquatable<ComparableBytesMemory>
         return obj is ComparableBytesMemory other && Equals(other);
     }
 
-    public override int GetHashCode()
-    {
-        return _bytes.GetHashCode();
-    }
+    public override int GetHashCode() => _hash;
 
     IEnumerator IEnumerable.GetEnumerator()
     {
