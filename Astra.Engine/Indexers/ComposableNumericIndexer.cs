@@ -267,3 +267,6 @@ public sealed class ComposableSingleRangeIndexer(UnmanagedColumnResolver<float> 
 public sealed class ComposableDoubleRangeIndexer(UnmanagedColumnResolver<double> resolver, int degree)
     : ComposableNumericIndexer<double, UnmanagedColumnResolver<double>>(resolver, degree);
 
+public sealed class ComposableDecimalRangeIndexer(UnmanagedColumnResolver<decimal> resolver, int degree)
+    : ComposableNumericIndexer<decimal, UnmanagedColumnResolver<decimal>>(resolver, degree);
+

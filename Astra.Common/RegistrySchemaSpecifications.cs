@@ -97,6 +97,8 @@ public struct RepresentableColumnSchemaSpecifications
             "Bytes" => Astra.Common.DataType.BytesMask,
             "bytes" => Astra.Common.DataType.BytesMask,
             "BYTES" => Astra.Common.DataType.BytesMask,
+            "decimal" => Astra.Common.DataType.DecimalMask,
+            "DECIMAL" => Astra.Common.DataType.DecimalMask,
             _ => throw new NotSupportedException($"Data type not supported: {DataType}")
         };
         

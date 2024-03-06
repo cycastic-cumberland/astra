@@ -48,6 +48,11 @@ public static class StreamReadAddons
         return ReadUnmanagedStruct<double>(reader);
     }
     
+    public static decimal ReadDecimal(this Stream reader)
+    {
+        return ReadUnmanagedStruct<decimal>(reader);
+    }
+    
     public static long ReadLong(this Stream reader)
     {
         return ReadUnmanagedStruct<long>(reader);

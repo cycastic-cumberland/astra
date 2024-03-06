@@ -54,3 +54,11 @@ public readonly struct StringWrapperStreamResolver : IStreamResolver<StringWrapp
         return stream.ReadString();
     }
 }
+
+public readonly struct DecimalStreamResolver : IStreamResolver<decimal>
+{
+    public static decimal ConsumeStream(Stream stream)
+    {
+        return stream.ReadDecimal();
+    }
+}

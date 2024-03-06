@@ -39,6 +39,7 @@ public readonly struct DataType(uint value)
     public const uint DoubleMask       = 1U << 17 | Comparable | Numeric | StaticSize;
     public const uint StringMask       = 1U << 18 | Comparable;
     public const uint BytesMask        = 1U << 19;
+    public const uint DecimalMask      = 1U << 20 | Comparable | Numeric | StaticSize;
 
     public const uint Comparable       = 1U << 31;
     public const uint Numeric          = 1U << 30;
@@ -58,6 +59,7 @@ public readonly struct DataType(uint value)
     public static readonly  DataType Double = new(DoubleMask);
     public static readonly  DataType String = new(StringMask);
     public static readonly  DataType Bytes = new(BytesMask);
+    public static readonly  DataType Decimal = new(DecimalMask);
 
     public bool IsNone => value == 0;
     public bool IsSerial => value == SerialMask;
