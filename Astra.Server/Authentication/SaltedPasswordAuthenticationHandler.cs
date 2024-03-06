@@ -7,7 +7,7 @@ namespace Astra.Server.Authentication;
 
 public class SaltedPasswordAuthenticationHandler(
     byte[] rawPassword,
-    Func<byte[], Hash256> hasher,
+    Func<ReadOnlyMemory<byte>, Hash256> hasher,
     Func<Hash256, Hash256, bool> comparer,
     int timeout) : IAuthenticationHandler
 {
@@ -15,12 +15,12 @@ public class SaltedPasswordAuthenticationHandler(
     {
         var stream = client.GetStream();
         await stream.WriteValueAsync(CommunicationProtocol.SaltedPasswordAuthentication, token: cancellationToken);
-        var salt = new byte[CommonProtocol.SaltLength];
+        using var salt = BytesCluster.Rent(CommonProtocol.SaltLength);
         using (var rng = RandomNumberGenerator.Create())
         {
-            rng.GetBytes(salt);
+            rng.GetBytes(salt.Writer);
         }
-        await stream.WriteAsync(salt, cancellationToken);
+        await stream.WriteAsync(salt.ReaderMemory, cancellationToken);
         var timer = Stopwatch.StartNew();
         while (client.Available < Hash256.Size)
         {
@@ -33,10 +33,11 @@ public class SaltedPasswordAuthenticationHandler(
                 return IAuthenticationHandler.AuthenticationState.Timeout;
         }
 
-        var bytes = new byte[Hash256.Size];
-        await stream.ReadExactlyAsync(bytes, cancellationToken);
-        var userHash = Hash256.Create(bytes);
-        var correctHash = hasher(CommonProtocol.CombineSalt(rawPassword, salt));
+        using var bytes = BytesCluster.Rent(Hash256.Size);
+        await stream.ReadExactlyAsync(bytes.WriterMemory, cancellationToken);
+        var userHash = Hash256.Create(bytes.Reader);
+        using var combined = CommonProtocol.CombineSalt(rawPassword, salt.Reader);
+        var correctHash = hasher(combined.ReaderMemory);
         return comparer(userHash, correctHash) ? IAuthenticationHandler.AuthenticationState.AllowConnection : IAuthenticationHandler.AuthenticationState.RejectConnection;
     }
 

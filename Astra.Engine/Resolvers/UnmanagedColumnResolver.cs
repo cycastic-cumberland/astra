@@ -24,7 +24,7 @@ file static class ResolverHelper
     }
 }
 
-public abstract class UnmanagedColumnResolver<TD>(int offset, bool shouldBeHashed, DataType type) 
+public abstract class UnmanagedColumnResolver<TD>(string columnName, int offset, bool shouldBeHashed, DataType type) 
     : IColumnResolver<TD>
     where TD : unmanaged
 {
@@ -32,7 +32,8 @@ public abstract class UnmanagedColumnResolver<TD>(int offset, bool shouldBeHashe
     public int Occupying => Unsafe.SizeOf<TD>();
     public int HashSize => Unsafe.SizeOf<TD>();
     public int Offset => offset;
-    
+    public string ColumnName => columnName;
+
     public void Initialize<T>(T row) where T : struct, IDataRow
     {
         Enroll(new TD(), row);
@@ -85,14 +86,14 @@ public abstract class UnmanagedColumnResolver<TD>(int offset, bool shouldBeHashe
     }
 }
 
-public sealed class IntegerColumnResolver(int offset, bool shouldBeHashed) 
-    : UnmanagedColumnResolver<int>(offset, shouldBeHashed, DataType.DWord);
+public sealed class IntegerColumnResolver(string columnName, int offset, bool shouldBeHashed) 
+    : UnmanagedColumnResolver<int>(columnName, offset, shouldBeHashed, DataType.DWord);
 
-public sealed class LongColumnResolver(int offset, bool shouldBeHashed) 
-    : UnmanagedColumnResolver<long>(offset, shouldBeHashed, DataType.QWord);
+public sealed class LongColumnResolver(string columnName, int offset, bool shouldBeHashed) 
+    : UnmanagedColumnResolver<long>(columnName, offset, shouldBeHashed, DataType.QWord);
 
-public sealed class SingleColumnResolver(int offset, bool shouldBeHashed) 
-    : UnmanagedColumnResolver<float>(offset, shouldBeHashed, DataType.Single);
+public sealed class SingleColumnResolver(string columnName, int offset, bool shouldBeHashed) 
+    : UnmanagedColumnResolver<float>(columnName, offset, shouldBeHashed, DataType.Single);
 
-public sealed class DoubleColumnResolver(int offset, bool shouldBeHashed) 
-    : UnmanagedColumnResolver<double>(offset, shouldBeHashed, DataType.Double);
+public sealed class DoubleColumnResolver(string columnName, int offset, bool shouldBeHashed) 
+    : UnmanagedColumnResolver<double>(columnName, offset, shouldBeHashed, DataType.Double);

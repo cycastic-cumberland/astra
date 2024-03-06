@@ -4,14 +4,15 @@ using Astra.Engine.Indexers;
 
 namespace Astra.Engine.Resolvers;
 
-public sealed class BytesColumnResolver(int offset, int index, bool shouldBeHashed) : 
+public sealed class BytesColumnResolver(string columnName, int offset, int index, bool shouldBeHashed) : 
     IColumnResolver<ComparableBytesMemory>
 {
     public DataType Type => DataType.Bytes;
     public int Occupying => sizeof(ulong);
     public int HashSize => Hash128.Size;
     public int Offset => offset;
-    
+    public string ColumnName => columnName;
+
     public void Initialize<T>(T row) where T : struct, IDataRow
     {
         var cluster = BytesCluster.Rent(Hash128.Size);

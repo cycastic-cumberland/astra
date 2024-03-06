@@ -1,6 +1,7 @@
 ﻿using System.Security.Cryptography;
 using Astra.Client;
-using Astra.Client.Aggregator;
+using Astra.Client.Simple;
+using Astra.Client.Simple.Aggregator;
 using Astra.Common;
 using Astra.Server;
 using Astra.Server.Authentication;
@@ -23,7 +24,7 @@ internal struct SimpleSerializableStruct : IAstraSerializable
         writer.SaveValue(Value4);
     }
 
-    public void DeserializeStream<TStream>(TStream reader) where TStream : IStreamWrapper
+    public void DeserializeStream<TStream>(TStream reader, ReadOnlySpan<string> columnSequence) where TStream : IStreamWrapper
     {
         Value1 = reader.LoadInt();
         Value2 = reader.LoadString();
@@ -48,7 +49,7 @@ public class EmbeddedServer
             {
                 Name = "col1",
                 DataType = DataType.DWordMask,
-                Indexer = IndexerType.Range,
+                Indexer = IndexerType.BTree,
             },
             new()
             {
@@ -76,14 +77,10 @@ public class EmbeddedServer
             publicKey = Convert.ToBase64String(rsa.ExportRSAPublicKey());
             privateKey = Convert.ToBase64String(rsa.ExportRSAPrivateKey());
         }
-        var connectionSettings = new AstraConnectionSettings
+        var connectionSettings = new SimpleAstraClientConnectionSettings
         {
             Address = "127.0.0.1",
             Port = port,
-            Schema = new()
-            {
-                Columns = columns
-            },
             PrivateKey = privateKey
         };
         var server = new TcpServer(new()

@@ -29,12 +29,12 @@ public abstract class NumericTypeHandler<T, TColumnResolver, TResolverFactory, T
         var degree = registry.BinaryTreeDegree < BTreeMap.MinDegree
             ? NumericTypeHandler.DefaultBinaryTreeDegree
             : registry.BinaryTreeDegree;
-        var isHashed = column.ShouldBeHashed ?? column.Indexer != IndexerType.None;
-        var resolver = TResolverFactory.Create(offset, isHashed);
-        IIndexer? indexer = column.Indexer switch
+        var isHashed = column.ShouldBeHashed ?? column.Indexer.Type != IndexerType.None;
+        var resolver = TResolverFactory.Create(column.Name, offset, isHashed);
+        IIndexer? indexer = column.Indexer.Type switch
         {
             IndexerType.Generic => TGenericIndexerFactory.Create(resolver),
-            IndexerType.Range => TRangeIndexerFactory.Create(resolver, degree),
+            IndexerType.BTree => TRangeIndexerFactory.Create(resolver, degree),
             IndexerType.None => null,
             _ => throw new NotSupportedException($"Indexer not supported: {column.Indexer}")
         };
@@ -53,33 +53,33 @@ public abstract class NumericTypeHandler<T, TColumnResolver, TResolverFactory, T
 
 public readonly struct IntegerResolverFactory : IResolverFactory<IntegerColumnResolver>
 {
-    public static IntegerColumnResolver Create(int offset, bool isHashed)
+    public static IntegerColumnResolver Create(string columnName, int offset, bool isHashed)
     {
-        return new(offset, isHashed);
+        return new(columnName, offset, isHashed);
     }
 }
 
 public readonly struct LongResolverFactory : IResolverFactory<LongColumnResolver>
 {
-    public static LongColumnResolver Create(int offset, bool isHashed)
+    public static LongColumnResolver Create(string columnName, int offset, bool isHashed)
     {
-        return new(offset, isHashed);
+        return new(columnName, offset, isHashed);
     }
 }
 
 public readonly struct SingleResolverFactory : IResolverFactory<SingleColumnResolver>
 {
-    public static SingleColumnResolver Create(int offset, bool isHashed)
+    public static SingleColumnResolver Create(string columnName, int offset, bool isHashed)
     {
-        return new(offset, isHashed);
+        return new(columnName, offset, isHashed);
     }
 }
 
 public readonly struct DoubleResolverFactory : IResolverFactory<DoubleColumnResolver>
 {
-    public static DoubleColumnResolver Create(int offset, bool isHashed)
+    public static DoubleColumnResolver Create(string columnName, int offset, bool isHashed)
     {
-        return new(offset, isHashed);
+        return new(columnName, offset, isHashed);
     }
 }
 

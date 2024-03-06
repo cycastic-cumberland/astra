@@ -1,5 +1,6 @@
 using Astra.Client;
-using Astra.Client.Aggregator;
+using Astra.Client.Simple;
+using Astra.Client.Simple.Aggregator;
 using Astra.Common;
 using Astra.Server;
 using Astra.Server.Authentication;
@@ -15,7 +16,7 @@ public class AggregationTestFixture
         {
             Name = "col1",
             DataType = DataType.DWordMask,
-            Indexer = IndexerType.Range,
+            Indexer = IndexerType.BTree,
         },
         new()
         {
@@ -39,10 +40,10 @@ public class AggregationTestFixture
         {
             Name = "col5",
             DataType = DataType.SingleMask,
-            Indexer = IndexerType.Range,
+            Indexer = IndexerType.BTree,
         },
     ];
-    private AstraConnectionSettings _connectionSettings;
+    private SimpleAstraClientConnectionSettings _connectionSettings;
     
     private TcpServer _server = null!;
     private Task _serverTask = null!;
@@ -57,10 +58,6 @@ public class AggregationTestFixture
         {
             Address = "127.0.0.1",
             Port = TcpServer.DefaultPort + 1,
-            Schema = new()
-            {
-                Columns = _columns
-            },
             Password = password
         };
         _server = new(new()
@@ -213,7 +210,7 @@ public class AggregationTestFixture
         
         Assert.That(await _simpleAstraClient.CountAllAsync(), Is.EqualTo(5));
 
-        var fetch = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
+        var fetch = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct, GenericAstraQueryBranch>(
             _table.Column5.LesserThan(0));
 
         var count = 0;

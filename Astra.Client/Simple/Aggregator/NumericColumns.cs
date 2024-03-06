@@ -1,7 +1,7 @@
 using System.Numerics;
 using Astra.Common;
 
-namespace Astra.Client.Aggregator;
+namespace Astra.Client.Simple.Aggregator;
 
 public abstract class NumericColumn<T>(int offset, uint mask) : IAstraColumnQuery<T>
     where T : unmanaged, INumber<T>

@@ -2,19 +2,20 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using Astra.Common;
-using Astra.Engine;
 
 namespace Astra.Server.Authentication;
 
 public class PublicKeyAuthenticationHandler : IAuthenticationHandler
 {
-    private readonly byte[] _challenge = new byte[CommonProtocol.PublicKeyChallengeLength];
+    private readonly BytesCluster _challenge;
     private readonly RSA _rsa = new RSACryptoServiceProvider(2048);
     private readonly int _timeout;
     
     public PublicKeyAuthenticationHandler(string base64PubKey, int timeout)
     {
+        const int challengeLength = (int)CommonProtocol.PublicKeyChallengeLength;
         _timeout = timeout;
+        _challenge = BytesCluster.Rent(challengeLength);
         _rsa.ImportRSAPublicKey(Convert.FromBase64String(base64PubKey), out _);
     }
     
@@ -24,7 +25,7 @@ public class PublicKeyAuthenticationHandler : IAuthenticationHandler
         await stream.WriteValueAsync(CommunicationProtocol.PubKeyAuthentication, token: cancellationToken);
         using (var rng = RandomNumberGenerator.Create())
         {
-            rng.GetBytes(_challenge);
+            rng.GetBytes(_challenge.Writer);
         }
 
         await stream.WriteValueAsync(_challenge, cancellationToken);
@@ -53,9 +54,9 @@ public class PublicKeyAuthenticationHandler : IAuthenticationHandler
         }
         timer.Stop();
 
-        var signatureBytes = new byte[privateKeySize];
-        await stream.ReadExactlyAsync(signatureBytes, cancellationToken);
-        var verified = _rsa.VerifyData(_challenge, signatureBytes,
+        using var signatureBytes = BytesCluster.Rent((int)privateKeySize);
+        await stream.ReadExactlyAsync(signatureBytes.WriterMemory, cancellationToken);
+        var verified = _rsa.VerifyData(_challenge.Reader, signatureBytes.Reader,
             HashAlgorithmName.SHA512, RSASignaturePadding.Pkcs1);
         return verified
             ? IAuthenticationHandler.AuthenticationState.AllowConnection
@@ -65,5 +66,6 @@ public class PublicKeyAuthenticationHandler : IAuthenticationHandler
     public void Dispose()
     {
         _rsa.Dispose();
+        _challenge.Dispose();
     }
 }

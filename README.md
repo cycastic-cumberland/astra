@@ -38,12 +38,14 @@ Here is an example configuration file:
             {
                 "name": "col1",
                 "dataType" : "dword",
-                "indexer": "none"
+                "indexer": "btree"
             },
             {
                 "name": "col2",
                 "dataType" : "string",
-                "indexer": "fuzzy"
+                "indexer": "fuzzy",
+                "shouldBeHashed": false
+
             },
             {
                 "name": "col3",

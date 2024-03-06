@@ -2,7 +2,9 @@ namespace Astra.Common;
 
 public static class CommonProtocol
 {
-    public const uint AstraCommonVersion = 0x00011000U;
+    public const int SignatureSizeBit = 2048;
+    public const int SignatureSize = 2048 / 8;
+    public const uint AstraCommonVersion = 0x00012000U;
     public const int LongStringThreshold = 96;
     public const uint PublicKeyChallengeLength = 64;
     public const int SaltLength = 16;
@@ -24,11 +26,19 @@ public static class CommonProtocol
     {
         return AstraCommonVersion.ToAstraCommonVersion();
     }
-    public static byte[] CombineSalt(byte[] password, byte[] salt)
+    public static BytesCluster CombineSalt(ReadOnlySpan<byte> password, ReadOnlySpan<byte> salt)
     {
-        var ret = new byte[password.Length + salt.Length];
-        Buffer.BlockCopy(salt, 0, ret, 0, salt.Length);
-        Buffer.BlockCopy(password, 0, ret, salt.Length, password.Length);
-        return ret;
+        var cluster = BytesCluster.Rent(password.Length + salt.Length);
+        try
+        {
+            salt.CopyTo(cluster.Writer);
+            password.CopyTo(cluster.Writer[salt.Length..]);
+            return cluster;
+        }
+        catch
+        {
+            cluster.Dispose();
+            throw;
+        }
     }
 }

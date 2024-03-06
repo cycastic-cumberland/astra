@@ -1,6 +1,6 @@
 using System.Collections;
 using System.Runtime.CompilerServices;
-using Astra.Collections.RangeDictionaries.BTree;
+using Astra.Collections;
 using Astra.Common;
 using Astra.Engine.Aggregator;
 using Astra.Engine.Indexers;
@@ -16,6 +16,7 @@ using SynthesizersWrite = (IIndexer.IIndexerWriteHandler? handler, IColumnResolv
 
 public class WriteOperationsNotAllowed(string? msg = null) : Exception(msg);
 
+public class DuplicatedColumnNameException(string? msg = null) : Exception(msg);
 
 public abstract class AbstractRegistryDump
 {
@@ -207,7 +208,7 @@ public sealed class DataRegistry : IDisposable
     private readonly AbstractRegistryDump _dump;
     private readonly AutoIndexer _autoIndexer = new();
     private readonly ColumnSynthesizer[] _synthesizers;
-    private readonly IReadOnlyDictionary<uint, ITypeHandler> _handlers;
+    private readonly ReadOnlyDictionary<Dictionary<string, ColumnSynthesizer>, string, ColumnSynthesizer> _nameToResolvers;
 
     public int ColumnCount => _synthesizers.Length;
     public int IndexedColumnCount => _synthesizers.Length;
@@ -222,7 +223,8 @@ public sealed class DataRegistry : IDisposable
     }
     public DataRegistry(RegistrySchemaSpecifications schema, ILoggerFactory? loggerFactory = null, IReadOnlyDictionary<uint, ITypeHandler>? handlers = null, AbstractRegistryDump? dump = null)
     {
-        _handlers = handlers ?? TypeHandler.Default;
+        handlers ??= TypeHandler.Default;
+        var nameToResolvers = new Dictionary<string, ColumnSynthesizer>();
         if (loggerFactory == null)
         {
             _loggerFactory = LoggerFactory.Create(_ =>
@@ -242,18 +244,13 @@ public sealed class DataRegistry : IDisposable
         var indexerCount = 0;
         foreach (var column in schema.Columns)
         {
-            bool shouldBeHashed;
-            string dataType;
-            IColumnResolver resolver;
-            IIndexer? indexer;
-
-            var handler = _handlers[column.DataType];
+            var handler = handlers[column.DataType];
             var result = handler.Process(column, schema, i, offset);
             offset = result.NewOffset;
-            shouldBeHashed = result.IsHashed;
-            dataType = result.TypeName;
-            resolver = result.Resolver;
-            indexer = result.Indexer;
+            var shouldBeHashed = result.IsHashed;
+            var dataType = result.TypeName;
+            var resolver = result.Resolver;
+            var indexer = result.Indexer;
 
             if (shouldBeHashed)
             {
@@ -261,16 +258,19 @@ public sealed class DataRegistry : IDisposable
             }
             _logger.LogDebug("Column {}: found type: {}, indexer: {}, should be hashed: {}",
                 i, dataType, column.Indexer, shouldBeHashed);
-
             if (indexer != null)
             {
                 indexerCount++;
             }
-            _synthesizers[i++] = ColumnSynthesizer.Create(indexer, resolver);
+            var synth = ColumnSynthesizer.Create(indexer, resolver);
+            if (!nameToResolvers.TryAdd(column.Name, synth))
+                throw new DuplicatedColumnNameException(column.Name);
+            _synthesizers[i++] = synth;
         }
         _rowSize = offset;
         _hashSize = hashSize;
         _indexerCount = indexerCount;
+        _nameToResolvers = new(nameToResolvers);
         _logger.LogInformation("Row length: {} byte(s)", _rowSize);
         _logger.LogInformation("Hash stream length: {} byte(s)", _hashSize);
     }
@@ -334,7 +334,7 @@ public sealed class DataRegistry : IDisposable
         return IAstraSerializable.DeserializeStream<T, RecyclableMemoryStream>(dataOut, false);
     }
     
-    public IEnumerable<T> Aggregate<T>(ReadOnlyMemory<byte> predicateStream) where T : IAstraSerializable
+    public AstraSerializableEnumerable<T, RecyclableMemoryStream> Aggregate<T>(ReadOnlyMemory<byte> predicateStream) where T : IAstraSerializable
     {
         var buffer = LocalBuffer.Value ?? new(); 
         buffer.Buffer = predicateStream;
@@ -541,6 +541,7 @@ public sealed class DataRegistry : IDisposable
             case Command.UnsortedAggregate:
             {
                 using var readLock = new AutoReadLock(this, _readLogger);
+                OutputLayout(dataOut, _synthesizers);
                 dataIn.AggregateStream(dataOut, readLock);
                 break;
             }
@@ -658,5 +659,19 @@ public sealed class DataRegistry : IDisposable
         autoIndexerLock.Commit();
         writeLock.Commit();
         return ret;
+    }
+
+    private static void OutputLayout<TStream, TList>(TStream stream, TList synthesizers) 
+        where TStream : Stream
+        where TList : IReadOnlyList<ColumnSynthesizer>
+    {
+        var columnCount = synthesizers.Count;
+        stream.WriteValue(columnCount);
+        // Reducing heap allocation
+        for (var i = 0; i < columnCount; i++)
+        {
+            var synth = synthesizers[i];
+            stream.WriteValue(synth.Resolver.ColumnName);
+        }
     }
 }

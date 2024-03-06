@@ -9,6 +9,7 @@ public interface IColumnResolver
     public int Occupying { get; }
     public int HashSize { get; }
     public int Offset { get; }
+    public string ColumnName { get; }
     public void Initialize<T>(T row) where T : struct, IDataRow;
     public void Initialize<T>(Stream reader, Stream hashStream, T row) where T : struct, IDataRow;
     public void BeginHash<T>(Stream writer, T row) where T : struct, IImmutableDataRow;

@@ -20,7 +20,7 @@ public class EngineTestFixture
             writer.SaveValue(Value3);
         }
 
-        public void DeserializeStream<TStream>(TStream reader) where TStream : IStreamWrapper
+        public void DeserializeStream<TStream>(TStream reader, ReadOnlySpan<string> columnSequence) where TStream : IStreamWrapper
         {
             Value1 = reader.LoadInt();
             Value2 = reader.LoadString();
@@ -35,7 +35,7 @@ public class EngineTestFixture
         {
             Name = "col1",
             DataType = DataType.DWordMask,
-            Indexer = IndexerType.Range,
+            Indexer = IndexerType.BTree,
         },
         new()
         {

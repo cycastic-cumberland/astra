@@ -1,4 +1,4 @@
-namespace Astra.Client.Aggregator;
+namespace Astra.Client.Simple.Aggregator;
 
 internal static class ColumnQueryHelper
 {

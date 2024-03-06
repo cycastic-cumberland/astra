@@ -1,16 +1,14 @@
 using Astra.Common;
 using Newtonsoft.Json;
 
-namespace Astra.Client;
+namespace Astra.Client.Simple;
 
-public struct AstraConnectionSettings
+public struct SimpleAstraClientConnectionSettings
 {
     [JsonProperty("address")]
     public string Address { get; set; }
     [JsonProperty("port")]
     public int Port { get; set; }
-    [JsonProperty("schema")]
-    public RegistrySchemaSpecifications Schema { get; set; }
     [JsonProperty("timeout")]
     public int Timeout { get; set; }
     [JsonProperty("password")]

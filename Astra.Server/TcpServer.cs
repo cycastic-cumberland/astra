@@ -1,4 +1,5 @@
-﻿using System.Diagnostics;
+﻿using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -7,6 +8,7 @@ using Astra.Common;
 using Astra.Engine.Data;
 using Astra.Server.Authentication;
 using Microsoft.Extensions.Logging;
+using Microsoft.IO;
 using Newtonsoft.Json;
 
 namespace Astra.Server;
@@ -16,6 +18,7 @@ public class TcpServer : IDisposable
     public const int DefaultPort = 8488;
     private const string ConfigPathEnvEntry = "ASTRA_CONFIG_PATH";
     private static readonly byte[] FaultedResponse = [ 1 ];
+    private static readonly byte[] SafeResponse = [ 0 ];
 
     private static readonly IReadOnlyDictionary<string, LogLevel> StringToLog = new Dictionary<string, LogLevel>
     {
@@ -45,6 +48,7 @@ public class TcpServer : IDisposable
     };
     private static readonly IPAddress Address = IPAddress.Parse("0.0.0.0");
     private static readonly IPGlobalProperties IpProperties = IPGlobalProperties.GetIPGlobalProperties();
+    private readonly ConcurrentBag<RecyclableMemoryStream> _streamPool = new();
     private readonly DataRegistry _registry;
     private readonly TcpListener _listener;
     private readonly ILoggerFactory _loggerFactory;
@@ -58,9 +62,7 @@ public class TcpServer : IDisposable
 
     public ILogger<TL> GetLogger<TL>() => _loggerFactory.CreateLogger<TL>();
     
-#if DEBUG
-    public DataRegistry ProbeRegistry() => _registry;
-#endif
+    public unsafe DataRegistry GetRegistry() => _registry;
     
     public TcpServer(AstraLaunchSettings settings, Func<IAuthenticationHandler> authenticationSpawner)
     {
@@ -209,6 +211,13 @@ public class TcpServer : IDisposable
             return false;
         }
     }
+
+    private RecyclableMemoryStream AllocateStream()
+    {
+        if (_streamPool.TryTake(out var existing)) return existing;
+        return MemoryStreamPool.Allocate();
+    }
+    
     
     private async Task ResolveClientAsync(TcpClient client)
     {
@@ -217,7 +226,7 @@ public class TcpServer : IDisposable
         var stopwatch = new Stopwatch();
         var threshold = (long)sizeof(long);
         var waiting = true;
-        var writeStream = MemoryStreamPool.Allocate();
+        var writeStream = AllocateStream();
         var lastCheck = 0L;
         var timer = Stopwatch.StartNew();
         try
@@ -267,7 +276,7 @@ public class TcpServer : IDisposable
                         if (writeStream.Length > CommonProtocol.ThreadLocalStreamDisposalThreshold)
                         {
                             await writeStream.DisposeAsync();
-                            writeStream = MemoryStreamPool.Allocate();
+                            writeStream = AllocateStream();
                         }
                         else
                         {
@@ -278,8 +287,8 @@ public class TcpServer : IDisposable
                 catch (Exception e)
                 {
                     // "Faulted" response
-                    await writeStream.WriteValueAsync(1L, token: cancellationToken);
-                    await writeStream.WriteAsync(FaultedResponse, cancellationToken);
+                    // await writeStream.WriteValueAsync(1L, token: cancellationToken);
+                    // await writeStream.WriteAsync(FaultedResponse, cancellationToken);
                     _logger.LogError(e, "Error occured while resolving request");
                 }
                 finally
@@ -295,7 +304,15 @@ public class TcpServer : IDisposable
         }
         finally
         {
-            await writeStream.DisposeAsync();
+            if (writeStream.Length > CommonProtocol.ThreadLocalStreamDisposalThreshold)
+            {
+                await writeStream.DisposeAsync();
+            }
+            else
+            {
+                writeStream.SetLength(0);
+                _streamPool.Add(writeStream);
+            }
         }
     }
     

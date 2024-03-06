@@ -49,7 +49,7 @@ public class LocalBulkInsertionBenchmark
                 {
                     Name = "col1",
                     DataType = DataType.DWordMask,
-                    Indexer = IndexerType.Range,
+                    Indexer = IndexerType.BTree,
                 },
                 new()
                 {

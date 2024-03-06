@@ -1,4 +1,5 @@
 using Astra.Client;
+using Astra.Client.Simple;
 using Astra.Common;
 using Astra.Server;
 using Astra.Server.Authentication;
@@ -14,7 +15,7 @@ public class SequentialClientTestFixture
         {
             Name = "col1",
             DataType = DataType.DWordMask,
-            Indexer = IndexerType.Range,
+            Indexer = IndexerType.BTree,
         },
         new()
         {
@@ -38,10 +39,10 @@ public class SequentialClientTestFixture
         {
             Name = "col5",
             DataType = DataType.SingleMask,
-            Indexer = IndexerType.Range,
+            Indexer = IndexerType.BTree,
         },
     ];
-    private AstraConnectionSettings _connectionSettings;
+    private SimpleAstraClientConnectionSettings _connectionSettings;
     
     private TcpServer _server = null!;
     private Task _serverTask = null!;
@@ -55,10 +56,6 @@ public class SequentialClientTestFixture
         {
             Address = "127.0.0.1",
             Port = TcpServer.DefaultPort,
-            Schema = new()
-            {
-                Columns = _columns
-            },
             Password = password
         };
         _server = new(new()

@@ -1,4 +1,4 @@
-using Astra.Client.Aggregator;
+using Astra.Client.Simple.Aggregator;
 using Astra.Common;
 using Astra.Engine;
 using Astra.Engine.Data;
@@ -30,7 +30,7 @@ public class LocalSimpleAggregationBenchmark
                 {
                     Name = "col1",
                     DataType = DataType.DWordMask,
-                    Indexer = IndexerType.Range,
+                    Indexer = IndexerType.BTree,
                 },
                 new()
                 {
@@ -84,7 +84,6 @@ public class LocalSimpleAggregationBenchmark
         var predicate = _table.Column1.EqualsLiteral(Index);
         _ = _registry.Aggregate<SimpleSerializableStruct>(
             predicate.DumpMemory());
-        
     }
 
     private ulong _a;

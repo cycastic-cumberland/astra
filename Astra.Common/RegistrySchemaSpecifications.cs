@@ -6,7 +6,7 @@ public struct ColumnSchemaSpecifications
 {
     public string Name { get; set; }
     public uint DataType { get; set; }
-    public IndexerType Indexer { get; set; }
+    public IndexerData Indexer { get; set; }
     public bool? ShouldBeHashed { get; set; }
 }
 
@@ -27,6 +27,54 @@ public struct RepresentableColumnSchemaSpecifications
     [JsonProperty("shouldBeHashed")]
     public bool? ShouldBeHashed { get; set; }
 
+    private IndexerData SelectOtherIndexer()
+    {
+        const string prefix = "dyn://";
+        if (!Indexer.StartsWith(prefix)) goto notSupported;
+        var offset = prefix.Length;
+        var assemblyPathBuffer = Indexer.Length - offset < 64
+            ? stackalloc char[Indexer.Length - offset]
+            : new char[Indexer.Length - offset];
+
+        int i;
+        for (i = 0; i < Indexer.Length; i++)
+        {
+            var absolute = offset + i;
+            var c = Indexer[absolute];
+            if (c == ':')
+                goto finalize;
+            assemblyPathBuffer[i] = c;
+        }
+
+        goto notSupported;
+        finalize: 
+        if (offset + i >= Indexer.Length - 2) goto notSupported;
+        i++;
+        var assemblyPath = new string(assemblyPathBuffer[..i]);
+        var className = Indexer[(offset + i)..];
+        return new(IndexerType.Dynamic, new(assemblyPath, className));
+        notSupported:
+        throw new NotSupportedException($"Indexer not supported: {Indexer}");
+    }
+    
+    private IndexerData SelectIndexer()
+    {
+        return Indexer switch
+        {
+            "generic" => IndexerType.Generic,
+            "GENERIC" => IndexerType.Generic,
+            "btree" => IndexerType.BTree,
+            "BTREE" => IndexerType.BTree,
+            "fuzzy" => IndexerType.Fuzzy,
+            "FUZZY" => IndexerType.Fuzzy,
+            "none" => IndexerType.None,
+            "NONE" => IndexerType.None,
+            "" => IndexerType.None,
+            null => IndexerType.None,
+            _ => SelectOtherIndexer()
+        };
+    }
+    
     public ColumnSchemaSpecifications ToInternal()
     {
         var dataType = DataType switch
@@ -51,24 +99,12 @@ public struct RepresentableColumnSchemaSpecifications
             "BYTES" => Astra.Common.DataType.BytesMask,
             _ => throw new NotSupportedException($"Data type not supported: {DataType}")
         };
+        
         return new()
         {
             Name = Name,
             DataType = dataType,
-            Indexer = Indexer switch
-            {
-                "generic" => IndexerType.Generic,
-                "GENERIC" => IndexerType.Generic,
-                "range" => IndexerType.Range,
-                "RANGE" => IndexerType.Range,
-                "fuzzy" => IndexerType.Fuzzy,
-                "FUZZY" => IndexerType.Fuzzy,
-                "none" => IndexerType.None,
-                "NONE" => IndexerType.None,
-                "" => IndexerType.None,
-                null => IndexerType.None,
-                _ => throw new NotSupportedException($"Indexer not supported: {Indexer}")
-            },
+            Indexer = SelectIndexer(),
             ShouldBeHashed = ShouldBeHashed
         };
     }

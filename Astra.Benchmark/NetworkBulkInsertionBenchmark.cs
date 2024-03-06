@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Astra.Client;
+using Astra.Client.Simple;
 using Astra.Common;
 using Astra.Engine;
 using Astra.Server;
@@ -20,7 +21,7 @@ public class NetworkBulkInsertionBenchmark
             {
                 Name = "col1",
                 DataType = DataType.DWordMask,
-                Indexer = IndexerType.Range,
+                Indexer = IndexerType.BTree,
             },
             new()
             {
@@ -60,7 +61,6 @@ public class NetworkBulkInsertionBenchmark
         {
             Address = "127.0.0.1",
             Port = TcpServer.DefaultPort,
-            Schema = Schema
         });
     }
     

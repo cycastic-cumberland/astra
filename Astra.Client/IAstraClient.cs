@@ -1,4 +1,5 @@
-using Astra.Client.Aggregator;
+using Astra.Client.Simple;
+using Astra.Client.Simple.Aggregator;
 using Astra.Common;
 
 namespace Astra.Client;
@@ -11,7 +12,7 @@ public interface IAstraClient : IDisposable
     /// <summary>
     /// Gets the connection settings used by this Astra client.
     /// </summary>
-    public AstraConnectionSettings? ConnectionSettings { get; }
+    public SimpleAstraClientConnectionSettings? ConnectionSettings { get; }
     
     /// <summary>
     /// Gets a value indicating whether the client is currently connected to the Astra server.
@@ -24,7 +25,7 @@ public interface IAstraClient : IDisposable
     /// <param name="settings">The connection settings to use for the connection.</param>
     /// <param name="cancellationToken">The cancellation token to observe while waiting for the task to complete.</param>
     /// <returns>A task representing the asynchronous operation.</returns>
-    public Task ConnectAsync(AstraConnectionSettings settings, CancellationToken cancellationToken = default);
+    public Task ConnectAsync(SimpleAstraClientConnectionSettings settings, CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Asynchronously inserts a serializable object into the Astra database.

@@ -56,6 +56,8 @@ public readonly struct BytesCluster : IReadOnlyCollection<byte>, IDisposable
         var arr = ArrayPool<byte>.Shared.Rent(size);
         return new(arr, size);
     }
+
+    public static BytesCluster Rent(uint size) => Rent(unchecked((int)size));
     
     public void Dispose()
     {

@@ -19,9 +19,9 @@ public abstract class SequenceTypeHandler<TUnit, T, TColumnResolver, TResolverFa
     public uint FeaturingType => type;
     public TypeHandlingResult Process(ColumnSchemaSpecifications column, RegistrySchemaSpecifications registry, int index, int offset)
     {
-        var isHashed = column.ShouldBeHashed ?? column.Indexer != IndexerType.None;
-        var resolver = TResolverFactory.Create(offset, index, isHashed);
-        IIndexer? indexer = column.Indexer switch
+        var isHashed = column.ShouldBeHashed ?? column.Indexer.Type != IndexerType.None;
+        var resolver = TResolverFactory.Create(column.Name, offset, index, isHashed);
+        IIndexer? indexer = column.Indexer.Type switch
         {
             IndexerType.Generic => TGenericIndexerFactory.Create(resolver),
             IndexerType.Fuzzy => TFuzzyIndexerFactory.Create(resolver),
@@ -43,17 +43,17 @@ public abstract class SequenceTypeHandler<TUnit, T, TColumnResolver, TResolverFa
 
 public readonly struct StringResolverFactory : IPeripheralResolverFactory<StringColumnResolver>
 {
-    public static StringColumnResolver Create(int offset, int index, bool isHashed)
+    public static StringColumnResolver Create(string columnName, int offset, int index, bool isHashed)
     {
-        return new(offset, index, isHashed);
+        return new(columnName, offset, index, isHashed);
     }
 }
 
 public readonly struct BytesResolverFactory : IPeripheralResolverFactory<BytesColumnResolver>
 {
-    public static BytesColumnResolver Create(int offset, int index, bool isHashed)
+    public static BytesColumnResolver Create(string columnName, int offset, int index, bool isHashed)
     {
-        return new(offset, index, isHashed);
+        return new(columnName, offset, index, isHashed);
     }
 }
 

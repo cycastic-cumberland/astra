@@ -4,7 +4,7 @@ using Astra.Engine.Data;
 
 namespace Astra.Engine.Resolvers;
 
-public sealed class StringColumnResolver(int offset, int index, bool shouldBeHashed) 
+public sealed class StringColumnResolver(string columnName, int offset, int index, bool shouldBeHashed) 
     : IColumnResolver<StringWrapper>
 {
     private const int HeaderSize = sizeof(long);
@@ -13,6 +13,7 @@ public sealed class StringColumnResolver(int offset, int index, bool shouldBeHas
     public int Occupying => sizeof(ulong);
     public int HashSize => Hash128.Size;
     public int Offset => offset;
+    public string ColumnName => columnName;
 
     public void Initialize<T>(T row) where T : struct, IDataRow
     {

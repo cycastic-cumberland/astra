@@ -1,6 +1,6 @@
 using Astra.Common;
 
-namespace Astra.Client.Aggregator;
+namespace Astra.Client.Simple.Aggregator;
 
 public interface IAstraQueryBranch
 {
