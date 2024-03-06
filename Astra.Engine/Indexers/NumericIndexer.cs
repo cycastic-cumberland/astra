@@ -21,3 +21,9 @@ public sealed class DoubleRangeIndexer(DoubleColumnResolver resolver, int degree
     : SelfContainedIndexer<double, ComposableDoubleRangeIndexer,
         ComposableNumericIndexer<double, UnmanagedColumnResolver<double>>,
         ComposableNumericIndexer<double, UnmanagedColumnResolver<double>>>(new(resolver, degree));
+
+public sealed class DecimalRangeIndexer(DecimalColumnResolver resolver, int degree)
+    : SelfContainedIndexer<decimal, ComposableDecimalRangeIndexer,
+        ComposableNumericIndexer<decimal, UnmanagedColumnResolver<decimal>>,
+        ComposableNumericIndexer<decimal, UnmanagedColumnResolver<decimal>>>(new(resolver, degree));
+

@@ -97,3 +97,6 @@ public sealed class SingleColumnResolver(string columnName, int offset, bool sho
 
 public sealed class DoubleColumnResolver(string columnName, int offset, bool shouldBeHashed) 
     : UnmanagedColumnResolver<double>(columnName, offset, shouldBeHashed, DataType.Double);
+
+public sealed class DecimalColumnResolver(string columnName, int offset, bool shouldBeHashed) 
+    : UnmanagedColumnResolver<decimal>(columnName, offset, shouldBeHashed, DataType.Decimal);

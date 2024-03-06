@@ -163,3 +163,6 @@ public sealed class ComposableBytesIndexer(BytesColumnResolver resolver) :
 
 public sealed class ComposableStringIndexer(StringColumnResolver resolver) :
     ComposableStandardIndexer<StringWrapper, StringColumnResolver, StringWrapperStreamResolver>(resolver);
+
+public sealed class ComposableDecimalIndexer(DecimalColumnResolver resolver) :
+    ComposableStandardIndexer<decimal, DecimalColumnResolver, DecimalStreamResolver>(resolver);

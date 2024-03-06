@@ -20,6 +20,7 @@ public static class TypeHandler
         DoubleTypeHandler.Default.AddToMap(map);
         StringTypeHandler.Default.AddToMap(map);
         BytesTypeHandler.Default.AddToMap(map);
+        DecimalTypeHandler.Default.AddToMap(map);
         return map;
     }
 }

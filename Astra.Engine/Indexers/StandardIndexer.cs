@@ -32,3 +32,8 @@ public sealed class StringIndexer(StringColumnResolver resolver) :
     SelfContainedIndexer<StringWrapper, ComposableStringIndexer,
         ComposableStandardIndexer<StringWrapper, StringColumnResolver, StringWrapperStreamResolver>,
         ComposableStandardIndexer<StringWrapper, StringColumnResolver, StringWrapperStreamResolver>>(new(resolver));
+
+public sealed class DecimalIndexer(DecimalColumnResolver resolver) :
+    SelfContainedIndexer<decimal, ComposableDecimalIndexer,
+        ComposableStandardIndexer<decimal, DecimalColumnResolver, DecimalStreamResolver>,
+        ComposableStandardIndexer<decimal, DecimalColumnResolver, DecimalStreamResolver>>(new(resolver));

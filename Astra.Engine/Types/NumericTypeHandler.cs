@@ -83,6 +83,14 @@ public readonly struct DoubleResolverFactory : IResolverFactory<DoubleColumnReso
     }
 }
 
+public readonly struct DecimalResolverFactory : IResolverFactory<DecimalColumnResolver>
+{
+    public static DecimalColumnResolver Create(string columnName, int offset, bool isHashed)
+    {
+        return new(columnName, offset, isHashed);
+    }
+}
+
 public readonly struct IntegerIndexerFactory : IIndexerFactory<int, IntegerColumnResolver, IntegerIndexer>
 {
     public static IntegerIndexer Create(IntegerColumnResolver resolver)
@@ -147,6 +155,22 @@ public readonly struct DoubleRangeIndexerFactory : IRangeIndexerFactory<double, 
     }
 }
 
+public readonly struct DecimalIndexerFactory : IIndexerFactory<decimal, DecimalColumnResolver, DecimalIndexer>
+{
+    public static DecimalIndexer Create(DecimalColumnResolver resolver)
+    {
+        return new(resolver);
+    }
+}
+
+public readonly struct DecimalRangeIndexerFactory : IRangeIndexerFactory<decimal, DecimalColumnResolver, DecimalRangeIndexer>
+{
+    public static DecimalRangeIndexer Create(DecimalColumnResolver resolver, int degree)
+    {
+        return new(resolver, degree);
+    }
+}
+
 public sealed class IntegerTypeHandler()
     : NumericTypeHandler<int, IntegerColumnResolver, IntegerResolverFactory, IntegerIndexer, IntegerIndexerFactory, 
         IntegerRangeIndexer, IntegerRangeIndexerFactory>(Feature, nameof(DataType.DWord)),
@@ -178,4 +202,13 @@ public sealed class DoubleTypeHandler() : NumericTypeHandler<double, DoubleColum
 {
     public const uint Feature = DataType.DoubleMask;
     public static DoubleTypeHandler Default { get; } = new();
+}
+
+
+public sealed class DecimalTypeHandler() : NumericTypeHandler<decimal, DecimalColumnResolver, DecimalResolverFactory, 
+        DecimalIndexer, DecimalIndexerFactory, DecimalRangeIndexer, DecimalRangeIndexerFactory>(Feature, nameof(DataType.Decimal)),
+    IDefault<DecimalTypeHandler>
+{
+    public const uint Feature = DataType.DecimalMask;
+    public static DecimalTypeHandler Default { get; } = new();
 }
