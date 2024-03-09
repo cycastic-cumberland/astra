@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using Astra.Common;
+using Astra.Common.StreamUtils;
 
 namespace Astra.Engine;
 

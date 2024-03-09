@@ -1,4 +1,5 @@
 using Astra.Common;
+using Astra.Common.StreamUtils;
 using Astra.Engine.Data;
 
 namespace Astra.Engine.Aggregator;

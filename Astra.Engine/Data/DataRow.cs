@@ -1,6 +1,9 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
 using Astra.Common;
+using Astra.Common.Data;
+using Astra.Common.Hashes;
+using Astra.Common.StreamUtils;
 
 namespace Astra.Engine.Data;
 

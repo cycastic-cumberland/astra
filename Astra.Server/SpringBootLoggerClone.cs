@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Runtime.Versioning;
 using Astra.Common;
+using Astra.Common.Protocols;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;

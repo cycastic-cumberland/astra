@@ -2,6 +2,9 @@ using System.Security.Cryptography;
 using Astra.Client;
 using Astra.Client.Simple;
 using Astra.Common;
+using Astra.Common.Data;
+using Astra.Common.Hashes;
+using Astra.Common.Protocols;
 using Astra.Engine;
 using Astra.Server;
 using Astra.Server.Authentication;
@@ -42,7 +45,7 @@ public class NetworkBulkInsertionBenchmark
     private SimpleAstraClient _client = null!;
     private Task _serverTask = Task.CompletedTask;
     private SimpleSerializableStruct[] _array = null!;
-    private const uint MaxBulkInsertAmount = 2_000;
+    private const uint MaxBulkInsertAmount = 10_000;
     
     [Params(10, 100, 1_000, MaxBulkInsertAmount)]
     public uint BulkInsertAmount;

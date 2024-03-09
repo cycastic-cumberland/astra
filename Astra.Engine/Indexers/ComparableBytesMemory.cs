@@ -2,6 +2,7 @@ using System.Collections;
 using System.IO.Hashing;
 using Astra.Collections;
 using Astra.Common;
+using Astra.Common.Data;
 
 namespace Astra.Engine.Indexers;
 

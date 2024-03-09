@@ -2,6 +2,8 @@ using Astra.Client;
 using Astra.Client.Simple;
 using Astra.Client.Simple.Aggregator;
 using Astra.Common;
+using Astra.Common.Data;
+using Astra.Common.Protocols;
 using Astra.Server;
 using Astra.Server.Authentication;
 
@@ -132,32 +134,40 @@ public class AggregationTestFixture
                 Value4 = [1, 2, 3, 4]
             },
         });
-        var fetch1 = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
-            _table.Column1.EqualsLiteral(2));
-        var count1 = 0;
-        foreach (var f in fetch1)
+        using (var fetch1 = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
+                   _table.Column1.EqualsLiteral(2)))
         {
-            Assert.That(f.Value1, Is.EqualTo(2));
-            count1++;
-        }
-        Assert.That(count1, Is.EqualTo(2));
-        var fetch2 = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
-            _table.Column1.EqualsLiteral(2).And(_table.Column3.EqualsLiteral("🇵🇱")));
-        var count2 = 0;
-        foreach (var f in fetch2)
-        {
-            Assert.Multiple(() =>
+            var count1 = 0;
+            foreach (var f in fetch1)
             {
                 Assert.That(f.Value1, Is.EqualTo(2));
-                Assert.That(f.Value3, Is.EqualTo("🇵🇱"));
-            });
-            count2++;
+                count1++;
+            }
+            Assert.That(count1, Is.EqualTo(2));
         }
-        Assert.That(count2, Is.EqualTo(1));
-        var fetch3 = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
-            _table.Column1.EqualsLiteral(2).Or(_table.Column3.EqualsLiteral("🇵🇱")));
-        var count3 = fetch3.Count();
-        Assert.That(count3, Is.EqualTo(3));
+
+        using (var fetch2 = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
+                   _table.Column1.EqualsLiteral(2).And(_table.Column3.EqualsLiteral("🇵🇱"))))
+        {
+            var count2 = 0;
+            foreach (var f in fetch2)
+            {
+                Assert.Multiple(() =>
+                {
+                    Assert.That(f.Value1, Is.EqualTo(2));
+                    Assert.That(f.Value3, Is.EqualTo("🇵🇱"));
+                });
+                count2++;
+            }
+            Assert.That(count2, Is.EqualTo(1));
+        }
+
+        using (var fetch3 = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
+                   _table.Column1.EqualsLiteral(2).Or(_table.Column3.EqualsLiteral("🇵🇱"))))
+        {
+            var count3 = fetch3.Count();
+            Assert.That(count3, Is.EqualTo(3));
+        }
         await CleanUp();
     }
 
@@ -210,64 +220,74 @@ public class AggregationTestFixture
         
         Assert.That(await _simpleAstraClient.CountAllAsync(), Is.EqualTo(5));
 
-        var fetch = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct, GenericAstraQueryBranch>(
-            _table.Column5.LesserThan(0));
-
-        var count = 0;
-        foreach (var value in fetch)
+        using (var fetch = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct, GenericAstraQueryBranch>(
+                   _table.Column5.LesserThan(0)))
         {
-            Assert.That(value.Value5, Is.EqualTo(-1.2f));
-            Assert.That(value.Value1, Is.EqualTo(5));
-            count++;
-        }
-        
-        Assert.That(count, Is.EqualTo(1));
-
-        count = 0;
-        fetch = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
-            _table.Column5.Between(1.1f, 1.3f));
-        foreach (var value in fetch)
-        {
-            Assert.That(value.Value5, Is.EqualTo(1.2f));
-            Assert.That(value.Value1, Is.EqualTo(1));
-            count++;
-        }
-        
-        Assert.That(count, Is.EqualTo(1));
-        
-        count = 0;
-        fetch = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
-            _table.Column5.Between(1.3f, 1.5f));
-        foreach (var value in fetch)
-        {
-            Assert.That(value.Value5, Is.EqualTo(1.4f));
-            Assert.That(value.Value1, Is.EqualTo(2));
-            count++;
-        }
-        
-        Assert.That(count, Is.EqualTo(1));
-        
-        count = 0;
-        fetch = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
-            _table.Column5.Between(1.5f, 1.9f));
-        foreach (var value in fetch)
-        {
-            switch (count)
+            var count = 0;
+            foreach (var value in fetch)
             {
-                case 0:
-                    Assert.That(value.Value5, Is.EqualTo(1.6f));
-                    Assert.That(value.Value1, Is.EqualTo(3));
-                    break;
-                case 1:
-                    Assert.That(value.Value5, Is.EqualTo(1.8f));
-                    Assert.That(value.Value1, Is.EqualTo(4));
-                    break;
+                Assert.That(value.Value5, Is.EqualTo(-1.2f));
+                Assert.That(value.Value1, Is.EqualTo(5));
+                count++;
             }
+            
+            Assert.That(count, Is.EqualTo(1));
+            
+        }
 
-            count++;
+
+        using (var fetch = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
+                   _table.Column5.Between(1.1f, 1.3f)))
+        {
+            var count = 0;
+            foreach (var value in fetch)
+            {
+                Assert.That(value.Value5, Is.EqualTo(1.2f));
+                Assert.That(value.Value1, Is.EqualTo(1));
+                count++;
+            }
+            
+            Assert.That(count, Is.EqualTo(1));
         }
         
-        Assert.That(count, Is.EqualTo(2));
+        
+        using (var fetch = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
+                   _table.Column5.Between(1.3f, 1.5f)))
+        {
+            var count = 0;
+            foreach (var value in fetch)
+            {
+                Assert.That(value.Value5, Is.EqualTo(1.4f));
+                Assert.That(value.Value1, Is.EqualTo(2));
+                count++;
+            }
+            
+            Assert.That(count, Is.EqualTo(1));
+        }
+
+        using (var fetch = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
+                   _table.Column5.Between(1.5f, 1.9f)))
+        {
+            var count = 0;
+            foreach (var value in fetch)
+            {
+                switch (count)
+                {
+                    case 0:
+                        Assert.That(value.Value5, Is.EqualTo(1.6f));
+                        Assert.That(value.Value1, Is.EqualTo(3));
+                        break;
+                    case 1:
+                        Assert.That(value.Value5, Is.EqualTo(1.8f));
+                        Assert.That(value.Value1, Is.EqualTo(4));
+                        break;
+                }
+
+                count++;
+            }
+            Assert.That(count, Is.EqualTo(2));
+        }
+        
         
         await CleanUp();
     }

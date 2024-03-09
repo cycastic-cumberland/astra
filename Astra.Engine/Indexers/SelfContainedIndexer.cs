@@ -1,6 +1,8 @@
 using System.Collections;
 using Astra.Collections.Recyclable;
 using Astra.Common;
+using Astra.Common.Data;
+using Astra.Common.Protocols;
 using Astra.Engine.Data;
 
 namespace Astra.Engine.Indexers;

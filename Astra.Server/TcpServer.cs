@@ -1,14 +1,15 @@
-﻿using System.Collections.Concurrent;
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using Astra.Common;
+using Astra.Common.Data;
+using Astra.Common.Protocols;
+using Astra.Common.StreamUtils;
 using Astra.Engine.Data;
 using Astra.Server.Authentication;
 using Microsoft.Extensions.Logging;
-using Microsoft.IO;
 using Newtonsoft.Json;
 
 namespace Astra.Server;
@@ -48,7 +49,6 @@ public class TcpServer : IDisposable
     };
     private static readonly IPAddress Address = IPAddress.Parse("0.0.0.0");
     private static readonly IPGlobalProperties IpProperties = IPGlobalProperties.GetIPGlobalProperties();
-    private readonly ConcurrentBag<RecyclableMemoryStream> _streamPool = new();
     private readonly DataRegistry _registry;
     private readonly TcpListener _listener;
     private readonly ILoggerFactory _loggerFactory;
@@ -212,13 +212,7 @@ public class TcpServer : IDisposable
         }
     }
 
-    private RecyclableMemoryStream AllocateStream()
-    {
-        if (_streamPool.TryTake(out var existing)) return existing;
-        return MemoryStreamPool.Allocate();
-    }
-    
-    
+
     private async Task ResolveClientAsync(TcpClient client)
     {
         var cancellationToken = _cancellationTokenSource.Token;
@@ -226,93 +220,59 @@ public class TcpServer : IDisposable
         var stopwatch = new Stopwatch();
         var threshold = (long)sizeof(long);
         var waiting = true;
-        var writeStream = AllocateStream();
         var lastCheck = 0L;
         var timer = Stopwatch.StartNew();
-        try
+        while (!cancellationToken.IsCancellationRequested)
         {
-            while (!cancellationToken.IsCancellationRequested)
+            var elapsed = timer.ElapsedMilliseconds;
+            if (elapsed - lastCheck > 60_000)
             {
-                var elapsed = timer.ElapsedMilliseconds;
-                if (elapsed - lastCheck > 60_000)
-                {
-                    lastCheck = elapsed;
-                    if (!IsConnected(client)) return;
-                }
-                if (client.Available < threshold)
-                {
+                lastCheck = elapsed;
+                if (!IsConnected(client)) return;
+            }
+            if (client.Available < threshold)
+            {
 #if DEBUG
-                    await Task.Delay(100, cancellationToken);
+                await Task.Delay(100, cancellationToken);
 #else
-                    Thread.Yield();
+                Thread.Yield();
 #endif
-                    if (!waiting && elapsed > _timeout)
-                    {
-                        _logger.LogInformation("Client timed out");
-                        return;
-                    }
-                    continue;
-                }
-                if (waiting)
+                if (!waiting && elapsed > _timeout)
                 {
-                    threshold = await stream.ReadLongAsync(cancellationToken);
-                    waiting = false;
-                    timer.Restart();
-                    lastCheck = 0;
-                    continue;
+                    _logger.LogInformation("Client timed out");
+                    return;
                 }
-                stopwatch.Start();
-                try
-                {
-                    _registry.ConsumeStream(stream, writeStream);
-                    try
-                    {
-                        await stream.WriteValueAsync(writeStream.Length, token: cancellationToken);
-                        await stream.WriteAsync(new ReadOnlyMemory<byte>(writeStream.GetBuffer(), 0,
-                            (int)writeStream.Length), cancellationToken);
-                    }
-                    finally
-                    {
-                        if (writeStream.Length > CommonProtocol.ThreadLocalStreamDisposalThreshold)
-                        {
-                            await writeStream.DisposeAsync();
-                            writeStream = AllocateStream();
-                        }
-                        else
-                        {
-                            writeStream.SetLength(0);
-                        }
-                    }
-                }
-                catch (Exception e)
-                {
-                    // "Faulted" response
-                    // await writeStream.WriteValueAsync(1L, token: cancellationToken);
-                    // await writeStream.WriteAsync(FaultedResponse, cancellationToken);
-                    _logger.LogError(e, "Error occured while resolving request");
-                }
-                finally
-                {
-                    stopwatch.Stop();
-                    _logger.LogDebug("Request resolved after {} us", stopwatch.Elapsed.TotalMicroseconds);
-                    stopwatch.Reset();
-                }
-                threshold = sizeof(long);
-                waiting = true;
+                continue;
+            }
+            if (waiting)
+            {
+                _ = await stream.ReadLongAsync(cancellationToken);
+                threshold = 0;
+                waiting = false;
                 timer.Restart();
+                lastCheck = 0;
+                continue;
             }
-        }
-        finally
-        {
-            if (writeStream.Length > CommonProtocol.ThreadLocalStreamDisposalThreshold)
+            stopwatch.Start();
+            try
             {
-                await writeStream.DisposeAsync();
+                _registry.ConsumeStream(stream, stream);
             }
-            else
+            catch (Exception e)
             {
-                writeStream.SetLength(0);
-                _streamPool.Add(writeStream);
+                _logger.LogError(e, "Error occured while resolving request");
+                client.Close();
+                return;
             }
+            finally
+            {
+                stopwatch.Stop();
+                _logger.LogDebug("Request resolved after {} us", stopwatch.Elapsed.TotalMicroseconds);
+                stopwatch.Reset();
+            }
+            threshold = sizeof(long);
+            waiting = true;
+            timer.Restart();
         }
     }
     

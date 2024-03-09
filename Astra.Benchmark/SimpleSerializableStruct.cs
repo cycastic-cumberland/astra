@@ -1,4 +1,6 @@
 using Astra.Common;
+using Astra.Common.Data;
+using Astra.Common.StreamUtils;
 using Astra.Engine;
 
 namespace Astra.Benchmark;

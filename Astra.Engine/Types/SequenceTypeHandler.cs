@@ -1,5 +1,7 @@
 using Astra.Collections;
 using Astra.Common;
+using Astra.Common.Data;
+using Astra.Common.Protocols;
 using Astra.Engine.Indexers;
 using Astra.Engine.Resolvers;
 

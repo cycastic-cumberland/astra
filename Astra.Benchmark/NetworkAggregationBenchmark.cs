@@ -1,6 +1,6 @@
 using Astra.Client.Simple;
 using Astra.Client.Simple.Aggregator;
-using Astra.Common;
+using Astra.Common.Data;
 using Astra.Server;
 using Astra.Server.Authentication;
 using BenchmarkDotNet.Attributes;
@@ -82,7 +82,7 @@ public class NetworkAggregationBenchmark
         GlobalCleanupAsync().Wait();
     }
     
-    [Params(200, 2_000, 2_000)]
+    [Params(100, 1_000, 10_000)]
     public uint AggregatedRows;
     private uint GibberishRows => AggregatedRows / 2;
     
@@ -95,9 +95,9 @@ public class NetworkAggregationBenchmark
         {
             data[i] = new()
             {
-                Value1 = Index,
-                Value2 = "test",
-                Value3 = i.ToString()
+                Value1 = Index, // 4 bytes
+                Value2 = "test", // 4 + 4 bytes
+                Value3 = i.ToString() // 4 + (<= 4) bytes
             };
         }
         
@@ -133,17 +133,12 @@ public class NetworkAggregationBenchmark
     
     private async Task TransmissionBenchmarkAsync()
     {
-        _ = await _client.AggregateAsync<SimpleSerializableStruct, GenericAstraQueryBranch>(_fakePredicate);
+        using var a = await _client.AggregateAsync<SimpleSerializableStruct, GenericAstraQueryBranch>(_fakePredicate);
     }
 
-    private async Task AggregationBenchmarkAsync()
+    private async Task SimpleAggregationAndDeserializationBenchmarkAsync()
     {
-        _ = await _client.AggregateAsync<SimpleSerializableStruct, GenericAstraQueryBranch>(_predicate);
-    }
-
-    private async Task AggregationAndDeserializationBenchmarkAsync()
-    {
-        var fetched = await _client.AggregateAsync<SimpleSerializableStruct, GenericAstraQueryBranch>(_predicate);
+        using var fetched = await _client.AggregateAsync<SimpleSerializableStruct, GenericAstraQueryBranch>(_predicate);
         foreach (var f in fetched)
         {
             _a += unchecked((ulong)f.Value1);
@@ -157,14 +152,8 @@ public class NetworkAggregationBenchmark
     }
 
     [Benchmark]
-    public void AggregationBenchmark()
+    public void SimpleAggregationAndDeserializationBenchmark()
     {
-        AggregationBenchmarkAsync().Wait();
-    }
-
-    [Benchmark]
-    public void AggregationAndDeserializationBenchmark()
-    {
-        AggregationAndDeserializationBenchmarkAsync().Wait();
+        SimpleAggregationAndDeserializationBenchmarkAsync().Wait();
     }
 }

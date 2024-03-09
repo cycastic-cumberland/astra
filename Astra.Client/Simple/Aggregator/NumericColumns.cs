@@ -1,5 +1,8 @@
 using System.Numerics;
 using Astra.Common;
+using Astra.Common.Data;
+using Astra.Common.Protocols;
+using Astra.Common.StreamUtils;
 
 namespace Astra.Client.Simple.Aggregator;
 

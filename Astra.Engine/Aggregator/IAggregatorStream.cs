@@ -1,6 +1,13 @@
+using System.Collections;
 using System.Runtime.CompilerServices;
 using Astra.Common;
+using Astra.Common.Data;
+using Astra.Common.Protocols;
+using Astra.Common.StreamUtils;
 using Astra.Engine.Data;
+using Astra.Engine.Indexers;
+using Astra.Engine.Resolvers;
+using Microsoft.IO;
 
 namespace Astra.Engine.Aggregator;
 
@@ -27,12 +34,133 @@ public interface IAggregatorStream
     }
 }
 
+
+file static class LocalAggregatorEnumerator
+{
+    private static void Process((IIndexer.IIndexerReadHandler? handler, IColumnResolver resolver) tuple, 
+        (RecyclableMemoryStream _buffer, ImmutableDataRow Current) payload)
+    {
+        var (_, resolver) = tuple;
+        var (buffer, row) = payload;
+        resolver.Serialize(buffer, row);
+    }
+    
+    public static readonly
+        Action<(IIndexer.IIndexerReadHandler? handler, IColumnResolver resolver), (RecyclableMemoryStream _buffer,
+            ImmutableDataRow Current)> ProcessDelegate = Process; 
+}
+public struct LocalAggregatorEnumerator<T, TIndexerLock> : IEnumerator<T>
+    where TIndexerLock : struct, DataRegistry.IIndexersLock
+    where T : IAstraSerializable
+{
+    private readonly Stream _stream;
+    private TIndexerLock _indexerLock;
+    private readonly string[] _columnNames;
+    private T _current = default!;
+    private IEnumerator<ImmutableDataRow> _enumerator = null!;
+    private RecyclableMemoryStream _buffer = null!;
+    private int _stage;
+
+    public LocalAggregatorEnumerator(Stream stream, TIndexerLock indexerLock, string[] columnNames)
+    {
+        _stream = stream;
+        _indexerLock = indexerLock;
+        _columnNames = columnNames;
+        _stage = 1;
+    }
+
+    public void Dispose()
+    {
+        _enumerator?.Dispose();
+        _buffer?.Dispose();
+        _enumerator = null!;
+        _buffer = null!;
+    }
+    
+    public bool MoveNext()
+    {
+        switch (_stage)
+        {
+            case 1:
+            {
+                var result = _stream.Aggregate(_indexerLock);
+                if (result == null)
+                {
+                    goto case -1;
+                }
+                _buffer = MemoryStreamPool.Allocate();
+                _enumerator = result.GetEnumerator();
+                _stage = 2;
+                goto case 2;
+            }
+            case 2:
+            {
+                if (!_enumerator.MoveNext()) goto case 3;
+                for (var i = 0; i < _indexerLock.Count; i++)
+                {
+                    var t = (_buffer, _enumerator.Current);
+                    _indexerLock.Read(i, t, LocalAggregatorEnumerator.ProcessDelegate);
+                }
+                _buffer.Position = 0;
+                var value = Activator.CreateInstance<T>();
+                value.DeserializeStream(new ForwardStreamWrapper(_buffer), _columnNames);
+                _current = value;
+                return true;
+            }
+            case 3:
+            {
+                _enumerator.Dispose();
+                _buffer.Dispose();
+                _enumerator = null!;
+                _buffer = null!;
+                goto case -1;
+            }
+            case -1:
+            {
+                _stage = 0;
+                goto default;
+            }
+            default:
+                return false;
+        }
+    }
+
+    public void Reset()
+    {
+        Dispose();
+        _stage = 1;
+    }
+
+    public T Current => _current;
+
+    object IEnumerator.Current => Current;
+}
+
+public readonly struct LocalAggregatorEnumerable<T, TIndexerLock>(Stream stream, TIndexerLock indexerLock, string[] columnNames) : IEnumerable<T>
+    where TIndexerLock : struct, DataRegistry.IIndexersLock
+    where T : IAstraSerializable
+{
+    public LocalAggregatorEnumerator<T, TIndexerLock> GetEnumerator()
+    {
+        return new(stream, indexerLock, columnNames);
+    }
+    IEnumerator<T> IEnumerable<T>.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
+
+    IEnumerator IEnumerable.GetEnumerator()
+    {
+        return GetEnumerator();
+    }
+}
+
 public static class AstraAggregatorHelper
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static HashSet<ImmutableDataRow>? Aggregate<T>(this Stream predicateStream, T indexersLock)
+    public static IEnumerable<ImmutableDataRow>? Aggregate<T>(this Stream predicateStream, T indexersLock)
         where T : struct, DataRegistry.IIndexersLock
-    => IAggregatorStream.Aggregate(predicateStream, indexersLock)?.ToHashSet();
+        => IAggregatorStream.Aggregate(predicateStream, indexersLock);
 
     public static void AggregateStream<T>(this Stream predicateStream, Stream outStream, T indexersLock)
         where T : struct, DataRegistry.IIndexersLock
@@ -40,13 +168,16 @@ public static class AstraAggregatorHelper
         var result = predicateStream.Aggregate(indexersLock);
         if (result == null)
         {
-            outStream.WriteValue(0);
+            outStream.WriteValue(CommonProtocol.EndOfResultsSetFlag);
             return;
         }
-        outStream.WriteValue(result.Count);
+
+        var flag = CommonProtocol.HasRow;
         var resolverCount = indexersLock.Count;
         foreach (var row in result)
         {
+            outStream.WriteValue(flag);
+            flag = CommonProtocol.ChainedFlag;
             for (var i = 0; i < resolverCount; i++)
             {
                 indexersLock.Read(i, (outStream, row), (tuple, enclosed) =>
@@ -55,5 +186,13 @@ public static class AstraAggregatorHelper
                 });
             }
         }
+        outStream.WriteValue(CommonProtocol.EndOfResultsSetFlag);
+    }
+    
+    public static LocalAggregatorEnumerable<T, TIndexerLock> AggregateStream<T, TIndexerLock>(this Stream predicateStream, TIndexerLock indexersLock, string[] columnNames)
+        where TIndexerLock : struct, DataRegistry.IIndexersLock
+        where T : IAstraSerializable
+    {
+        return new(predicateStream, indexersLock, columnNames);
     }
 }

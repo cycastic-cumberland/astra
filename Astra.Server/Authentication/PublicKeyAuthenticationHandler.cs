@@ -2,6 +2,9 @@ using System.Diagnostics;
 using System.Net.Sockets;
 using System.Security.Cryptography;
 using Astra.Common;
+using Astra.Common.Data;
+using Astra.Common.Protocols;
+using Astra.Common.StreamUtils;
 
 namespace Astra.Server.Authentication;
 

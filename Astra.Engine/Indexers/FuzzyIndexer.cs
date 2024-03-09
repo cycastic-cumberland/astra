@@ -1,4 +1,5 @@
 using Astra.Common;
+using Astra.Common.Data;
 using Astra.Engine.Resolvers;
 
 namespace Astra.Engine.Indexers;

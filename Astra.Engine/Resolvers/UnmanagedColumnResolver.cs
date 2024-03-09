@@ -1,28 +1,10 @@
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using Astra.Common;
+using Astra.Common.Data;
+using Astra.Common.Protocols;
 using Astra.Engine.Data;
 
 namespace Astra.Engine.Resolvers;
-
-file static class ResolverHelper
-{
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void CopyBytes<T>(this T value, Span<byte> toSpan) where T : unmanaged
-    {
-        unsafe
-        {
-            var fromSpan = new Span<byte>(&value, sizeof(T));
-            fromSpan.CopyTo(toSpan);
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static T ConvertBytes<T>(this ReadOnlySpan<byte> bytes) where T : unmanaged
-    {
-        return Unsafe.ReadUnaligned<T>(ref MemoryMarshal.GetReference(bytes));
-    }
-}
 
 public abstract class UnmanagedColumnResolver<TD>(string columnName, int offset, bool shouldBeHashed, DataType type) 
     : IColumnResolver<TD>
@@ -52,12 +34,12 @@ public abstract class UnmanagedColumnResolver<TD>(string columnName, int offset,
 
     public TD Dump<TR>(TR row) where TR : struct, IImmutableDataRow
     {
-        return row.Read[offset..(offset + Occupying)].ConvertBytes<TD>();
+        return row.Read[offset..(offset + Occupying)].MarshalTo<TD>();
     }
 
     public void Enroll<TR>(TD value, TR row) where TR : struct, IDataRow
     {
-        value.CopyBytes(row.Write[offset..(offset + Occupying)]);
+        value.ToBytes(row.Write[offset..(offset + Occupying)]);
     }
 
     public void Serialize<T>(Stream writer, T row) where T : struct, IImmutableDataRow
@@ -69,17 +51,7 @@ public abstract class UnmanagedColumnResolver<TD>(string columnName, int offset,
     {
         reader.ReadExactly(row.Write[offset..(offset + Occupying)]);
     }
-
-    public Task SerializeAsync<T>(Stream writer, T row) where T : struct, IImmutableDataRow
-    {
-        throw new NotSupportedException();
-    }
-
-    public Task DeserializeAsync<T>(Stream reader, T row) where T : struct, IDataRow
-    {
-        throw new NotSupportedException();
-    }
-
+    
     public void Clear()
     {
         

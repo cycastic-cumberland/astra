@@ -1,5 +1,6 @@
 using System.Text;
 using Astra.Common;
+using Astra.Common.Hashes;
 using Astra.Engine;
 
 namespace Astra.Server.Authentication;

@@ -1,5 +1,7 @@
 using System.Net.Sockets;
 using Astra.Common;
+using Astra.Common.Protocols;
+using Astra.Common.StreamUtils;
 using Astra.Engine;
 
 namespace Astra.Server.Authentication;

@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 using Astra.Common;
+using Astra.Common.Data;
+using Astra.Common.Hashes;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
