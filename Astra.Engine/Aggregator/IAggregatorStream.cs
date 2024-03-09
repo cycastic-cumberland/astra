@@ -188,11 +188,4 @@ public static class AstraAggregatorHelper
         }
         outStream.WriteValue(CommonProtocol.EndOfResultsSetFlag);
     }
-    
-    public static LocalAggregatorEnumerable<T, TIndexerLock> AggregateStream<T, TIndexerLock>(this Stream predicateStream, TIndexerLock indexersLock, string[] columnNames)
-        where TIndexerLock : struct, DataRegistry.IIndexersLock
-        where T : IAstraSerializable
-    {
-        return new(predicateStream, indexersLock, columnNames);
-    }
 }
