@@ -13,7 +13,7 @@ public class LocalAggregationBenchmark
     private DataRegistry _registry = null!;
     private const int Index = 1;
 
-    [Params(100, 1_000, 10_000)]
+    [Params(100, 1_000, 10_000, 100_000)]
     public uint AggregatedRows;
 
     private uint GibberishRows => AggregatedRows / 2;

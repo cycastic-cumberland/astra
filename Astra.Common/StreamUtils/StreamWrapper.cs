@@ -4,6 +4,7 @@ namespace Astra.Common.StreamUtils;
 
 public interface IStreamWrapper
 {
+    public void SaveValue(byte value);
     public void SaveValue(int value);
     public ValueTask SaveValueAsync(int value, CancellationToken cancellationToken = default);
     public void SaveValue(uint value);
@@ -22,6 +23,7 @@ public interface IStreamWrapper
     public ValueTask SaveValueAsync(byte[] value, CancellationToken cancellationToken = default);
     public void SaveValue(BytesCluster value);
     public ValueTask SaveValueAsync(BytesCluster value, CancellationToken cancellationToken = default);
+    public byte LoadByte();
     public int LoadInt();
     public uint LoadUInt();
     public long LoadLong();

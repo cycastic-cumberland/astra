@@ -566,21 +566,15 @@ public sealed class DataRegistry : IDisposable
         return true;
     }
     
-    private int Insert(Stream reader, int rowCount, AutoIndexer.WriteHandler autoIndexerLock, IndexersWriteLock writeLock)
+    private int Insert(Stream reader, AutoIndexer.WriteHandler autoIndexerLock, IndexersWriteLock writeLock)
     {
+        var rowCount = reader.ReadInt();
         var inserted = 0;
         for (var i = 0; i < rowCount; i++)
         {
             _ = InsertOne(reader, autoIndexerLock, writeLock) ? ++inserted : 0;
         }
         return inserted;
-    }
-    
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private int Insert(Stream reader, AutoIndexer.WriteHandler autoIndexerLock, IndexersWriteLock writeLock)
-    {
-        var rowCount = reader.ReadInt();
-        return Insert(reader, rowCount, autoIndexerLock, writeLock);
     }
 
     private void WriteOnce<TIn, TOut>(TIn dataIn, TOut dataOut,  AutoIndexer.WriteHandler autoIndexerLock, IndexersWriteLock writeLock) where TIn : Stream where TOut : Stream
@@ -697,46 +691,39 @@ public sealed class DataRegistry : IDisposable
             ReadOnce(dataIn, dataOut);
     }
 
-    public int Insert<T>(T value) where T : IAstraSerializable
+    public bool Insert<T>(T value) where T : IAstraSerializable
     {
         using var inStream = MemoryStreamPool.Allocate();
         value.SerializeStream(new ForwardStreamWrapper(inStream));
         inStream.Position = 0;
         using var autoIndexerLock = _autoIndexer.Write();
         using var writeLock = AcquireWriteLock();
-        return Insert(inStream, 1, autoIndexerLock, writeLock);
+        return InsertOne(inStream, autoIndexerLock, writeLock);
     }
     
     public int BulkInsert<T>(IEnumerable<T> values) where T : IAstraSerializable
     {
         var inStream = LocalBulkInsertStream.Value ?? MemoryStreamPool.Allocate();
+        var wrapper = new ForwardStreamWrapper(inStream);
         try
         {
             var count = 0;
-            foreach (var value in values)
-            {
-                value.SerializeStream(new ForwardStreamWrapper(inStream));
-                count++;
-            }
-
-            if (count == 0) return 0;
-            inStream.Position = 0;
             using var autoIndexerLock = _autoIndexer.Write();
             using var writeLock = AcquireWriteLock();
-            return Insert(inStream, count, autoIndexerLock, writeLock);
+            foreach (var value in values)
+            {
+                inStream.SetLength(0);
+                value.SerializeStream(wrapper);
+                inStream.Position = 0;
+                _ = InsertOne(inStream, autoIndexerLock, writeLock) ? count++ : 0;
+            }
+
+            return count;
         }
         finally
         {
-            if (inStream.Length > CommonProtocol.ThreadLocalStreamDisposalThreshold)
-            {
-                LocalBulkInsertStream.Value = null;
-                inStream.Dispose();
-            }
-            else
-            {
-                inStream.SetLength(0);
-                LocalBulkInsertStream.Value = inStream;
-            }
+            inStream.SetLength(0);
+            LocalBulkInsertStream.Value = inStream;
         }
     }
 

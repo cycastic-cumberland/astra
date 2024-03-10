@@ -57,6 +57,12 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
         reader.ReadExactly(new Span<byte>(&bytes, size));
         return ReverseEndianness(bytes);
     }
+    
+    public void SaveValue(byte value)
+    {
+        stream.WriteValue(value);
+    }
+    
     public void SaveValue(int value)
     {
         WriteDWordUnsafe(stream, value);
@@ -194,6 +200,13 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
     {
         await SaveValueAsync(value.LongLength, cancellationToken);
         await stream.WriteAsync(value.ReaderMemory, cancellationToken);
+    }
+    
+    public byte LoadByte()
+    {
+        Span<byte> span = stackalloc byte[1];
+        stream.ReadExactly(span);
+        return span[0];
     }
 
     public int LoadInt()

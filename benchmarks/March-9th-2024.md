@@ -15,10 +15,11 @@ UnrollFactor=1
 
 | Method                 | BulkInsertAmount | Mean         | Error      | StdDev       | Median       |
 |----------------------- |----------------- |-------------:|-----------:|-------------:|-------------:|
-| BulkInsertionBenchmark | 10               |     72.18 us |   3.374 us |     9.405 us |     72.10 us |
-| BulkInsertionBenchmark | 100              |    664.61 us |  83.745 us |   241.624 us |    535.72 us |
-| BulkInsertionBenchmark | 1000             |  1,988.63 us | 225.062 us |   608.467 us |  1,769.58 us |
-| BulkInsertionBenchmark | 10000            | 17,671.41 us | 519.706 us | 1,457.310 us | 17,403.87 us |
+| BulkInsertionBenchmark | 10               |     54.68 us |   1.608 us |     4.561 us |     53.77 us |
+| BulkInsertionBenchmark | 100              |    546.46 us |  37.468 us |   107.504 us |    517.97 us |
+| BulkInsertionBenchmark | 1000             |  2,307.32 us | 408.688 us | 1,139.260 us |  1,741.34 us |
+| BulkInsertionBenchmark | 10000            | 16,534.76 us | 330.394 us |   921.007 us | 16,496.62 us |
+
 
 
 - NetworkBulkInsertionBenchmark:
@@ -33,11 +34,12 @@ UnrollFactor=1
 
 - LocalAggregationBenchmark:
 
-| Method                                       | AggregatedRows | Mean       | Error     | StdDev    | Median     |
-|--------------------------------------------- |--------------- |-----------:|----------:|----------:|-----------:|
-| SimpleAggregationAndDeserializationBenchmark | 100            |   294.4 us |  24.40 us |  71.93 us |   318.5 us |
-| SimpleAggregationAndDeserializationBenchmark | 1000           | 1,372.6 us | 274.38 us | 804.70 us | 1,029.1 us |
-| SimpleAggregationAndDeserializationBenchmark | 10000          | 5,530.5 us | 110.17 us | 108.20 us | 5,503.1 us |
+| Method                                       | AggregatedRows | Mean        | Error     | StdDev    | Median      |
+|--------------------------------------------- |--------------- |------------:|----------:|----------:|------------:|
+| SimpleAggregationAndDeserializationBenchmark | 100            |    291.2 us |  24.90 us |  73.02 us |    297.6 us |
+| SimpleAggregationAndDeserializationBenchmark | 1000           |    910.1 us | 131.40 us | 364.12 us |    705.8 us |
+| SimpleAggregationAndDeserializationBenchmark | 10000          |  5,733.5 us | 112.64 us | 120.52 us |  5,746.3 us |
+| SimpleAggregationAndDeserializationBenchmark | 100000         | 63,230.0 us | 966.58 us | 904.14 us | 63,521.0 us |
 
 
 - NetworkAggregationBenchmark:

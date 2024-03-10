@@ -19,6 +19,12 @@ public static class StreamWriteAddons
     {
         writer.Write(new ReadOnlySpan<byte>(&value, sizeof(T)));
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static void WriteValue(this Stream writer, byte value)
+    {
+        writer.WriteByte(value);
+    }
     
     public static void WriteValue(this Stream writer, int value)
     {

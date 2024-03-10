@@ -62,14 +62,20 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
 
     public void Dispose()
     {
-        while (MoveNext())
+        try
         {
-            
+            while (MoveNext())
+            {
+                
+            }
+        }
+        finally
+        {
+            if (_array.Length > 0)
+                CleanUpPool();
+            _exclusivityCheck.Dispose();
         }
 
-        if (_array.Length > 0)
-            CleanUpPool();
-        _exclusivityCheck.Dispose();
     }
     
     private void CleanUpPool()
@@ -97,7 +103,7 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
                         _array[i] = name;
                     }
 
-                    var flag = stream.LoadInt();
+                    var flag = stream.LoadByte();
                     if (flag != CommonProtocol.HasRow) goto case -1;
                     _stage = 2;
                     goto case 2;
@@ -108,7 +114,7 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
                     var value = Activator.CreateInstance<T>();
                     value.DeserializeStream(stream, _array.AsSpan()[.._columnCount]);
                     _current = value;
-                    var flag = stream.LoadInt();
+                    var flag = stream.LoadByte();
                     if (flag != CommonProtocol.ChainedFlag) _stage = -1;
                     return true;
                 }
@@ -123,7 +129,7 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
                         _array[i] = name;
                     }
 
-                    var flag = stream.LoadInt();
+                    var flag = stream.LoadByte();
                     if (flag != CommonProtocol.EndOfResultsSetFlag) goto case -1;
                     _stage = 4;
                     goto case 4;
@@ -134,7 +140,7 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
                     var value = Activator.CreateInstance<T>();
                     value.DeserializeStream(stream, _array.AsSpan()[.._columnCount]);
                     _current = value;
-                    var flag = stream.LoadInt();
+                    var flag = stream.LoadByte();
                     if (flag != CommonProtocol.ChainedFlag) _stage = -1;
                     return true;
                 }

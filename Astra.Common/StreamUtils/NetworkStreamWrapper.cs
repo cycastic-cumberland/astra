@@ -6,6 +6,11 @@ namespace Astra.Common.StreamUtils;
 
 public readonly struct NetworkStreamWrapper<T>(T stream, TcpClient client, int timeout) : IStreamWrapper where T : IStreamWrapper
 {
+    public void SaveValue(byte value)
+    {
+        stream.SaveValue(value);
+    }
+
     public void SaveValue(int value)
     {
         stream.SaveValue(value);
@@ -94,6 +99,11 @@ public readonly struct NetworkStreamWrapper<T>(T stream, TcpClient client, int t
     public ValueTask SaveValueAsync(BytesCluster value, CancellationToken cancellationToken = default)
     {
         return stream.SaveValueAsync(value, cancellationToken);
+    }
+
+    public byte LoadByte()
+    {
+        return stream.LoadByte();
     }
 
     public int LoadInt()

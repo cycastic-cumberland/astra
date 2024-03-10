@@ -14,9 +14,9 @@ public static class CommonProtocol
     public const int SaltLength = 16;
     public const int ThreadLocalStreamDisposalThreshold = int.MaxValue / 4; // 512 MiB
 
-    public const int HasRow = 1;
-    public const int ChainedFlag = HasRow;
-    public const int EndOfResultsSetFlag = 0;
+    public const byte HasRow = 1;
+    public const byte ChainedFlag = HasRow;
+    public const byte EndOfResultsSetFlag = 0;
     
     // This is so ridiculous...
     public static string ToAstraCommonVersion(this uint value)

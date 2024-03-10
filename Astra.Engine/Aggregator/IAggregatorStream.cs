@@ -136,25 +136,6 @@ public struct LocalAggregatorEnumerator<T, TIndexerLock> : IEnumerator<T>
     object IEnumerator.Current => Current;
 }
 
-public readonly struct LocalAggregatorEnumerable<T, TIndexerLock>(Stream stream, TIndexerLock indexerLock, string[] columnNames) : IEnumerable<T>
-    where TIndexerLock : struct, DataRegistry.IIndexersLock
-    where T : IAstraSerializable
-{
-    public LocalAggregatorEnumerator<T, TIndexerLock> GetEnumerator()
-    {
-        return new(stream, indexerLock, columnNames);
-    }
-    IEnumerator<T> IEnumerable<T>.GetEnumerator()
-    {
-        return GetEnumerator();
-    }
-
-    IEnumerator IEnumerable.GetEnumerator()
-    {
-        return GetEnumerator();
-    }
-}
-
 public static class AstraAggregatorHelper
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
