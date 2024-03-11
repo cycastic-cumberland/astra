@@ -49,6 +49,8 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
     private string[] _array;
     private int _columnCount;
 
+    public ReadOnlySpan<string> Columns => new(_array, 0, _columnCount);
+
     public ResultsSet(SimpleAstraClient client, int timeout)
     {
         var (networkClient, clientStream, reversed) = client.Client ?? throw new SimpleAstraClient.NotConnectedException();

@@ -1,11 +1,9 @@
-using Astra.Common;
 using Astra.Common.Data;
 using Astra.Common.StreamUtils;
-using Astra.Engine;
 
 namespace Astra.Benchmark;
 
-internal struct SimpleSerializableStruct : IAstraSerializable
+public struct SimpleSerializableStruct : IAstraSerializable
 {
     public int Value1 { get; set; }
     public string Value2 { get; set; }

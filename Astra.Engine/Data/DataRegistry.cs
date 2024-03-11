@@ -4,6 +4,7 @@ using Astra.Collections;
 using Astra.Common;
 using Astra.Common.Data;
 using Astra.Common.Protocols;
+using Astra.Common.Serializable;
 using Astra.Common.StreamUtils;
 using Astra.Engine.Aggregator;
 using Astra.Engine.Indexers;
@@ -231,7 +232,7 @@ public sealed class DataRegistry : IDisposable
 
         object IEnumerator.Current => Current;
     }
-
+    
     public readonly struct StreamBasedAggregationEnumerable<T> : IEnumerable<T>
         where T : IAstraSerializable
     {
@@ -245,6 +246,55 @@ public sealed class DataRegistry : IDisposable
         }
 
         public StreamBasedAggregationEnumerator<T> GetEnumerator()
+        {
+            return new(_host, _stream);
+        }
+        
+        IEnumerator<T> IEnumerable<T>.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+    }
+    
+    public struct DynamicStreamBasedAggregationEnumerator<T> : IEnumerator<T>
+    {
+        private StreamBasedAggregationEnumerator<FlexSerializable<T>> _enumerator;
+        internal DynamicStreamBasedAggregationEnumerator(DataRegistry host, Stream stream)
+        {
+            _enumerator = new(host, stream);
+        }
+
+        public void Dispose()
+        {
+            _enumerator.Dispose();
+        }
+
+        public bool MoveNext() => _enumerator.MoveNext();
+
+        public void Reset() => _enumerator.Reset();
+
+        public T Current => _enumerator.Current.Target;
+
+        object IEnumerator.Current => Current!;
+    }
+    
+    public readonly struct DynamicStreamBasedAggregationEnumerable<T> : IEnumerable<T>
+    {
+        private readonly DataRegistry _host;
+        private readonly Stream _stream;
+
+        internal DynamicStreamBasedAggregationEnumerable(DataRegistry host, Stream stream)
+        {
+            _host = host;
+            _stream = stream;
+        }
+
+        public DynamicStreamBasedAggregationEnumerator<T> GetEnumerator()
         {
             return new(_host, _stream);
         }
@@ -307,6 +357,56 @@ public sealed class DataRegistry : IDisposable
         }
 
         public BufferBasedAggregationEnumerator<T> GetEnumerator()
+        {
+            return new(_host, _predicate);
+        }
+        
+        IEnumerator<T> IEnumerable<T>.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+    }
+
+    public struct DynamicBufferBasedAggregationEnumerator<T> : IEnumerator<T>
+    {
+        private BufferBasedAggregationEnumerator<FlexSerializable<T>> _enumerator;
+
+        internal DynamicBufferBasedAggregationEnumerator(DataRegistry host, ReadOnlyMemory<byte> predicate)
+        {
+            _enumerator = new(host, predicate);
+        }
+
+        public void Dispose()
+        {
+            _enumerator.Dispose();
+        }
+
+        public bool MoveNext() => _enumerator.MoveNext();
+
+        public void Reset() => _enumerator.Reset();
+
+        public T Current => _enumerator.Current.Target;
+
+        object IEnumerator.Current => Current!;
+    }
+    
+    public readonly struct DynamicBufferBasedAggregationEnumerable<T> : IEnumerable<T>
+    {
+        private readonly DataRegistry _host;
+        private readonly ReadOnlyMemory<byte> _predicate;
+
+        internal DynamicBufferBasedAggregationEnumerable(DataRegistry host, ReadOnlyMemory<byte> predicate)
+        {
+            _host = host;
+            _predicate = predicate;
+        }
+
+        public DynamicBufferBasedAggregationEnumerator<T> GetEnumerator()
         {
             return new(_host, _predicate);
         }
@@ -448,12 +548,22 @@ public sealed class DataRegistry : IDisposable
         }
     }
     
-    public StreamBasedAggregationEnumerable<T> Aggregate<T>(Stream predicateStream) where T : IAstraSerializable
+    public StreamBasedAggregationEnumerable<T> AggregateCompat<T>(Stream predicateStream) where T : IAstraSerializable
     {
         return new(this, predicateStream);
     }
     
-    public BufferBasedAggregationEnumerable<T> Aggregate<T>(ReadOnlyMemory<byte> predicateStream) where T : IAstraSerializable
+    public BufferBasedAggregationEnumerable<T> AggregateCompat<T>(ReadOnlyMemory<byte> predicateStream) where T : IAstraSerializable
+    {
+        return new(this, predicateStream);
+    }
+    
+    public DynamicStreamBasedAggregationEnumerable<T> Aggregate<T>(Stream predicateStream) where T : IAstraSerializable
+    {
+        return new(this, predicateStream);
+    }
+    
+    public DynamicBufferBasedAggregationEnumerable<T> Aggregate<T>(ReadOnlyMemory<byte> predicateStream) where T : IAstraSerializable
     {
         return new(this, predicateStream);
     }

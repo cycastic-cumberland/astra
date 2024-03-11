@@ -181,7 +181,7 @@ public class EngineTestFixture
         predicateStream.WriteValue(DataType.DWordMask); // data type
         predicateStream.WriteValue(2); // Value to compare against
         predicateStream.Position = 0;
-        var deserialized = _registry.Aggregate<TinySerializableStruct>(predicateStream);
+        var deserialized = _registry.AggregateCompat<TinySerializableStruct>(predicateStream);
         var pass = true;
         foreach (var row in deserialized)
         {

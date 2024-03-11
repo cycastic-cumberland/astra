@@ -88,7 +88,7 @@ public class SequentialClientTestFixture
     private async Task SimpleValueTypeInsertionTestAsync()
     {
         var originalAmount = await _simpleAstraClient.CountAllAsync();
-        var inserted = await _simpleAstraClient.BulkInsertSerializableAsync(new SimpleSerializableStruct[]
+        var inserted = await _simpleAstraClient.BulkInsertSerializableCompatAsync(new SimpleSerializableStruct[]
         {
             new()
             {

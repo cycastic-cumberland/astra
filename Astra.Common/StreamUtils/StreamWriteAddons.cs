@@ -137,6 +137,12 @@ public static class StreamWriteAddons
         writer.WriteValue(array.LongLength);
         writer.Write(array);
     }
+    
+    public static void WriteValue(this Stream writer, ReadOnlyMemory<byte> array)
+    {
+        writer.WriteValue((long)array.Length);
+        writer.Write(array.Span);
+    }
 
     public static async ValueTask WriteValueAsync(this Stream writer, byte[] value, CancellationToken token = default)
     {

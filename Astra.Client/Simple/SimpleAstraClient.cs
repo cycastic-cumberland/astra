@@ -7,6 +7,7 @@ using Astra.Client.Simple.Aggregator;
 using Astra.Common.Data;
 using Astra.Common.Hashes;
 using Astra.Common.Protocols;
+using Astra.Common.Serializable;
 using Astra.Common.StreamUtils;
 using Microsoft.IO;
 
@@ -314,8 +315,10 @@ public class SimpleAstraClient : IAstraClient
         return inserted;
     }
 
-    public async Task<int> BulkInsertSerializableAsync<T>(IEnumerable<T> values, CancellationToken cancellationToken = default) where T : IAstraSerializable
+    private async Task<int> BulkInsertSerializableInternalAsync<T>(IEnumerable<T> values,
+        CancellationToken cancellationToken = default) where T : IAstraSerializable
     {
+        
         var (client, clientStream, reversed) = _client ?? throw new NotConnectedException();
         FlushStream(client, clientStream);
         _inStream.Position = 0;
@@ -360,7 +363,26 @@ public class SimpleAstraClient : IAstraClient
         return inserted;
     }
     
-    private async ValueTask<ResultsSet<T>> AggregateInternalAsync<T>(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default) where T : IAstraSerializable
+    Task<int> IAstraClient.BulkInsertSerializableAsync<T>(IEnumerable<T> values, CancellationToken cancellationToken)
+    {
+        return BulkInsertSerializableInternalAsync(values, cancellationToken);
+    }
+
+    public Task<int> BulkInsertSerializableCompatAsync<T>(IEnumerable<T> values,
+        CancellationToken cancellationToken = default) where T : IAstraSerializable
+    {
+        return BulkInsertSerializableInternalAsync(values, cancellationToken);
+    }
+    
+    public Task<int> BulkInsertSerializableAsync<T>(IEnumerable<T> values,
+        CancellationToken cancellationToken = default)
+    {
+        return BulkInsertSerializableInternalAsync(values.Select(o => new FlexSerializable<T> { Target = o }),
+            cancellationToken);
+    }
+
+    private async ValueTask SendPredicateInternal(ReadOnlyMemory<byte> predicateStream,
+        CancellationToken cancellationToken = default)
     {
         var (_, clientStream, _) = _client ?? throw new NotConnectedException();
         // FlushStream(client, clientStream);
@@ -375,24 +397,54 @@ public class SimpleAstraClient : IAstraClient
         // var stream = outCluster.Promote();
         var faulted = (byte)clientStream.ReadByte();
         if (faulted != 0) throw new FaultedRequestException();
+    }
+    
+    private async ValueTask<ResultsSet<T>> AggregateCompatInternalAsync<T>(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default) where T : IAstraSerializable
+    {
+        await SendPredicateInternal(predicateStream, cancellationToken);
+        return new(this, ConnectionSettings!.Value.Timeout);
+    }
+    
+    private async ValueTask<DynamicResultsSet<T>> AggregateInternalAsync<T>(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default)
+    {
+        await SendPredicateInternal(predicateStream, cancellationToken);
         return new(this, ConnectionSettings!.Value.Timeout);
     }
 
-    public ValueTask<ResultsSet<T>> AggregateAsync<T>(IAstraQueryBranch predicate,
+    public ValueTask<ResultsSet<T>> AggregateCompatAsync<T>(IAstraQueryBranch predicate,
         CancellationToken cancellationToken = default) where T : IAstraSerializable
+    {
+        return AggregateCompatInternalAsync<T>(predicate.DumpMemory(), cancellationToken);
+    }
+    
+    public ValueTask<DynamicResultsSet<T>> AggregateAsync<T>(IAstraQueryBranch predicate,
+        CancellationToken cancellationToken = default)
     {
         return AggregateInternalAsync<T>(predicate.DumpMemory(), cancellationToken);
     }
     
-    public ValueTask<ResultsSet<T>> AggregateAsync<T>(GenericAstraQueryBranch predicate,
+    public ValueTask<ResultsSet<T>> AggregateCompatAsync<T>(GenericAstraQueryBranch predicate,
         CancellationToken cancellationToken = default) where T : IAstraSerializable
+    {
+        return AggregateCompatInternalAsync<T>(predicate.DumpMemory(), cancellationToken);
+    }
+    
+    public ValueTask<DynamicResultsSet<T>> AggregateAsync<T>(GenericAstraQueryBranch predicate,
+        CancellationToken cancellationToken = default)
     {
         return AggregateInternalAsync<T>(predicate.DumpMemory(), cancellationToken);
     }
     
-    public ValueTask<ResultsSet<T>> AggregateAsync<T, TPredicate>(TPredicate predicate,
+    public ValueTask<ResultsSet<T>> AggregateCompatAsync<T, TPredicate>(TPredicate predicate,
         CancellationToken cancellationToken = default) 
         where T : IAstraSerializable
+        where TPredicate : IAstraQueryBranch
+    {
+        return AggregateCompatInternalAsync<T>(predicate.DumpMemory(), cancellationToken);
+    }
+    
+    public ValueTask<DynamicResultsSet<T>> AggregateAsync<T, TPredicate>(TPredicate predicate,
+        CancellationToken cancellationToken = default) 
         where TPredicate : IAstraQueryBranch
     {
         return AggregateInternalAsync<T>(predicate.DumpMemory(), cancellationToken);

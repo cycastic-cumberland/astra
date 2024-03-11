@@ -110,6 +110,6 @@ public class NetworkBulkInsertionBenchmark
     [Benchmark]
     public void BulkInsertionBenchmark()
     { 
-        _client.BulkInsertSerializableAsync(_array).Wait();
+        _client.BulkInsertSerializableCompatAsync(_array).Wait();
     }
 }

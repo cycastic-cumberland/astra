@@ -111,7 +111,7 @@ public class NetworkAggregationBenchmark
             };
         }
 
-        await _client.BulkInsertSerializableAsync(data);
+        await _client.BulkInsertSerializableCompatAsync(data);
     }
 
     private Task IterationCleanupAsync() => _client.ClearAsync();
@@ -133,10 +133,19 @@ public class NetworkAggregationBenchmark
     
     private async Task TransmissionBenchmarkAsync()
     {
-        using var a = await _client.AggregateAsync<SimpleSerializableStruct, GenericAstraQueryBranch>(_fakePredicate);
+        using var a = await _client.AggregateCompatAsync<SimpleSerializableStruct, GenericAstraQueryBranch>(_fakePredicate);
     }
 
-    private async Task SimpleAggregationAndDeserializationBenchmarkAsync()
+    private async Task SimpleAggregationAndManualDeserializationBenchmarkAsync()
+    {
+        using var fetched = await _client.AggregateCompatAsync<SimpleSerializableStruct, GenericAstraQueryBranch>(_predicate);
+        foreach (var f in fetched)
+        {
+            _a += unchecked((ulong)f.Value1);
+        }
+    }
+
+    private async Task SimpleAggregationAndAutoDeserializationBenchmarkAsync()
     {
         using var fetched = await _client.AggregateAsync<SimpleSerializableStruct, GenericAstraQueryBranch>(_predicate);
         foreach (var f in fetched)
@@ -146,14 +155,20 @@ public class NetworkAggregationBenchmark
     }
 
     [Benchmark]
-    public void TransmissionBenchmark()
+    public void Transmission()
     {
         TransmissionBenchmarkAsync().Wait();
     }
 
     [Benchmark]
-    public void SimpleAggregationAndDeserializationBenchmark()
+    public void ManualDeserialization()
     {
-        SimpleAggregationAndDeserializationBenchmarkAsync().Wait();
+        SimpleAggregationAndManualDeserializationBenchmarkAsync().Wait();
+    }
+    
+    [Benchmark]
+    public void AutoDeserialization()
+    {
+        SimpleAggregationAndAutoDeserializationBenchmarkAsync().Wait();
     }
 }

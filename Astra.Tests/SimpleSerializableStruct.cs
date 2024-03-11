@@ -4,7 +4,7 @@ using Astra.Common.StreamUtils;
 
 namespace Astra.Tests;
 
-internal struct SimpleSerializableStruct : IAstraSerializable
+public struct SimpleSerializableStruct : IAstraSerializable
 {
     public int Value1 { get; set; }
     public string Value2 { get; set; }

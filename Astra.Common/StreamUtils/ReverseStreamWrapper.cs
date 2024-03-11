@@ -184,6 +184,11 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
         stream.Write(value);
     }
 
+    public void SaveValue(ReadOnlyMemory<byte> value)
+    {
+        stream.Write(value.Span);
+    }
+
     public async ValueTask SaveValueAsync(byte[] value, CancellationToken cancellationToken = default)
     {
         await SaveValueAsync(value.LongLength, cancellationToken);

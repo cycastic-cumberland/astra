@@ -1,5 +1,6 @@
 using Astra.Client.Simple.Aggregator;
 using Astra.Common.Data;
+using Astra.Common.Serializable;
 using Astra.Engine.Data;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
@@ -18,6 +19,12 @@ public class LocalAggregationBenchmark
 
     private uint GibberishRows => AggregatedRows / 2;
 
+    [GlobalSetup]
+    public void GlobalSetUp()
+    {
+        DynamicSerializable.BuildSerializer<SimpleSerializableStruct>();
+    }
+    
     [IterationSetup]
     public void SetUp()
     {
@@ -80,7 +87,20 @@ public class LocalAggregationBenchmark
     private ulong _a;
     
     [Benchmark]
-    public void SimpleAggregationAndDeserializationBenchmark()
+    public void ManualDeserialization()
+    {
+        var predicate = _table.Column1.EqualsLiteral(Index);
+        var fetched = _registry.AggregateCompat<SimpleSerializableStruct>(
+            predicate.DumpMemory());
+        
+        foreach (var f in fetched)
+        {
+            _a += unchecked((ulong)f.Value1);
+        }
+    }
+    
+    [Benchmark]
+    public void AutoDeserialization()
     {
         var predicate = _table.Column1.EqualsLiteral(Index);
         var fetched = _registry.Aggregate<SimpleSerializableStruct>(

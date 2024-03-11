@@ -86,6 +86,11 @@ public readonly struct NetworkStreamWrapper<T>(T stream, TcpClient client, int t
         stream.SaveValue(value);
     }
 
+    public void SaveValue(ReadOnlyMemory<byte> value)
+    {
+        stream.SaveValue(value);
+    }
+
     public ValueTask SaveValueAsync(byte[] value, CancellationToken cancellationToken = default)
     {
         return stream.SaveValueAsync(value, cancellationToken);

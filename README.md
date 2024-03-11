@@ -94,7 +94,8 @@ There are currently 3 supported data types, with more on the way:
 - [x] Aggregation
 - [x] Insertion/Bulk insertion
 - [x] Conditional deletion
-- [x] ORM (partially finished)
+- [x] Objects mapping (using Dynamic Code generation)
+- [ ] IQueryable compatible API
 - [x] Fuzzy string search supports
 - [x] Supports for qword, single and double
 - [x] Ranged query

@@ -105,7 +105,7 @@ public class EmbeddedServer
         
         using var client = new SimpleAstraClient();
         await client.ConnectAsync(connectionSettings);
-        var inserted = await client.BulkInsertSerializableAsync(new SimpleSerializableStruct[]
+        var inserted = await client.BulkInsertSerializableCompatAsync(new SimpleSerializableStruct[]
         {
             new()
             {
@@ -144,7 +144,7 @@ public class EmbeddedServer
             },
         });
         logger.LogInformation("Inserted: {}", inserted);
-        var fetch1 = await client.AggregateAsync<SimpleSerializableStruct>(
+        var fetch1 = await client.AggregateCompatAsync<SimpleSerializableStruct>(
             table.Column1.EqualsLiteral(2));
         var count1 = 0;
         logger.LogInformation("Fetch 1: col1 == 2");
@@ -156,7 +156,7 @@ public class EmbeddedServer
         logger.LogInformation("Fetched rows count: {}", count1);
         
         logger.LogInformation("Fetch 2: col1 == 2 AND col3 == '🇵🇱'");
-        var fetch2 = await client.AggregateAsync<SimpleSerializableStruct>(
+        var fetch2 = await client.AggregateCompatAsync<SimpleSerializableStruct>(
             table.Column1.EqualsLiteral(2).And(table.Column3.EqualsLiteral("🇵🇱")));
         var count2 = 0;
         foreach (var f in fetch2)
@@ -167,7 +167,7 @@ public class EmbeddedServer
         logger.LogInformation("Fetched rows count: {}", count2);
         
         logger.LogInformation("Fetch 3: col1 == 2 OR col3 == '🇵🇱'");
-        var fetch3 = await client.AggregateAsync<SimpleSerializableStruct>(
+        var fetch3 = await client.AggregateCompatAsync<SimpleSerializableStruct>(
             table.Column1.EqualsLiteral(2).Or(table.Column3.EqualsLiteral("🇵🇱")));
         var count3 = 0;
         foreach (var f in fetch3)

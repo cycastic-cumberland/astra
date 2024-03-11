@@ -10,4 +10,8 @@
       <ProjectReference Include="..\Astra.Common\Astra.Common.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <Folder Include="Entity\" />
+    </ItemGroup>
+
 </Project>

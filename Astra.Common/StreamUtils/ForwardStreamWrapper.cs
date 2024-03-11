@@ -84,6 +84,11 @@ public readonly struct ForwardStreamWrapper(Stream stream) : IStreamWrapper
         stream.WriteValue(value);
     }
 
+    public void SaveValue(ReadOnlyMemory<byte> value)
+    {
+        stream.WriteValue(value);
+    }
+
     public ValueTask SaveValueAsync(byte[] value, CancellationToken cancellationToken = default)
     {
         return stream.WriteValueAsync(value, cancellationToken);
