@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Runtime.CompilerServices;
 using Astra.Collections;
-using Astra.Common;
 using Astra.Common.Data;
 using Astra.Common.Protocols;
 using Astra.Common.Serializable;
@@ -801,7 +800,7 @@ public sealed class DataRegistry : IDisposable
             ReadOnce(dataIn, dataOut);
     }
 
-    public bool Insert<T>(T value) where T : IAstraSerializable
+    public bool InsertCompat<T>(T value) where T : IAstraSerializable
     {
         using var inStream = MemoryStreamPool.Allocate();
         value.SerializeStream(new ForwardStreamWrapper(inStream));
@@ -810,8 +809,13 @@ public sealed class DataRegistry : IDisposable
         using var writeLock = AcquireWriteLock();
         return InsertOne(inStream, autoIndexerLock, writeLock);
     }
+
+    public bool Insert<T>(T value)
+    {
+        return InsertCompat(new FlexSerializable<T> { Target = value });
+    }
     
-    public int BulkInsert<T>(IEnumerable<T> values) where T : IAstraSerializable
+    public int BulkInsertCompat<T>(IEnumerable<T> values) where T : IAstraSerializable
     {
         var inStream = LocalBulkInsertStream.Value ?? MemoryStreamPool.Allocate();
         var wrapper = new ForwardStreamWrapper(inStream);
@@ -835,6 +839,11 @@ public sealed class DataRegistry : IDisposable
             inStream.SetLength(0);
             LocalBulkInsertStream.Value = inStream;
         }
+    }
+
+    public int BulkInsert<T>(IEnumerable<T> values)
+    {
+        return BulkInsertCompat(values.Select(o => new FlexSerializable<T> { Target = o }));
     }
 
     private static int Clear(AutoIndexer.WriteHandler autoIndexerLock, IndexersWriteLock writeLock)

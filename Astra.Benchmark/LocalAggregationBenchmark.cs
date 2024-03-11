@@ -74,7 +74,7 @@ public class LocalAggregationBenchmark
             };
         }
 
-        _registry.BulkInsert(data);
+        _registry.BulkInsertCompat(data);
     }
 
     [IterationCleanup]

@@ -1,7 +1,5 @@
-using Astra.Common;
 using Astra.Common.Data;
-using Astra.Common.Protocols;
-using Astra.Engine;
+using Astra.Common.Serializable;
 using Astra.Engine.Data;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
@@ -67,6 +65,7 @@ public class LocalBulkInsertionBenchmark
                 }
             }
         });
+        DynamicSerializable.BuildSerializer<SimpleSerializableStruct>();
     }
     
     [GlobalCleanup]
@@ -76,7 +75,13 @@ public class LocalBulkInsertionBenchmark
     }
 
     [Benchmark]
-    public void BulkInsertionBenchmark()
+    public void ManualSerialization()
+    {
+        _registry.BulkInsertCompat(_data);
+    }
+    
+    [Benchmark]
+    public void AutoSerialization()
     {
         _registry.BulkInsert(_data);
     }

@@ -374,7 +374,7 @@ public class SimpleAstraClient : IAstraClient
         return BulkInsertSerializableInternalAsync(values, cancellationToken);
     }
     
-    public Task<int> BulkInsertSerializableAsync<T>(IEnumerable<T> values,
+    public Task<int> BulkInsertAsync<T>(IEnumerable<T> values,
         CancellationToken cancellationToken = default)
     {
         return BulkInsertSerializableInternalAsync(values.Select(o => new FlexSerializable<T> { Target = o }),

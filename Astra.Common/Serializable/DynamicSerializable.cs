@@ -105,9 +105,9 @@ file static class DynamicSerializableHelpers<T>
             ilGenerator.Emit(OpCodes.Ldarg_S, 2);
             var getter = property.GetMethod ?? throw new UnreachableException();
             if (getter.IsVirtual || getter.IsAbstract)
-                ilGenerator.Emit(OpCodes.Call, property.GetMethod ?? throw new UnreachableException());
+                ilGenerator.Emit(OpCodes.Call, getter);
             else 
-                ilGenerator.Emit(OpCodes.Callvirt, property.GetMethod ?? throw new UnreachableException());
+                ilGenerator.Emit(OpCodes.Callvirt, getter);
             ilGenerator.Emit(OpCodes.Constrained, streamType);
             types ??= new Type[1];
             types[0] = property.PropertyType;
@@ -159,9 +159,9 @@ file static class DynamicSerializableHelpers<T>
             ilGenerator.Emit(OpCodes.Callvirt, mi);
             var setter = property.SetMethod ?? throw new UnreachableException();
             if (setter.IsVirtual || setter.IsAbstract)
-                ilGenerator.Emit(OpCodes.Callvirt, property.SetMethod ?? throw new UnreachableException());
+                ilGenerator.Emit(OpCodes.Callvirt, setter);
             else 
-                ilGenerator.Emit(OpCodes.Call, property.SetMethod ?? throw new UnreachableException());
+                ilGenerator.Emit(OpCodes.Call, setter);
         }
         
         ilGenerator.Emit(OpCodes.Ldloc_S, localValue);
@@ -177,7 +177,7 @@ file static class DynamicSerializableHelpers<T>
         var typeBuilder = DynamicSerializableHelpers.CreateType(typeof(T));
         var properties = typeof(T).GetProperties().Where(o => o is { CanRead: true, CanWrite: true }).ToArray();
         {
-            var serializationMethod = typeBuilder.DefineMethod("SerializeStream",
+            var serializationMethod = typeBuilder.DefineMethod(nameof(IStatelessSerializable<int>.SerializeStream),
                 MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig);
             var genericBuilder = serializationMethod.DefineGenericParameters(DynamicSerializableHelpers.TypeParameterNames)[0];
             genericBuilder.SetInterfaceConstraints(DynamicSerializableHelpers.GenericConstraint);
@@ -190,7 +190,7 @@ file static class DynamicSerializableHelpers<T>
                 MakeSerializationMethod(serializationMethod.GetILGenerator(), properties, genericBuilder);
         }
         {
-            var deserializationMethod = typeBuilder.DefineMethod("DeserializeStream",
+            var deserializationMethod = typeBuilder.DefineMethod(nameof(IStatelessSerializable<int>.DeserializeStream),
                 MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig);
             var genericBuilder = deserializationMethod.DefineGenericParameters(DynamicSerializableHelpers.TypeParameterNames)[0];
             genericBuilder.SetInterfaceConstraints(DynamicSerializableHelpers.GenericConstraint);

@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using Astra.Client.Simple;
 using Astra.Common.Data;
 using Astra.Common.Hashes;
+using Astra.Common.Serializable;
 using Astra.Server;
 using Astra.Server.Authentication;
 using BenchmarkDotNet.Attributes;
@@ -75,6 +76,7 @@ public class NetworkBulkInsertionBenchmark
     public void FirstSetup()
     {
         GlobalSetupAsync().Wait();
+        DynamicSerializable.BuildSerializer<SimpleSerializableStruct>();
     }
     
     [GlobalCleanup]
@@ -105,11 +107,18 @@ public class NetworkBulkInsertionBenchmark
     public void CleanUp()
     {
         _array = null!;
+        _server.GetRegistry().Clear();
     }
         
     [Benchmark]
-    public void BulkInsertionBenchmark()
+    public void ManualSerialization()
     { 
         _client.BulkInsertSerializableCompatAsync(_array).Wait();
+    }
+    
+    [Benchmark]
+    public void AutoSerialization()
+    { 
+        _client.BulkInsertAsync(_array).Wait();
     }
 }

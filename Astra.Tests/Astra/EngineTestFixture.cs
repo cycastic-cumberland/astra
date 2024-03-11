@@ -152,7 +152,7 @@ public class EngineTestFixture
     [Test]
     public void LocalRegistryTest()
     {
-        var inserted = _registry.BulkInsert(new TinySerializableStruct[]
+        var inserted = _registry.BulkInsertCompat(new TinySerializableStruct[]
         {
             new()
             {

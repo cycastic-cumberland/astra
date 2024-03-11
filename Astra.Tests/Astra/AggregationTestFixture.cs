@@ -96,7 +96,7 @@ public class AggregationTestFixture
     [Test]
     public async Task SimpleFetchTest()
     {
-        await _simpleAstraClient.BulkInsertSerializableAsync(new SimpleSerializableStruct[]
+        await _simpleAstraClient.BulkInsertAsync(new SimpleSerializableStruct[]
         {
             new()
             {
@@ -174,7 +174,7 @@ public class AggregationTestFixture
     [Test]
     public async Task RangeAggregationTest()
     {
-        await _simpleAstraClient.BulkInsertSerializableAsync(new SimpleSerializableStruct[]
+        await _simpleAstraClient.BulkInsertAsync(new SimpleSerializableStruct[]
         {
             new()
             {
