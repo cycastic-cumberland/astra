@@ -20,6 +20,26 @@ public static class DataTypeHelper
 
 public readonly struct DataType(uint value)
 {
+    public static uint DotnetTypeToAstraType(Type type)
+    {
+        switch (Type.GetTypeCode(type))
+        {
+            case TypeCode.Int32:
+                return DWordMask;
+            case TypeCode.Int64:
+                return QWordMask;
+            case TypeCode.Single:
+                return SingleMask;
+            case TypeCode.Double:
+                return DoubleMask;
+            case TypeCode.Decimal:
+                return DecimalMask;
+            default:
+                if (type == typeof(string)) return DataType.StringMask;
+                if (type == typeof(byte[])) return DataType.BytesMask;
+                throw new ArgumentOutOfRangeException(nameof(type));
+        }
+    }
     public override bool Equals(object? obj)
     {
         return obj is DataType other && this == other;

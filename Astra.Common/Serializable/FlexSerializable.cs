@@ -14,11 +14,11 @@ public struct FlexSerializable<T> : IAstraSerializable
     }
     public void SerializeStream<TStream>(TStream writer) where TStream : IStreamWrapper
     {
-        DynamicSerializable.GetSerializer<T>().SerializeStream(writer, _target);
+        DynamicSerializable.GetDefaultSerializer<T>().SerializeStream(writer, _target);
     }
 
-    public void DeserializeStream<TStream>(TStream reader, ReadOnlySpan<string> columnSequence) where TStream : IStreamWrapper
+    public void DeserializeStream<TStream>(TStream reader) where TStream : IStreamWrapper
     {
-        _target = DynamicSerializable.GetSerializer<T>().DeserializeStream(reader, columnSequence);
+        _target = DynamicSerializable.GetDefaultSerializer<T>().DeserializeStream(reader);
     }
 }

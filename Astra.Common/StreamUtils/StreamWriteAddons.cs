@@ -20,6 +20,43 @@ public static class StreamWriteAddons
         writer.Write(new ReadOnlySpan<byte>(&value, sizeof(T)));
     }
 
+    public static void WriteWildcard(this Stream writer, object? obj)
+    {
+        if (obj == null) throw new ArgumentException(nameof(obj));
+        var type = obj.GetType();
+        switch (Type.GetTypeCode(type))
+        {
+            case TypeCode.Int32:
+                writer.WriteUnmanagedValue((int)obj);
+                return;
+            case TypeCode.Int64:
+                writer.WriteUnmanagedValue((long)obj);
+                return;
+            case TypeCode.Single:
+                writer.WriteUnmanagedValue((float)obj);
+                return;
+            case TypeCode.Double:
+                writer.WriteUnmanagedValue((double)obj);
+                return;
+            case TypeCode.Decimal:
+                writer.WriteUnmanagedValue((decimal)obj);
+                return;
+            default:
+                if (type == typeof(string))
+                {
+                    writer.WriteValue((string)obj);
+                    return;
+                }
+
+                if (type == typeof(byte[]))
+                {
+                    writer.WriteValue((byte[])obj);
+                    return;
+                }
+                throw new ArgumentOutOfRangeException(nameof(type));
+        }
+    }
+
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void WriteValue(this Stream writer, byte value)
     {

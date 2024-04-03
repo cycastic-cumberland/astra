@@ -28,7 +28,7 @@ internal struct SimpleSerializableStruct : IAstraSerializable
         writer.SaveValue(Value4);
     }
 
-    public void DeserializeStream<TStream>(TStream reader, ReadOnlySpan<string> columnSequence) where TStream : IStreamWrapper
+    public void DeserializeStream<TStream>(TStream reader) where TStream : IStreamWrapper
     {
         Value1 = reader.LoadInt();
         Value2 = reader.LoadString();

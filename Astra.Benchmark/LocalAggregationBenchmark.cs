@@ -22,7 +22,7 @@ public class LocalAggregationBenchmark
     [GlobalSetup]
     public void GlobalSetUp()
     {
-        DynamicSerializable.BuildSerializer<SimpleSerializableStruct>();
+        DynamicSerializable.BuildDynamicSerializer<SimpleSerializableStruct>();
     }
     
     [IterationSetup]

@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Emit;
+using Astra.Common.Data;
 using Astra.Common.StreamUtils;
 
 namespace Astra.Common.Serializable;
@@ -168,14 +169,16 @@ file static class DynamicSerializableHelpers<T>
         ilGenerator.Emit(OpCodes.Ret);
     }
     
-    private static IStatelessSerializable<T> BuildType()
+    private static IStatelessSerializable<T> BuildDynamicType()
     {
         if (!typeof(T).IsPublic)
+        {
             throw new NotSupportedException("Generic type `T` must be public");
+        }
         if (!typeof(T).IsValueType && typeof(T).GetConstructor(Type.EmptyTypes) == null) 
             throw new NotSupportedException($"`{typeof(T).Name}` must have a public parameterless constructor");
         var typeBuilder = DynamicSerializableHelpers.CreateType(typeof(T));
-        var properties = typeof(T).GetProperties().Where(o => o is { CanRead: true, CanWrite: true }).ToArray();
+        var properties = TypeHelpers.ToAccessibleProperties<T>().ToArray();
         {
             var serializationMethod = typeBuilder.DefineMethod(nameof(IStatelessSerializable<int>.SerializeStream),
                 MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig);
@@ -195,7 +198,7 @@ file static class DynamicSerializableHelpers<T>
             var genericBuilder = deserializationMethod.DefineGenericParameters(DynamicSerializableHelpers.TypeParameterNames)[0];
             genericBuilder.SetInterfaceConstraints(DynamicSerializableHelpers.GenericConstraint);
             deserializationMethod.SetReturnType(typeof(T));
-            deserializationMethod.SetParameters([genericBuilder, typeof(ReadOnlySpan<string>)]);
+            deserializationMethod.SetParameters([genericBuilder]);
             if (typeof(T).IsValueType)
                 MakeDeserializationValueTypeMethod(deserializationMethod.GetILGenerator(), properties, genericBuilder);
             else
@@ -207,20 +210,27 @@ file static class DynamicSerializableHelpers<T>
         return (IStatelessSerializable<T>)obj;
     }
 
-    public static readonly IStatelessSerializable<T> Serializer = BuildType();
+    public static readonly IStatelessSerializable<T> DynamicSerializer = BuildDynamicType();
+    public static GenericStatelessSerializable<T> FallbackSerializer => GenericStatelessSerializable<T>.Default;
+
+    public static IStatelessSerializable<T> DefaultSerializer => typeof(T).IsPublic
+        ? DynamicSerializer
+        : FallbackSerializer;
 }
 
 public static class DynamicSerializable
 {
-    public static IStatelessSerializable<T> GetSerializer<T>() => DynamicSerializableHelpers<T>.Serializer;
-    public static void BuildSerializer<T>() => GetSerializer<T>();
+    public static GenericStatelessSerializable<T> GetFallbackSerializer<T>() => DynamicSerializableHelpers<T>.FallbackSerializer;
+    public static IStatelessSerializable<T> GetDefaultSerializer<T>() => DynamicSerializableHelpers<T>.DefaultSerializer;
+    public static IStatelessSerializable<T> GetDynamicSerializer<T>() => DynamicSerializableHelpers<T>.DynamicSerializer;
+    public static void BuildDynamicSerializer<T>() => GetDynamicSerializer<T>();
 
     public static void BuildSerializers(params Type[] types)
     {
         foreach (var type in types)
         {
             var handler = typeof(DynamicSerializableHelpers<>).MakeGenericType(type);
-            _ = handler.GetField(nameof(DynamicSerializableHelpers<int>.Serializer))?.GetValue(null);
+            _ = handler.GetField(nameof(DynamicSerializableHelpers<int>.DefaultSerializer))?.GetValue(null);
         }
     }
 }

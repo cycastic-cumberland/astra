@@ -95,13 +95,12 @@ There are currently 3 supported data types, with more on the way:
 - [x] Insertion/Bulk insertion
 - [x] Conditional deletion
 - [x] Objects mapping via Code Generation
-- [ ] IQueryable compatible API
+- [x] IQueryable compatible API
 - [x] Fuzzy string search supports
 - [x] Supports for qword, single and double
 - [x] Ranged query
+- [x] Strict schema check
 - [ ] .NET 6 supports for `Astra.Client`
-- [ ] Multiple tables
-- [ ] Strict schema check
 
 ## Benchmark results
 

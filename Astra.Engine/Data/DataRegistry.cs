@@ -199,7 +199,6 @@ public sealed class DataRegistry : IDisposable
         }
     }
     
-    
     public struct StreamBasedAggregationEnumerator<T> : IEnumerator<T>
         where T : IAstraSerializable
     {
@@ -208,7 +207,7 @@ public sealed class DataRegistry : IDisposable
         internal StreamBasedAggregationEnumerator(DataRegistry host, Stream stream)
         {
             _lock = new(host, host._readLogger);
-            _enumerator = new (stream, _lock, host._columnNames);
+            _enumerator = new (stream, _lock);
         }
 
         public void Dispose()
@@ -420,6 +419,52 @@ public sealed class DataRegistry : IDisposable
             return GetEnumerator();
         }
     }
+
+    public struct Enumerator<T> : IEnumerator<T>
+    {
+        private AutoIndexer.ReadHandler _auto;
+        private AutoReadLock _read;
+        private PreparedLocalAggregatorEnumerator<FlexSerializable<T>, AutoReadLock> _enumerator;
+
+        public Enumerator(DataRegistry host)
+        {
+            _auto = host._autoIndexer.Read();
+            _read = new(host, host._readLogger);
+            _enumerator = new(_read, _auto.FetchAllUnsafe());
+        }
+
+        public void Dispose()
+        {
+            _enumerator.Dispose();
+            _read.Dispose();
+            _auto.Dispose();
+        }
+
+        public bool MoveNext() => _enumerator.MoveNext();
+
+        public void Reset() => _enumerator.Reset();
+
+        public T Current => _enumerator.Current.Target;
+
+        object IEnumerator.Current => Current!;
+    }
+
+    public readonly struct Enumerable<T>(DataRegistry host) : IEnumerable<T>
+    {
+        public Enumerator<T> GetEnumerator()
+        {
+            return new(host);
+        }
+        IEnumerator<T> IEnumerable<T>.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+
+        IEnumerator IEnumerable.GetEnumerator()
+        {
+            return GetEnumerator();
+        }
+    }
     
     private static readonly ThreadLocal<ReadOnlyBufferStream?> LocalBuffer = new();
     private static readonly ThreadLocal<RecyclableMemoryStream?> LocalBulkInsertStream = new();
@@ -537,7 +582,7 @@ public sealed class DataRegistry : IDisposable
         }
     }
 
-    public IEnumerable<ImmutableDataRow> FetchAll()
+    private IEnumerable<ImmutableDataRow> FetchAll()
     {
         using var reader = _autoIndexer.Read();
         using var enumerator = reader.GetEnumerator();
@@ -557,15 +602,17 @@ public sealed class DataRegistry : IDisposable
         return new(this, predicateStream);
     }
     
-    public DynamicStreamBasedAggregationEnumerable<T> Aggregate<T>(Stream predicateStream) where T : IAstraSerializable
+    public DynamicStreamBasedAggregationEnumerable<T> Aggregate<T>(Stream predicateStream)
     {
         return new(this, predicateStream);
     }
     
-    public DynamicBufferBasedAggregationEnumerable<T> Aggregate<T>(ReadOnlyMemory<byte> predicateStream) where T : IAstraSerializable
+    public DynamicBufferBasedAggregationEnumerable<T> Aggregate<T>(ReadOnlyMemory<byte> predicateStream)
     {
         return new(this, predicateStream);
     }
+
+    public Enumerable<T> Iterate<T>() => new(this);
     
     private static int ConditionalCountInternal<T>(Stream predicateStream, T indexersLock) where T : struct, DataRegistry.IIndexersLock
     {
@@ -881,6 +928,7 @@ public sealed class DataRegistry : IDisposable
         for (var i = 0; i < columnCount; i++)
         {
             var synth = synthesizers[i];
+            stream.WriteValue(synth.Resolver.Type.Value);
             stream.WriteValue(synth.Resolver.ColumnName);
         }
     }

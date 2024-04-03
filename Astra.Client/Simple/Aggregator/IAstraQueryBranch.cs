@@ -10,7 +10,7 @@ public interface IAstraQueryBranch
     public ReadOnlySpan<byte> Dump();
 }
 
-public readonly struct GenericAstraQueryBranch(byte[] bytes) : IAstraQueryBranch
+public readonly struct GenericAstraQueryBranch(ReadOnlyMemory<byte> bytes) : IAstraQueryBranch
 {
     public ReadOnlyMemory<byte> DumpMemory()
     {
@@ -19,7 +19,7 @@ public readonly struct GenericAstraQueryBranch(byte[] bytes) : IAstraQueryBranch
     
     public ReadOnlySpan<byte> Dump()
     {
-        return bytes;
+        return bytes.Span;
     }
 
     public GenericAstraQueryBranch And(GenericAstraQueryBranch other)

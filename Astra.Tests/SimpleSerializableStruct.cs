@@ -1,4 +1,3 @@
-using Astra.Common;
 using Astra.Common.Data;
 using Astra.Common.StreamUtils;
 
@@ -21,7 +20,7 @@ public struct SimpleSerializableStruct : IAstraSerializable
         writer.SaveValue(Value5);
     }
 
-    public void DeserializeStream<TStream>(TStream reader, ReadOnlySpan<string> columnSequence) where TStream : IStreamWrapper
+    public void DeserializeStream<TStream>(TStream reader) where TStream : IStreamWrapper
     {
         Value1 = reader.LoadInt();
         Value2 = reader.LoadString();

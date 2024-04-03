@@ -1,10 +1,13 @@
 using System.Collections;
+using Astra.Common.Data;
 using Astra.Common.Serializable;
 
 namespace Astra.Client.Simple;
 
 public readonly struct DynamicResultsSet<T> : IEnumerable<T>, IDisposable
 {
+    private static readonly uint[] CompiledTypeCodes = TypeHelpers.ToAccessibleProperties<T>()
+        .Select(o => DataType.DotnetTypeToAstraType(o.PropertyType)).ToArray();
     public readonly struct Enumerator : IEnumerator<T>
     {
         private readonly ResultsSet<FlexSerializable<T>>.Enumerator _host;
@@ -32,7 +35,7 @@ public readonly struct DynamicResultsSet<T> : IEnumerable<T>, IDisposable
 
     public DynamicResultsSet(SimpleAstraClient client, int timeout)
     {
-        _set = new(client, timeout);
+        _set = new(client, timeout, CompiledTypeCodes.AsMemory());
     }
     
     public Enumerator GetEnumerator()

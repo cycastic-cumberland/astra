@@ -1,4 +1,6 @@
 using System.Collections;
+using System.Diagnostics;
+using System.Linq.Expressions;
 using System.Numerics;
 using Astra.Collections.RangeDictionaries;
 using Astra.Collections.RangeDictionaries.BTree;
@@ -6,6 +8,7 @@ using Astra.Common;
 using Astra.Common.Data;
 using Astra.Common.Protocols;
 using Astra.Common.StreamUtils;
+using Astra.Engine.Aggregator;
 using Astra.Engine.Data;
 using Astra.Engine.Resolvers;
 
@@ -173,6 +176,49 @@ public abstract class ComposableNumericIndexer<T, TR> :
         return Fetch(op, predicateStream);
     }
 
+    public IEnumerable<ImmutableDataRow>? Fetch(Expression expression)
+    {
+        if (expression is not BinaryExpression binaryExpression)
+            throw new OperationNotSupported($"Operation not supported: {expression.GetType().Name}");
+        switch (binaryExpression.NodeType)
+        {
+            // Already checked
+            case ExpressionType.AndAlso:
+            {
+                var left = (BinaryExpression)binaryExpression.Left;
+                var right = (BinaryExpression)binaryExpression.Right;
+                if (left.NodeType == ExpressionType.LessThanOrEqual &&
+                    right.NodeType == ExpressionType.GreaterThanOrEqual)
+                    (left, right) = (right, left);
+                var leftBound = left.GetConstant<T>();
+                var rightBound = right.GetConstant<T>();
+                return ClosedBetween(leftBound, rightBound);
+            }
+            case ExpressionType.GreaterThan:
+            {
+                var literals = binaryExpression.GetConstant<T>();
+                return GreaterThan(literals);
+            }
+            case ExpressionType.GreaterThanOrEqual:
+            {
+                var literals = binaryExpression.GetConstant<T>();
+                return GreaterOrEqualsTo(literals);
+            }
+            case ExpressionType.LessThan:
+            {
+                var literals = binaryExpression.GetConstant<T>();
+                return LesserThan(literals);
+            }
+            case ExpressionType.LessThanOrEqual:
+            {
+                var literals = binaryExpression.GetConstant<T>();
+                return LesserOrEqualsTo(literals);
+            }
+            default:
+                throw new NotSupportedException($"Unsupported expression type: {binaryExpression.NodeType}");
+        }
+    }
+    
     public IEnumerable<ImmutableDataRow>? Fetch(uint operation, Stream predicateStream)
     {
         return operation switch

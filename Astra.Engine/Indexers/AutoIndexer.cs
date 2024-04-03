@@ -1,7 +1,6 @@
 using System.Collections;
-using Astra.Common;
+using System.Linq.Expressions;
 using Astra.Common.Data;
-using Astra.Common.Protocols;
 using Astra.Engine.Data;
 
 namespace Astra.Engine.Indexers;
@@ -45,9 +44,20 @@ public sealed class AutoIndexer :
             throw new NotSupportedException();
         }
 
+        public IEnumerable<ImmutableDataRow>? Fetch(Expression expression)
+        {
+            throw new NotSupportedException();
+        }
+
         public IEnumerable<ImmutableDataRow>? Fetch(uint operation, Stream predicateStream)
         {
             throw new NotSupportedException();
+        }
+        
+        public HashSet<ImmutableDataRow> FetchAllUnsafe()
+        {
+            // ReSharper disable once NotDisposedResourceIsReturned
+            return Repository.Data;
         }
     }
 
@@ -127,9 +137,20 @@ public sealed class AutoIndexer :
             throw new NotSupportedException();
         }
 
+        public IEnumerable<ImmutableDataRow>? Fetch(Expression expression)
+        {
+            throw new NotSupportedException();
+        }
+
         public IEnumerable<ImmutableDataRow>? Fetch(uint operation, Stream predicateStream)
         {
             throw new NotSupportedException();
+        }
+        
+        public HashSet<ImmutableDataRow> FetchAllUnsafe()
+        {
+            // ReSharper disable once NotDisposedResourceIsReturned
+            return Repository.Data;
         }
     }
 

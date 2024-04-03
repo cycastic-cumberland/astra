@@ -1,8 +1,11 @@
 using System.Collections;
+using System.Diagnostics;
+using System.Linq.Expressions;
 using System.Runtime.CompilerServices;
 using Astra.Common;
 using Astra.Common.Data;
 using Astra.Common.Protocols;
+using Astra.Engine.Aggregator;
 using Astra.Engine.Data;
 
 namespace Astra.Engine.Indexers;
@@ -56,6 +59,7 @@ public interface IIndexer
     {
         public bool Contains(ImmutableDataRow row);
         public IEnumerable<ImmutableDataRow>? Fetch(Stream predicateStream);
+        public IEnumerable<ImmutableDataRow>? Fetch(Expression expression);
         public IEnumerable<ImmutableDataRow>? Fetch(uint operation, Stream predicateStream);
     }
     public interface IIndexerWriteHandler : IIndexerReadHandler, ITransaction

@@ -1,9 +1,12 @@
 using System.Collections;
+using System.Diagnostics;
+using System.Linq.Expressions;
 using Astra.Collections.Trigram;
 using Astra.Common;
 using Astra.Common.Data;
 using Astra.Common.Protocols;
 using Astra.Common.StreamUtils;
+using Astra.Engine.Aggregator;
 using Astra.Engine.Data;
 using Astra.Engine.Resolvers;
 
@@ -230,6 +233,14 @@ public abstract class ComposableFuzzyIndexer<TUnit, T, TColumnResolver, TStreamR
     {
         var op = predicateStream.ReadUInt();
         return Fetch(op, predicateStream);
+    }
+    
+    public IEnumerable<ImmutableDataRow>? Fetch(Expression expression)
+    {
+        if (expression is BinaryExpression binaryExpression)
+            return CollectExact(binaryExpression.GetConstant<T>());
+        
+        throw new OperationNotSupported($"Operation not supported: {expression.GetType().Name}");
     }
     
     public IEnumerable<ImmutableDataRow>? Fetch(uint operation, Stream predicateStream)

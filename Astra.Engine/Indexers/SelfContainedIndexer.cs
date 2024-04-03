@@ -1,8 +1,10 @@
 using System.Collections;
+using System.Linq.Expressions;
 using Astra.Collections.Recyclable;
 using Astra.Common;
 using Astra.Common.Data;
 using Astra.Common.Protocols;
+using Astra.Engine.Aggregator;
 using Astra.Engine.Data;
 
 namespace Astra.Engine.Indexers;
@@ -71,6 +73,12 @@ public abstract class SelfContainedIndexer<T, TIndexer, TRead, TWrite> :
         {
             return _indexer.Fetch(predicateStream);
         }
+
+        public IEnumerable<ImmutableDataRow>? Fetch(Expression expression)
+        {
+            return _indexer.Fetch(expression);
+        }
+
 
         public IEnumerable<ImmutableDataRow>? Fetch(uint operation, Stream predicateStream)
         {
@@ -141,6 +149,11 @@ public abstract class SelfContainedIndexer<T, TIndexer, TRead, TWrite> :
         public IEnumerable<ImmutableDataRow>? Fetch(Stream predicateStream)
         {
             return _indexer.Fetch(predicateStream);
+        }
+
+        public IEnumerable<ImmutableDataRow>? Fetch(Expression expression)
+        {
+            return _indexer.Fetch(expression);
         }
 
         public IEnumerable<ImmutableDataRow>? Fetch(uint operation, Stream predicateStream)

@@ -3,6 +3,7 @@ using Astra.Common.Data;
 using Astra.Common.Protocols;
 using Astra.Common.StreamUtils;
 using Astra.Engine.Data;
+using Astra.Engine.Data.Attributes;
 using Microsoft.Extensions.Logging;
 
 namespace Astra.Tests.Astra;
@@ -12,8 +13,11 @@ public class EngineTestFixture
 {
     private struct TinySerializableStruct : IAstraSerializable
     {
+        [Indexed(Indexer = IndexerType.Generic)]
         public int Value1 { get; set; }
+        [Indexed(Indexer = IndexerType.None)]
         public string Value2 { get; set; }
+        [Indexed(Indexer = IndexerType.Generic)]
         public string Value3 { get; set; }
         
         public void SerializeStream<TStream>(TStream writer) where TStream : IStreamWrapper
@@ -23,7 +27,7 @@ public class EngineTestFixture
             writer.SaveValue(Value3);
         }
 
-        public void DeserializeStream<TStream>(TStream reader, ReadOnlySpan<string> columnSequence) where TStream : IStreamWrapper
+        public void DeserializeStream<TStream>(TStream reader) where TStream : IStreamWrapper
         {
             Value1 = reader.LoadInt();
             Value2 = reader.LoadString();
@@ -31,28 +35,9 @@ public class EngineTestFixture
         }
     }
     private ILoggerFactory _loggerFactory = null!;
-    private DataRegistry _registry = null!;
+    private DataRegistry<TinySerializableStruct> _registry = null!;
 
-    private readonly ColumnSchemaSpecifications[] _columns = {
-        new()
-        {
-            Name = "col1",
-            DataType = DataType.DWordMask,
-            Indexer = IndexerType.BTree,
-        },
-        new()
-        {
-            Name = "col2",
-            DataType = DataType.StringMask,
-            Indexer = IndexerType.None,
-        },
-        new()
-        {
-            Name = "col3",
-            DataType = DataType.StringMask,
-            Indexer = IndexerType.Generic,
-        }
-    };
+    
     [OneTimeSetUp]
     public void Setup()
     {
@@ -60,10 +45,7 @@ public class EngineTestFixture
         {
             builder.AddConsole();
         });
-        _registry = new(new()
-        {
-            Columns = _columns
-        }, _loggerFactory);
+        _registry = new(new(), _loggerFactory);
     }
 
     [OneTimeTearDown]
@@ -72,88 +54,10 @@ public class EngineTestFixture
         _registry.Dispose();
         _loggerFactory.Dispose();
     }
-
-    // [Test]
-    // [Parallelizable]
-    // public void InsertionBenchmark()
-    // {
-    //     const uint iterationCount = 5000;
-    //     const uint bulkInsertRowsCount = 2000;
-    //     var num = 0;
-    //     var totalTime = 0.0;
-    //     var stopwatch = new Stopwatch();
-    //     var primaryStopwatch = new Stopwatch();
-    //     using var registry = new DataRegistry(new()
-    //     {
-    //         Columns = new ColumnSchemaSpecifications[]
-    //         {
-    //             new()
-    //             {
-    //                 Name = "col1",
-    //                 DataType = DataType.DWordMask,
-    //                 Indexed = true,
-    //             },
-    //             new()
-    //             {
-    //                 Name = "col2",
-    //                 DataType = DataType.StringMask,
-    //                 Indexed = false,
-    //             },
-    //             new()
-    //             {
-    //                 Name = "col3",
-    //                 DataType = DataType.StringMask,
-    //                 Indexed = true,
-    //             }
-    //         }
-    //     });
-    //     primaryStopwatch.Start();
-    //     for (var i = 0U; i < iterationCount; i++)
-    //     {
-    //         using var inStream = MemoryStreamPool.Allocate();
-    //         using var outStream = MemoryStreamPool.Allocate();
-    //         inStream.WriteValue(Command.CreateWriteHeader(1U)); // 1 Command
-    //         inStream.WriteValue(Command.UnsortedInsert); // That command is insert
-    //         
-    //         inStream.WriteValue(bulkInsertRowsCount); // Insert this much rows
-    //         
-    //
-    //         for (var j = 0U; j < bulkInsertRowsCount; j++)
-    //         {
-    //             inStream.WriteValue(num++);
-    //             inStream.WriteValue("test1");
-    //             inStream.WriteValue("𝄞");
-    //         }
-    //
-    //         inStream.Position = 0;
-    //         stopwatch.Start();
-    //         registry.ConsumeStream(inStream, outStream);
-    //         stopwatch.Stop();
-    //
-    //         totalTime += stopwatch.Elapsed.TotalMicroseconds;
-    //         
-    //         stopwatch.Reset();
-    //     }
-    //     primaryStopwatch.Stop();
-    //     var pureBulkInsertionTime = totalTime / iterationCount;
-    //     var totalElapsedTime = primaryStopwatch.Elapsed.TotalMicroseconds;
-    //     var prepTime = totalElapsedTime - totalTime;
-    //     var prepPercentile = prepTime / totalElapsedTime;
-    //     
-    //     Console.WriteLine($"Average time to insert {bulkInsertRowsCount} rows: {pureBulkInsertionTime} us");
-    //     Console.WriteLine($"Average time to insert 1 row: {pureBulkInsertionTime / bulkInsertRowsCount} us");
-    //     Console.WriteLine($"Total time: {totalElapsedTime} us");
-    //     Console.WriteLine($"Preparation time: {prepTime} us ({prepPercentile * 100.0}%)");
-    //     var rowsCount = registry.RowsCount;
-    //     Console.WriteLine($"Rows count: {rowsCount}");
-    //     Assert.That(rowsCount, Is.EqualTo(iterationCount * bulkInsertRowsCount));
-    // }
-
     [Test]
     public void LocalRegistryTest()
     {
-        var inserted = _registry.BulkInsertCompat(new TinySerializableStruct[]
-        {
+        var inserted = _registry.Add([
             new()
             {
                 Value1 = 1,
@@ -172,16 +76,9 @@ public class EngineTestFixture
                 Value2 = "test6",
                 Value3 = "test4",
             },
-        });
+        ]);
         Assert.That(inserted, Is.EqualTo(2));
-        using var predicateStream = MemoryStreamPool.Allocate();
-        predicateStream.WriteValue(PredicateType.UnaryMask); // type
-        predicateStream.WriteValue(0); // indexer offset
-        predicateStream.WriteValue(Operation.Equal); // operation type
-        predicateStream.WriteValue(DataType.DWordMask); // data type
-        predicateStream.WriteValue(2); // Value to compare against
-        predicateStream.Position = 0;
-        var deserialized = _registry.AggregateCompat<TinySerializableStruct>(predicateStream);
+        var deserialized = _registry.Where(o => o.Value1 == 2);
         var pass = true;
         foreach (var row in deserialized)
         {
@@ -195,9 +92,8 @@ public class EngineTestFixture
             pass = false;
         }
 
-        predicateStream.Position = 0;
-        var deleted = _registry.Delete(predicateStream);
+        var deleted = _registry.Delete(_registry.Where(o => o.Value1 == 2));
         Assert.That(deleted, Is.EqualTo(1));
-        Assert.That(_registry.RowsCount, Is.EqualTo(1));
+        Assert.That(_registry.Count, Is.EqualTo(1));
     }
 }

@@ -7,6 +7,8 @@ using Astra.Common.StreamUtils;
 
 namespace Astra.Client.Simple;
 
+public class ConstraintCheckFailedException(string? msg = null) : Exception(msg);
+
 public class ResultsSet<T> : IEnumerable<T>, IDisposable
     where T : IAstraSerializable
 {
@@ -43,22 +45,24 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
     private readonly NetworkStream _stream;
     private readonly int _timeout;
     private readonly SimpleAstraClient.ExclusivityCheck _exclusivityCheck;
+    private readonly ReadOnlyMemory<uint>? _constraint;
     private bool _exclusivity;
     private int _stage;
     private T _current = default!;
-    private string[] _array;
+    private (uint type, string name)[] _array;
     private int _columnCount;
 
-    public ReadOnlySpan<string> Columns => new(_array, 0, _columnCount);
+    public ReadOnlySpan<(uint type, string name)> Columns => new(_array, 0, _columnCount);
 
-    public ResultsSet(SimpleAstraClient client, int timeout)
+    public ResultsSet(SimpleAstraClient client, int timeout, ReadOnlyMemory<uint>? constraintCheck = null)
     {
         var (networkClient, clientStream, reversed) = client.Client ?? throw new SimpleAstraClient.NotConnectedException();
         _exclusivityCheck = new(client);
+        _constraint = constraintCheck;
         _client = networkClient;
         _stream = clientStream;
         _timeout = timeout;
-        _array = Array.Empty<string>();
+        _array = Array.Empty<(uint, string)>();
         _stage = reversed ? 3 : 1;
     }
 
@@ -79,11 +83,24 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
         }
 
     }
+
+    private bool PerformConstraintCheck()
+    {
+        if (_constraint == null) return true;
+        var constraint = _constraint.Value.Span;
+        if (_columnCount != constraint.Length) return false;
+        for (var i = 0; i < constraint.Length; i++)
+        {
+            if (_array[i].type != constraint[i]) return false;
+        }
+
+        return true;
+    }
     
     private void CleanUpPool()
     {
-        ArrayPool<string>.Shared.Return(_array);
-        _array = Array.Empty<string>();
+        ArrayPool<(uint, string)>.Shared.Return(_array);
+        _array = Array.Empty<(uint, string)>();
     }
     
     private T Current => _current;
@@ -98,13 +115,15 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
                 {
                     var stream = new NetworkStreamWrapper<ForwardStreamWrapper>(new ForwardStreamWrapper(_stream), _client, _timeout);
                     _columnCount = stream.LoadInt();
-                    _array = ArrayPool<string>.Shared.Rent(_columnCount);
+                    _array = ArrayPool<(uint, string)>.Shared.Rent(_columnCount);
                     for (var i = 0; i < _columnCount; i++)
                     {
+                        var type = stream.LoadUInt();
                         var name = stream.LoadString();
-                        _array[i] = name;
+                        _array[i] = (type, name);
                     }
 
+                    if (!PerformConstraintCheck()) throw new ConstraintCheckFailedException();
                     var flag = stream.LoadByte();
                     if (flag != CommonProtocol.HasRow) goto case -1;
                     _stage = 2;
@@ -114,7 +133,7 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
                 {
                     var stream = new NetworkStreamWrapper<ForwardStreamWrapper>(new ForwardStreamWrapper(_stream), _client, _timeout);
                     var value = Activator.CreateInstance<T>();
-                    value.DeserializeStream(stream, _array.AsSpan()[.._columnCount]);
+                    value.DeserializeStream(stream);
                     _current = value;
                     var flag = stream.LoadByte();
                     if (flag != CommonProtocol.ChainedFlag) _stage = -1;
@@ -124,13 +143,15 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
                 {
                     var stream = new NetworkStreamWrapper<ReverseStreamWrapper>(new ReverseStreamWrapper(_stream), _client, _timeout);
                     _columnCount = stream.LoadInt();
-                    _array = ArrayPool<string>.Shared.Rent(_columnCount);
+                    _array = ArrayPool<(uint, string)>.Shared.Rent(_columnCount);
                     for (var i = 0; i < _columnCount; i++)
                     {
+                        var type = stream.LoadUInt();
                         var name = stream.LoadString();
-                        _array[i] = name;
+                        _array[i] = (type, name);
                     }
 
+                    if (!PerformConstraintCheck()) throw new ConstraintCheckFailedException();
                     var flag = stream.LoadByte();
                     if (flag != CommonProtocol.EndOfResultsSetFlag) goto case -1;
                     _stage = 4;
@@ -140,7 +161,7 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
                 {
                     var stream = new NetworkStreamWrapper<ReverseStreamWrapper>(new ReverseStreamWrapper(_stream), _client, _timeout);
                     var value = Activator.CreateInstance<T>();
-                    value.DeserializeStream(stream, _array.AsSpan()[.._columnCount]);
+                    value.DeserializeStream(stream);
                     _current = value;
                     var flag = stream.LoadByte();
                     if (flag != CommonProtocol.ChainedFlag) _stage = -1;
