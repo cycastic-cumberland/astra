@@ -65,7 +65,7 @@ public class LocalBulkInsertionBenchmark
                 }
             }
         });
-        DynamicSerializable.BuildDynamicSerializer<SimpleSerializableStruct>();
+        DynamicSerializable.EnsureBuilt<SimpleSerializableStruct>();
     }
     
     [GlobalCleanup]

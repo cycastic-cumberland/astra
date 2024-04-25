@@ -612,7 +612,7 @@ public sealed class DataRegistry : IDisposable
         return new(this, predicateStream);
     }
 
-    public Enumerable<T> Iterate<T>() => new(this);
+    public Enumerable<T> AsEnumerable<T>() => new(this);
     
     private static int ConditionalCountInternal<T>(Stream predicateStream, T indexersLock) where T : struct, DataRegistry.IIndexersLock
     {

@@ -2,6 +2,7 @@ using System.Collections;
 using System.Linq.Expressions;
 using System.Reflection;
 using Astra.Common.Data;
+using Astra.Common.Serializable;
 using Astra.Common.StreamUtils;
 using Astra.Engine.Data.Attributes;
 using Astra.Engine.Types;
@@ -12,6 +13,7 @@ namespace Astra.Engine.Data;
 public struct RegistrySettings
 {
     public int BinaryTreeDegree { get; set; }
+    public IndexerType? DefaultIndexerType { get; set; }
 }
 
 public class DataRegistry<T> : IDisposable, IQueryable<T>, IQueryProvider
@@ -21,7 +23,7 @@ public class DataRegistry<T> : IDisposable, IQueryable<T>, IQueryProvider
 
     internal DataRegistry InternalRegistry => _registry;
 
-    private static ColumnSchemaSpecifications[] GetSchema()
+    private static ColumnSchemaSpecifications[] GetSchema(IndexerType defaultType)
     {
         return (from pi in TypeHelpers.ToAccessibleProperties<T>()
             let type = DataType.DotnetTypeToAstraType(pi.PropertyType)
@@ -30,19 +32,20 @@ public class DataRegistry<T> : IDisposable, IQueryable<T>, IQueryProvider
             {
                 Name = pi.Name,
                 DataType = type,
-                Indexer = indexerAttr?.Indexer ?? IndexerType.Generic,
+                Indexer = indexerAttr?.Indexer ?? defaultType,
             }).ToArray();
     }
     
     public DataRegistry(RegistrySettings settings = default, ILoggerFactory? loggerFactory = null, IReadOnlyDictionary<uint, ITypeHandler>? handlers = null)
     {
+        DynamicSerializable.EnsureBuilt<T>();
         _registry = new(new()
         {
-            Columns = GetSchema(),
+            Columns = GetSchema(settings.DefaultIndexerType ?? IndexerType.Generic),
             BinaryTreeDegree = settings.BinaryTreeDegree
         }, loggerFactory, handlers);
         Query = new(this);
-        _enumerable = _registry.Iterate<T>();
+        _enumerable = _registry.AsEnumerable<T>();
     }
 
     public void Dispose()
@@ -85,6 +88,11 @@ public class DataRegistry<T> : IDisposable, IQueryable<T>, IQueryProvider
     {
         if (typeof(TElement) != typeof(T)) throw new NotSupportedException(typeof(TElement).Name);
         return (IQueryable<TElement>)CreateQuery(expression);
+    }
+
+    public DataRegistry.DynamicBufferBasedAggregationEnumerable<T> Aggregate(ReadOnlyMemory<byte> predicate)
+    {
+        return _registry.Aggregate<T>(predicate);
     }
 
     public RegistryQuery<T> Where(Expression<Func<T, bool>> predicate)

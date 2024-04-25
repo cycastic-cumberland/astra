@@ -223,7 +223,8 @@ public static class DynamicSerializable
     public static GenericStatelessSerializable<T> GetFallbackSerializer<T>() => DynamicSerializableHelpers<T>.FallbackSerializer;
     public static IStatelessSerializable<T> GetDefaultSerializer<T>() => DynamicSerializableHelpers<T>.DefaultSerializer;
     public static IStatelessSerializable<T> GetDynamicSerializer<T>() => DynamicSerializableHelpers<T>.DynamicSerializer;
-    public static void BuildDynamicSerializer<T>() => GetDynamicSerializer<T>();
+    public static void EnsureBuilt<T>() => GetDefaultSerializer<T>();
+    
 
     public static void BuildSerializers(params Type[] types)
     {

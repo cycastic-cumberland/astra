@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
+using Astra.Client.Entity;
 using Astra.Client.Simple.Aggregator;
 using Astra.Common.Data;
 using Astra.Common.Hashes;

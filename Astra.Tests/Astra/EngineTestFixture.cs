@@ -11,7 +11,7 @@ namespace Astra.Tests.Astra;
 [TestFixture]
 public class EngineTestFixture
 {
-    private struct TinySerializableStruct : IAstraSerializable
+    public struct TinySerializableStruct
     {
         [Indexed(Indexer = IndexerType.Generic)]
         public int Value1 { get; set; }
@@ -19,20 +19,6 @@ public class EngineTestFixture
         public string Value2 { get; set; }
         [Indexed(Indexer = IndexerType.Generic)]
         public string Value3 { get; set; }
-        
-        public void SerializeStream<TStream>(TStream writer) where TStream : IStreamWrapper
-        {
-            writer.SaveValue(Value1);
-            writer.SaveValue(Value2);
-            writer.SaveValue(Value3);
-        }
-
-        public void DeserializeStream<TStream>(TStream reader) where TStream : IStreamWrapper
-        {
-            Value1 = reader.LoadInt();
-            Value2 = reader.LoadString();
-            Value3 = reader.LoadString();
-        }
     }
     private ILoggerFactory _loggerFactory = null!;
     private DataRegistry<TinySerializableStruct> _registry = null!;
@@ -78,7 +64,7 @@ public class EngineTestFixture
             },
         ]);
         Assert.That(inserted, Is.EqualTo(2));
-        var deserialized = _registry.Where(o => o.Value1 == 2);
+        var deserialized = from o in _registry where o.Value1 == 2 select o;
         var pass = true;
         foreach (var row in deserialized)
         {
@@ -92,7 +78,7 @@ public class EngineTestFixture
             pass = false;
         }
 
-        var deleted = _registry.Delete(_registry.Where(o => o.Value1 == 2));
+        var deleted = _registry.Delete(from o in _registry where o.Value1 == 2 select o);
         Assert.That(deleted, Is.EqualTo(1));
         Assert.That(_registry.Count, Is.EqualTo(1));
     }

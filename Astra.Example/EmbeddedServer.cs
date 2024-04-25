@@ -1,5 +1,6 @@
 ﻿using System.Security.Cryptography;
 using Astra.Client;
+using Astra.Client.Entity;
 using Astra.Client.Simple;
 using Astra.Client.Simple.Aggregator;
 using Astra.Common;
@@ -97,7 +98,6 @@ public class EmbeddedServer
             }
         }, AuthenticationHelper.RSA(publicKey));
         var logger = server.GetLogger<EmbeddedServer>();
-        var table = new AstraTable<int, string, string, byte[]>();
         var serverTask = Task.Run(server.RunAsync);
         await Task.Delay(100);
         
@@ -144,11 +144,9 @@ public class EmbeddedServer
             },
         });
         logger.LogInformation("Inserted: {}", inserted);
-        var fetch1 = await client.AggregateCompatAsync<SimpleSerializableStruct>(
-            table.Column1.EqualsLiteral(2));
         var count1 = 0;
-        logger.LogInformation("Fetch 1: col1 == 2");
-        foreach (var f in fetch1)
+        await foreach (var f in from o in client.AsQuery<SimpleSerializableStruct>() 
+                       where o.Value1 == 2 select o)
         {
             logger.LogInformation("{}", f);
             count1++;
@@ -156,10 +154,10 @@ public class EmbeddedServer
         logger.LogInformation("Fetched rows count: {}", count1);
         
         logger.LogInformation("Fetch 2: col1 == 2 AND col3 == '🇵🇱'");
-        var fetch2 = await client.AggregateCompatAsync<SimpleSerializableStruct>(
-            table.Column1.EqualsLiteral(2).And(table.Column3.EqualsLiteral("🇵🇱")));
         var count2 = 0;
-        foreach (var f in fetch2)
+        await foreach (var f in from o in client.AsQuery<SimpleSerializableStruct>()
+                       where o.Value1 == 2 && o.Value3 == "🇵🇱"
+                       select o)
         {
             logger.LogInformation("{}", f);
             count2++;
@@ -167,21 +165,21 @@ public class EmbeddedServer
         logger.LogInformation("Fetched rows count: {}", count2);
         
         logger.LogInformation("Fetch 3: col1 == 2 OR col3 == '🇵🇱'");
-        var fetch3 = await client.AggregateCompatAsync<SimpleSerializableStruct>(
-            table.Column1.EqualsLiteral(2).Or(table.Column3.EqualsLiteral("🇵🇱")));
         var count3 = 0;
-        foreach (var f in fetch3)
+        await foreach (var f in from o in client.AsQuery<SimpleSerializableStruct>()
+                       where o.Value1 == 2 || o.Value3 == "🇵🇱"
+                       select o)
         {
             logger.LogInformation("{}", f);
             count3++;
         }
-        
         logger.LogInformation("Fetched rows count: {}", count3);
         
         logger.LogInformation("Current rows count: {}", await client.CountAllAsync());
         logger.LogInformation("Deleting: col1 == 2");
-        var deleted = await client.ConditionalDeleteAsync(
-            table.Column1.EqualsLiteral(2));
+        var deleted = await (from o in client.AsQuery<SimpleSerializableStruct>()
+            where o.Value1 == 2
+            select o).DeleteAsync();
         logger.LogInformation("Affected: {} row(s)", deleted);
         logger.LogInformation("Current rows count: {}", await client.CountAllAsync());
         

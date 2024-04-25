@@ -8,7 +8,7 @@ public static class CommonProtocol
 {
     public const int SignatureSizeBit = 2048;
     public const int SignatureSize = 2048 / 8;
-    public const uint AstraCommonVersion = 0x00012000U;
+    public const uint AstraCommonVersion = 0x00012100U;
     public const int LongStringThreshold = 96;
     public const uint PublicKeyChallengeLength = 64;
     public const int SaltLength = 16;

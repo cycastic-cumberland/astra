@@ -10,7 +10,7 @@ public interface IAsyncQueryable<out T> : IAsyncEnumerable<T>, IQueryable<T>;
 
 public class Query<T> : IAsyncQueryable<T>
 {
-    public struct AsyncEnumerator : IAsyncEnumerator<T>
+    public class AsyncEnumerator : IAsyncEnumerator<T>
     {
         private readonly Query<T> _host;
         private readonly CancellationToken _cancellationToken;
@@ -161,5 +161,15 @@ public class Query<T> : IAsyncQueryable<T>
     IEnumerator IEnumerable.GetEnumerator()
     {
         return GetEnumerator();
+    }
+
+    public Task<int> DeleteAsync(CancellationToken cancellationToken = default)
+    {
+        using var stream = LocalStreamWrapper.Create();
+        Serialize(stream.LocalStream);
+        stream.LocalStream.Position = 0;
+        return _queryable.Client.ConditionalDeleteAsync(new GenericAstraQueryBranch(stream.LocalStream.GetBuffer()
+                .AsMemory()[..(int)stream.LocalStream.Length]),
+            cancellationToken);
     }
 }

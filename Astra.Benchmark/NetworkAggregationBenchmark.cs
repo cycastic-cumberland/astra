@@ -36,7 +36,6 @@ public class NetworkAggregationBenchmark
         }
     };
     
-    private readonly AstraTable<int, string, string> _table = new();
     private TcpServer _server = null!;
     private SimpleAstraClient _client = null!;
     private Task _serverTask = Task.CompletedTask;
@@ -58,8 +57,8 @@ public class NetworkAggregationBenchmark
             Address = "127.0.0.1",
             Port = TcpServer.DefaultPort,
         });
-        _predicate = _table.Column1.EqualsLiteral(Index);
-        _fakePredicate = _table.Column1.EqualsLiteral(-Index);
+        _predicate = AstraTable<int, string, string>.Column1.EqualsLiteral(Index);
+        _fakePredicate = AstraTable<int, string, string>.Column1.EqualsLiteral(-Index);
     }
     
     public Task GlobalCleanupAsync()

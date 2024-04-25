@@ -10,7 +10,6 @@ namespace Astra.Benchmark;
 [SimpleJob(RuntimeMoniker.Net80)]
 public class LocalAggregationBenchmark
 {
-    private readonly AstraTable<int, string, string> _table = new();
     private DataRegistry _registry = null!;
     private const int Index = 1;
 
@@ -22,7 +21,7 @@ public class LocalAggregationBenchmark
     [GlobalSetup]
     public void GlobalSetUp()
     {
-        DynamicSerializable.BuildDynamicSerializer<SimpleSerializableStruct>();
+        DynamicSerializable.EnsureBuilt<SimpleSerializableStruct>();
     }
     
     [IterationSetup]
@@ -89,7 +88,7 @@ public class LocalAggregationBenchmark
     [Benchmark]
     public void ManualDeserialization()
     {
-        var predicate = _table.Column1.EqualsLiteral(Index);
+        var predicate = AstraTable<int, string, string, byte[], float>.Column1.EqualsLiteral(Index);
         var fetched = _registry.AggregateCompat<SimpleSerializableStruct>(
             predicate.DumpMemory());
         
@@ -102,7 +101,7 @@ public class LocalAggregationBenchmark
     [Benchmark]
     public void AutoDeserialization()
     {
-        var predicate = _table.Column1.EqualsLiteral(Index);
+        var predicate = AstraTable<int, string, string, byte[], float>.Column1.EqualsLiteral(Index);
         var fetched = _registry.Aggregate<SimpleSerializableStruct>(
             predicate.DumpMemory());
         

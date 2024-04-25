@@ -45,4 +45,12 @@ public readonly struct SimpleClientQueryable<T> : IQueryProvider
         if (!typeof(IEnumerable<T>).IsAssignableFrom(typeof(TResult))) throw new NotSupportedException(typeof(TResult).Name);
         return (TResult)(object)Execute(expression);
     }
+
+    public Query<T> Where(Expression<Func<T, bool>> predicate)
+    {
+        return CreateQuery(Expression.Call(null,
+            new Func<IQueryable<T>, Expression<Func<T, bool>>, IQueryable<T>>(
+                Queryable.Where).Method, new Query<T>(this).Expression,
+            Expression.Quote(predicate)));
+    }
 }

@@ -76,7 +76,7 @@ public class NetworkBulkInsertionBenchmark
     public void FirstSetup()
     {
         GlobalSetupAsync().Wait();
-        DynamicSerializable.BuildDynamicSerializer<SimpleSerializableStruct>();
+        DynamicSerializable.EnsureBuilt<SimpleSerializableStruct>();
     }
     
     [GlobalCleanup]

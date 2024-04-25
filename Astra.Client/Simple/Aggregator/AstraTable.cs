@@ -25,47 +25,47 @@ public static class AstraColumns<T>
     public static IAstraColumnQuery<T> Default(int offset) => (IAstraColumnQuery<T>)ColumnHelper.Lookup[typeof(T)](offset);
 }
 
-public class AstraTable<T1>
+public static class AstraTable<T1>
 {
-    public readonly IAstraColumnQuery<T1> Column1 = AstraColumns<T1>.Default(0);
+    public static IAstraColumnQuery<T1> Column1 => AstraTable<T1, int, int, int, int, int>.Column1;
 }
 
-public class AstraTable<T1, T2>
+public static class AstraTable<T1, T2>
 {
-    public readonly IAstraColumnQuery<T1> Column1 = AstraColumns<T1>.Default(0);
-    public readonly IAstraColumnQuery<T2> Column2 = AstraColumns<T2>.Default(1);
+    public static IAstraColumnQuery<T1> Column1 => AstraTable<T1, T2, int, int, int, int>.Column1;
+    public static IAstraColumnQuery<T2> Column2 => AstraTable<T1, T2, int, int, int, int>.Column2;
 }
 
-public class AstraTable<T1, T2, T3>
+public static class AstraTable<T1, T2, T3>
 {
-    public readonly IAstraColumnQuery<T1> Column1 = AstraColumns<T1>.Default(0);
-    public readonly IAstraColumnQuery<T2> Column2 = AstraColumns<T2>.Default(1);
-    public readonly IAstraColumnQuery<T3> Column3 = AstraColumns<T3>.Default(2);
+    public static IAstraColumnQuery<T1> Column1 => AstraTable<T1, T2, T3, int, int, int>.Column1;
+    public static IAstraColumnQuery<T2> Column2 => AstraTable<T1, T2, T3, int, int, int>.Column2;
+    public static IAstraColumnQuery<T3> Column3 => AstraTable<T1, T2, T3, int, int, int>.Column3;
 }
 
-public class AstraTable<T1, T2, T3, T4>
+public static class AstraTable<T1, T2, T3, T4>
 {
-    public readonly IAstraColumnQuery<T1> Column1 = AstraColumns<T1>.Default(0);
-    public readonly IAstraColumnQuery<T2> Column2 = AstraColumns<T2>.Default(1);
-    public readonly IAstraColumnQuery<T3> Column3 = AstraColumns<T3>.Default(2);
-    public readonly IAstraColumnQuery<T4> Column4 = AstraColumns<T4>.Default(3);
+    public static IAstraColumnQuery<T1> Column1 => AstraTable<T1, T2, T3, T4, int, int>.Column1;
+    public static IAstraColumnQuery<T2> Column2 => AstraTable<T1, T2, T3, T4, int, int>.Column2;
+    public static IAstraColumnQuery<T3> Column3 => AstraTable<T1, T2, T3, T4, int, int>.Column3;
+    public static IAstraColumnQuery<T4> Column4 => AstraTable<T1, T2, T3, T4, int, int>.Column4;
 }
 
-public class AstraTable<T1, T2, T3, T4, T5>
+public static class AstraTable<T1, T2, T3, T4, T5>
 {
-    public readonly IAstraColumnQuery<T1> Column1 = AstraColumns<T1>.Default(0);
-    public readonly IAstraColumnQuery<T2> Column2 = AstraColumns<T2>.Default(1);
-    public readonly IAstraColumnQuery<T3> Column3 = AstraColumns<T3>.Default(2);
-    public readonly IAstraColumnQuery<T4> Column4 = AstraColumns<T4>.Default(3);
-    public readonly IAstraColumnQuery<T5> Column5 = AstraColumns<T5>.Default(4);
+    public static IAstraColumnQuery<T1> Column1 => AstraTable<T1, T2, T3, T4, T5, int>.Column1;
+    public static IAstraColumnQuery<T2> Column2 => AstraTable<T1, T2, T3, T4, T5, int>.Column2;
+    public static IAstraColumnQuery<T3> Column3 => AstraTable<T1, T2, T3, T4, T5, int>.Column3;
+    public static IAstraColumnQuery<T4> Column4 => AstraTable<T1, T2, T3, T4, T5, int>.Column4;
+    public static IAstraColumnQuery<T5> Column5 => AstraTable<T1, T2, T3, T4, T5, int>.Column5;
 }
 
-public class AstraTable<T1, T2, T3, T4, T5, T6>
+public static class AstraTable<T1, T2, T3, T4, T5, T6>
 {
-    public readonly IAstraColumnQuery<T1> Column1 = AstraColumns<T1>.Default(0);
-    public readonly IAstraColumnQuery<T2> Column2 = AstraColumns<T2>.Default(1);
-    public readonly IAstraColumnQuery<T3> Column3 = AstraColumns<T3>.Default(2);
-    public readonly IAstraColumnQuery<T4> Column4 = AstraColumns<T4>.Default(3);
-    public readonly IAstraColumnQuery<T5> Column5 = AstraColumns<T5>.Default(4);
-    public readonly IAstraColumnQuery<T6> Column6 = AstraColumns<T6>.Default(5);
+    public static readonly IAstraColumnQuery<T1> Column1 = AstraColumns<T1>.Default(0);
+    public static readonly IAstraColumnQuery<T2> Column2 = AstraColumns<T2>.Default(1);
+    public static readonly IAstraColumnQuery<T3> Column3 = AstraColumns<T3>.Default(2);
+    public static readonly IAstraColumnQuery<T4> Column4 = AstraColumns<T4>.Default(3);
+    public static readonly IAstraColumnQuery<T5> Column5 = AstraColumns<T5>.Default(4);
+    public static readonly IAstraColumnQuery<T6> Column6 = AstraColumns<T6>.Default(5);
 }
