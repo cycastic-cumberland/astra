@@ -4,7 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Astra.Collections;
 
-internal struct LocalStack<T> : IDisposable, ICollection<T>, IReadOnlyCollection<T>
+public struct LocalStack<T> : IDisposable, ICollection<T>, IReadOnlyCollection<T>
 {
     private readonly T[] _realArray;
     private readonly Memory<T> _memory;

@@ -5,9 +5,9 @@ using Astra.Common.StreamUtils;
 
 namespace Astra.Engine.Data;
 
-public class RegistryQuery<T> : IQueryable<T>
+public class RegistryQuery<T, TRegistry> : IQueryable<T> where TRegistry : IRegistry<TRegistry>
 {
-    public struct Enumerator(DataRegistry.DynamicStreamBasedAggregationEnumerator<T> enumerator, Stream stream) : IEnumerator<T>
+    public readonly struct Enumerator(IEnumerator<T> enumerator, Stream stream) : IEnumerator<T>
     {
         public void Dispose()
         {
@@ -24,9 +24,9 @@ public class RegistryQuery<T> : IQueryable<T>
         object IEnumerator.Current => Current!;
     }
     
-    private readonly DataRegistry<T> _registry;
+    private readonly DataRegistry<T, TRegistry> _registry;
 
-    internal RegistryQuery(DataRegistry<T> registry, Expression? expression = null)
+    internal RegistryQuery(DataRegistry<T, TRegistry> registry, Expression? expression = null)
     {
         _registry = registry;
         Expression = expression ?? Expression.Constant(this);
@@ -35,7 +35,7 @@ public class RegistryQuery<T> : IQueryable<T>
 
     internal void Serialize(Stream stream)
     {
-        new SinglePassExpressionAnalyzer<T>(Expression, stream, typeof(RegistryQuery<T>)).Analyze();
+        new SinglePassExpressionAnalyzer<T>(Expression, stream, typeof(RegistryQuery<T, TRegistry>)).Analyze();
     }
     
     public Enumerator GetEnumerator()
@@ -45,7 +45,7 @@ public class RegistryQuery<T> : IQueryable<T>
         {
             Serialize(stream);
             stream.Position = 0;
-            return new(new(_registry.InternalRegistry, stream), stream);
+            return new Enumerator(_registry.InternalRegistry.Aggregate<T>(stream).GetEnumerator(), stream);
         }
         catch
         {

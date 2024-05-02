@@ -21,31 +21,7 @@ public class WriteOperationsNotAllowed(string? msg = null) : Exception(msg);
 
 public class DuplicatedColumnNameException(string? msg = null) : Exception(msg);
 
-public abstract class AbstractRegistryDump
-{
-    public abstract Stream PrepareStream();
-    public abstract void CloseStream(Stream stream);
-    public abstract bool CanBeDumped { get; }
-
-    private sealed class EmptyDump : AbstractRegistryDump
-    {
-        public override Stream PrepareStream()
-        {
-            throw new NotSupportedException();
-        }
-
-        public override void CloseStream(Stream stream)
-        {
-            throw new NotSupportedException();
-        }
-
-        public override bool CanBeDumped => false;
-    }
-
-    public static AbstractRegistryDump Empty => new EmptyDump();
-}
-
-public sealed class DataRegistry : IDisposable
+public sealed class DataRegistry : IRegistry<DataRegistry>
 {
     public interface IIndexersLock : IDisposable
     {
@@ -393,7 +369,7 @@ public sealed class DataRegistry : IDisposable
         object IEnumerator.Current => Current!;
     }
     
-    public readonly struct DynamicBufferBasedAggregationEnumerable<T> : IEnumerable<T>
+    public readonly struct DynamicBufferBasedAggregationEnumerable<T> : IEnumerable<T, DynamicBufferBasedAggregationEnumerator<T>>
     {
         private readonly DataRegistry _host;
         private readonly ReadOnlyMemory<byte> _predicate;
@@ -484,6 +460,12 @@ public sealed class DataRegistry : IDisposable
 
     public int ColumnCount => _synthesizers.Length;
     public int IndexedColumnCount => _synthesizers.Length;
+
+    public static DataRegistry Fabricate(RegistrySchemaSpecifications schema, ILoggerFactory? loggerFactory = null,
+        AbstractRegistryDump? dump = null)
+    {
+        return new(schema, loggerFactory: loggerFactory, dump: dump);
+    }
 
     public int RowsCount
     {
@@ -606,13 +588,24 @@ public sealed class DataRegistry : IDisposable
     {
         return new(this, predicateStream);
     }
+
+    IEnumerable<T> IRegistry.Aggregate<T>(Stream predicateStream)
+    {
+        return Aggregate<T>(predicateStream);
+    }
     
     public DynamicBufferBasedAggregationEnumerable<T> Aggregate<T>(ReadOnlyMemory<byte> predicateStream)
     {
         return new(this, predicateStream);
     }
 
-    public Enumerable<T> AsEnumerable<T>() => new(this);
+    IEnumerable<T> IRegistry.Aggregate<T>(ReadOnlyMemory<byte> predicate)
+    {
+        return Aggregate<T>(predicate);
+    }
+
+    public Enumerator<T> GetEnumerator<T>() => new(this);
+    IEnumerator<T> IRegistry.GetEnumerator<T>() => GetEnumerator<T>();
     
     private static int ConditionalCountInternal<T>(Stream predicateStream, T indexersLock) where T : struct, DataRegistry.IIndexersLock
     {
@@ -750,6 +743,7 @@ public sealed class DataRegistry : IDisposable
 #endif
             case Command.UnsortedAggregate:
             {
+                OutputLayout(dataOut, _synthesizers);
                 dataIn.AggregateStream(dataOut, writeLock);
                 break;
             }
@@ -917,6 +911,7 @@ public sealed class DataRegistry : IDisposable
         writeLock.Commit();
         return ret;
     }
+
 
     private static void OutputLayout<TStream, TList>(TStream stream, TList synthesizers) 
         where TStream : Stream

@@ -1,7 +1,9 @@
+using System.Runtime.CompilerServices;
 using Astra.Client.Simple.Aggregator;
 using Astra.Common.Data;
 using Astra.Common.Serializable;
 using Astra.Engine.Data;
+using Astra.Engine.v2.Data;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
@@ -11,9 +13,10 @@ namespace Astra.Benchmark;
 public class LocalAggregationBenchmark
 {
     private DataRegistry _registry = null!;
+    private ShinDataRegistry _newRegistry = null!;
     private const int Index = 1;
 
-    [Params(100, 1_000, 10_000, 100_000)]
+    [Params(100, 1_000, 10_000)]
     public uint AggregatedRows;
 
     private uint GibberishRows => AggregatedRows / 2;
@@ -27,7 +30,7 @@ public class LocalAggregationBenchmark
     [IterationSetup]
     public void SetUp()
     {
-        _registry = new(new() 
+        var specs = new RegistrySchemaSpecifications
         {
             Columns = new ColumnSchemaSpecifications[] 
             {
@@ -51,7 +54,9 @@ public class LocalAggregationBenchmark
                 }
             },
             BinaryTreeDegree = (int)(AggregatedRows / 10)
-        });
+        };
+        _registry = new(specs);
+        _newRegistry = new(specs);
         var data = new SimpleSerializableStruct[AggregatedRows + GibberishRows];
         for (var i = 0; i < AggregatedRows; i++)
         {
@@ -74,16 +79,20 @@ public class LocalAggregationBenchmark
         }
 
         _registry.BulkInsertCompat(data);
+        _newRegistry.BulkInsertCompat(data);
     }
 
     [IterationCleanup]
     public void CleanUp()
     {
         _registry.Dispose();
+        _newRegistry.Dispose();
         _registry = null!;
+        _newRegistry = null!;
     }
 
-    private ulong _a;
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+    private static void ProfessionalTimeWaster<T>(T _) {  }
     
     [Benchmark]
     public void ManualDeserialization()
@@ -94,7 +103,7 @@ public class LocalAggregationBenchmark
         
         foreach (var f in fetched)
         {
-            _a += unchecked((ulong)f.Value1);
+            ProfessionalTimeWaster(f.Value1);
         }
     }
     
@@ -107,7 +116,33 @@ public class LocalAggregationBenchmark
         
         foreach (var f in fetched)
         {
-            _a += unchecked((ulong)f.Value1);
+            ProfessionalTimeWaster(f.Value1);
+        }
+    }
+    
+    [Benchmark]
+    public void ManualDeserializationNew()
+    {
+        var predicate = AstraTable<int, string, string, byte[], float>.Column1.EqualsLiteral(Index);
+        var fetched = _newRegistry.AggregateCompat<SimpleSerializableStruct>(
+            predicate.DumpMemory());
+        
+        foreach (var f in fetched)
+        {
+            ProfessionalTimeWaster(f.Value1);
+        }
+    }
+    
+    [Benchmark]
+    public void AutoDeserializationNew()
+    {
+        var predicate = AstraTable<int, string, string, byte[], float>.Column1.EqualsLiteral(Index);
+        var fetched = _newRegistry.Aggregate<SimpleSerializableStruct>(
+            predicate.DumpMemory());
+        
+        foreach (var f in fetched)
+        {
+            ProfessionalTimeWaster(f.Value1);
         }
     }
 }

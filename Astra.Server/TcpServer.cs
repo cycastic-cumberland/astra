@@ -7,7 +7,9 @@ using Astra.Common;
 using Astra.Common.Data;
 using Astra.Common.Protocols;
 using Astra.Common.StreamUtils;
+using Astra.Engine;
 using Astra.Engine.Data;
+using Astra.Engine.v2.Data;
 using Astra.Server.Authentication;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -49,7 +51,7 @@ public class TcpServer : IDisposable
     };
     private static readonly IPAddress Address = IPAddress.Parse("0.0.0.0");
     private static readonly IPGlobalProperties IpProperties = IPGlobalProperties.GetIPGlobalProperties();
-    private readonly DataRegistry _registry;
+    private readonly IRegistry _registry;
     private readonly TcpListener _listener;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger<TcpServer> _logger;
@@ -62,7 +64,7 @@ public class TcpServer : IDisposable
 
     public ILogger<TL> GetLogger<TL>() => _loggerFactory.CreateLogger<TL>();
     
-    public unsafe DataRegistry GetRegistry() => _registry;
+    public IRegistry GetRegistry() => _registry;
     
     public TcpServer(AstraLaunchSettings settings, Func<IAuthenticationHandler> authenticationSpawner)
     {
@@ -77,7 +79,10 @@ public class TcpServer : IDisposable
                 configure.ColoredOutput = true;
             });
         });
-        _registry = new(settings.Schema, _loggerFactory);
+        if (settings.UseCellBasedDataStore)
+            _registry = new ShinDataRegistry(settings.Schema, _loggerFactory);
+        else
+            _registry = new DataRegistry(settings.Schema, _loggerFactory);
         _logger = GetLogger<TcpServer>();
         _port = settings.Port ?? DefaultPort;
         _listener = new(Address, _port);

@@ -6,6 +6,7 @@ namespace Astra.Common.Data;
 public struct AstraLaunchSettings
 {
     public RegistrySchemaSpecifications Schema { get; set; }
+    public bool UseCellBasedDataStore { get; set; }
     public string? LogLevel { get; set; }
     public int? Port { get; set; }
     public int Timeout { get; set; }
@@ -18,6 +19,8 @@ public struct RepresentableAstraLaunchSettings
 {
     [JsonProperty("schema")]
     public RepresentableSchemaSpecifications Schema { get; set; }
+    [JsonProperty("useCellBasedDataStore")]
+    public bool? UseCellBasedDataStore { get; set; }
     [JsonProperty("logLevel")]
     public string? LogLevel { get; set; }
     [JsonProperty("port")]
@@ -47,6 +50,7 @@ public struct RepresentableAstraLaunchSettings
         };
         return new()
         {
+            UseCellBasedDataStore = UseCellBasedDataStore ?? false,
             Schema = Schema.ToInternal(),
             LogLevel = LogLevel,
             Timeout = Timeout,

@@ -15,8 +15,8 @@ public class NetworkBulkInsertionBenchmark
 {
     private static readonly RegistrySchemaSpecifications Schema = new()
     {
-        Columns = new ColumnSchemaSpecifications[] 
-        {
+        Columns =
+        [
             new()
             {
                 Name = "col1",
@@ -35,12 +35,15 @@ public class NetworkBulkInsertionBenchmark
                 DataType = DataType.StringMask,
                 Indexer = IndexerType.Generic,
             }
-        }
+        ]
     };
 
     private TcpServer _server = null!;
+    private TcpServer _newServer = null!;
     private SimpleAstraClient _client = null!;
+    private SimpleAstraClient _client2 = null!;
     private Task _serverTask = Task.CompletedTask;
+    private Task _newServerTask = Task.CompletedTask;
     private SimpleSerializableStruct[] _array = null!;
     private const uint MaxBulkInsertAmount = 10_000;
     
@@ -51,10 +54,20 @@ public class NetworkBulkInsertionBenchmark
     {
         _server = new(new()
         {
+            Port = TcpServer.DefaultPort,
             LogLevel = "Critical",
+            UseCellBasedDataStore = false,
+            Schema = Schema with { BinaryTreeDegree = (int)(BulkInsertAmount / 10) }
+        }, AuthenticationHelper.NoAuthentication());
+        _newServer = new(new()
+        {
+            Port = TcpServer.DefaultPort + 1,
+            LogLevel = "Critical",
+            UseCellBasedDataStore = true,
             Schema = Schema with { BinaryTreeDegree = (int)(BulkInsertAmount / 10) }
         }, AuthenticationHelper.NoAuthentication());
         _serverTask = _server.RunAsync();
+        _newServerTask = _newServer.RunAsync();
         await Task.Delay(100);
         _client = new();
         await _client.ConnectAsync(new()
@@ -62,14 +75,23 @@ public class NetworkBulkInsertionBenchmark
             Address = "127.0.0.1",
             Port = TcpServer.DefaultPort,
         });
+        _client2 = new();
+        await _client2.ConnectAsync(new()
+        {
+            Address = "127.0.0.1",
+            Port = TcpServer.DefaultPort + 1,
+        });
     }
     
     public Task GlobalCleanupAsync()
     {
         _client.Dispose();
+        _client2.Dispose();
         _server.Kill();
         _server = null!;
-        return _serverTask;
+        _newServer.Kill();
+        _newServer = null!;
+        return Task.WhenAll(_serverTask, _newServerTask);
     }
     
     [GlobalSetup]
@@ -108,6 +130,7 @@ public class NetworkBulkInsertionBenchmark
     {
         _array = null!;
         _server.GetRegistry().Clear();
+        _newServer.GetRegistry().Clear();
     }
         
     [Benchmark]
@@ -120,5 +143,17 @@ public class NetworkBulkInsertionBenchmark
     public void AutoSerialization()
     { 
         _client.BulkInsertAsync(_array).Wait();
+    }
+    
+    [Benchmark]
+    public void ManualSerializationNew()
+    { 
+        _client2.BulkInsertSerializableCompatAsync(_array).Wait();
+    }
+    
+    [Benchmark]
+    public void AutoSerializationNew()
+    { 
+        _client2.BulkInsertAsync(_array).Wait();
     }
 }

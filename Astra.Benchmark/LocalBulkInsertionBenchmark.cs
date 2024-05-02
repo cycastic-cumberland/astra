@@ -1,6 +1,7 @@
 using Astra.Common.Data;
 using Astra.Common.Serializable;
 using Astra.Engine.Data;
+using Astra.Engine.v2.Data;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
@@ -10,6 +11,7 @@ namespace Astra.Benchmark;
 public class LocalBulkInsertionBenchmark
 {
     private DataRegistry _registry = null!;
+    private ShinDataRegistry _newRegistry = null!;
     private SimpleSerializableStruct[] _data = null!;
     
     private int _bulkCounter = 1;
@@ -41,7 +43,7 @@ public class LocalBulkInsertionBenchmark
     [GlobalSetup]
     public void FirstSetup()
     {
-        _registry = new(new()
+        var specs = new RegistrySchemaSpecifications()
         {
             Columns = new ColumnSchemaSpecifications[]
             {
@@ -64,7 +66,10 @@ public class LocalBulkInsertionBenchmark
                     Indexer = IndexerType.Generic,
                 }
             }
-        });
+        };
+        _registry = new(specs);
+        _newRegistry = new(specs);
+        
         DynamicSerializable.EnsureBuilt<SimpleSerializableStruct>();
     }
     
@@ -72,6 +77,7 @@ public class LocalBulkInsertionBenchmark
     public void FinalCleanUp()
     {
         _registry.Dispose();
+        _newRegistry.Dispose();
     }
 
     [Benchmark]
@@ -84,5 +90,17 @@ public class LocalBulkInsertionBenchmark
     public void AutoSerialization()
     {
         _registry.BulkInsert(_data);
+    }
+    
+    [Benchmark]
+    public void ManualSerializationNew()
+    {
+        _newRegistry.BulkInsertCompat(_data);
+    }
+    
+    [Benchmark]
+    public void AutoSerializationNew()
+    {
+        _newRegistry.BulkInsert(_data);
     }
 }
