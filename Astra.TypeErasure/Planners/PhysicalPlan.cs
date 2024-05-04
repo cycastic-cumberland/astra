@@ -54,7 +54,7 @@ public readonly struct PhysicalPlan : IDisposable
             case Operation.LesserOrEqualsTo:
             {
                 if (!schema.Type.IsNumeric)
-                    throw new OperationNotSupported($"Arithmetic operation not supported for type {schema.Type.Value}");
+                    throw new OperationNotSupported($"Filter operation not supported for type {schema.Type.Value}");
                 goto case Operation.Equal;
             }
             case Operation.Equal:
