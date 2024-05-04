@@ -215,7 +215,7 @@ public struct SinglePassExpressionAnalyzer<T>
 
     private void AnalyzeBinaryNoNesting(MemberExpression parameter, ConstantExpression constant, ExpressionType nodeType)
     {
-        _outStream.WriteValue(PredicateType.UnaryMask);
+        _outStream.WriteValue(QueryType.FilterMask);
         var offset = SinglePassExpressionAnalyzerHelpers<T>.NameToIndex[parameter.Member.Name ?? throw new NullReferenceException()]; 
         _outStream.WriteValue(offset);
         switch (nodeType)
@@ -268,7 +268,7 @@ public struct SinglePassExpressionAnalyzer<T>
     private void ClosedBetween(MemberExpression parameter, ConstantExpression lower,
         ConstantExpression upper)
     {
-        _outStream.WriteValue(PredicateType.UnaryMask);
+        _outStream.WriteValue(QueryType.FilterMask);
         var offset = SinglePassExpressionAnalyzerHelpers<T>.NameToIndex[parameter.Member.Name]; 
         _outStream.WriteValue(offset);
         _outStream.WriteValue(Operation.ClosedBetween);
@@ -370,14 +370,14 @@ public struct SinglePassExpressionAnalyzer<T>
     {
         // Could be ranged
         if (TryRanged(binaryExpression, rightExpression)) return;
-        _outStream.WriteValue(PredicateType.BinaryAndMask);
+        _outStream.WriteValue(QueryType.IntersectMask);
         AnalyzeInternal(binaryExpression);
         AnalyzeUnknown(rightExpression);
     }
     
     private void AnalyzeUnion(BinaryExpression binaryExpression, Expression rightExpression)
     {
-        _outStream.WriteValue(PredicateType.BinaryOrMask);
+        _outStream.WriteValue(QueryType.UnionMask);
         AnalyzeInternal(binaryExpression);
         AnalyzeUnknown(rightExpression);
     }

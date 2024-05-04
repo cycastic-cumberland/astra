@@ -1,5 +1,3 @@
-#define USE_STACK_AGGREGATOR
-
 using System.Collections;
 using System.Runtime.CompilerServices;
 using Astra.Collections;
@@ -7,6 +5,7 @@ using Astra.Common.Data;
 using Astra.Common.Protocols;
 using Astra.Common.StreamUtils;
 using Astra.Engine.v2.Indexers;
+using Astra.TypeErasure.Planners;
 using Microsoft.IO;
 
 namespace Astra.Engine.v2.Data;
@@ -162,7 +161,7 @@ public static class Aggregator
         public IEnumerable<DataRow>? Rhs;
     }
 
-    private static void SetFrame(ref LocalStack<AggregatorStackFrame> stack, ref AggregatorStackFrame frame,
+    private static void SetFrame(ref ArrayStack<AggregatorStackFrame> stack, ref AggregatorStackFrame frame,
         IEnumerable<DataRow>? target)
     {
         if (frame.LhsSet == false)
@@ -174,21 +173,10 @@ public static class Aggregator
         stack.Add(frame with {Rhs = target, RhsSet = true});
     }
 
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static IEnumerable<DataRow>? Aggregate<T>(Stream predicateStream, ref readonly Span<T?> readers)
         where T : struct, BaseIndexer.IReadable
-    {
-#if USE_STACK_AGGREGATOR
-        return StackAggregate(predicateStream, in readers);
-#else
-        return RecursiveAggregate(predicateStream, in readers);
-#endif
-    }
-    
-    private static IEnumerable<DataRow>? StackAggregate<T>(Stream predicateStream, ref readonly Span<T?> readers)
-        where T : struct, BaseIndexer.IReadable
-    {
-        var stack = new LocalStack<AggregatorStackFrame>(32); // 32 should be plenty enough tbh...
+    { 
+        var stack = new ArrayStack<AggregatorStackFrame>(32); // 32 should be plenty enough tbh...
         try
         {
             var type = predicateStream.ReadUInt();
@@ -205,7 +193,36 @@ public static class Aggregator
                 type = frame.Type;
                 switch (type)
                 {
-                    case 0:
+                    case QueryType.IntersectMask:
+                    {
+                        if (frame is { LhsSet: true, RhsSet: true })
+                        {
+                            var intersected = IntersectSelect(frame.Lhs, frame.Rhs);
+                            if (!stack.TryPop(out var prev)) return intersected;
+                            SetFrame(ref stack, ref prev, intersected);
+                        }
+
+                        goto case QueryType.FilterMask + 1;
+                    }
+                    case QueryType.UnionMask:
+                    {
+                        if (frame is { LhsSet: true, RhsSet: true })
+                        {
+                            var intersected = UnionSelect(frame.Lhs, frame.Rhs);
+                            if (!stack.TryPop(out var prev)) return intersected;
+                            SetFrame(ref stack, ref prev, intersected);
+                        }
+
+                        goto case QueryType.FilterMask + 1;
+                    }
+                    case QueryType.FilterMask:
+                    {
+                        var filtered = Filter(predicateStream, in readers);
+                        if (!stack.TryPop(out var prev)) return filtered;
+                        SetFrame(ref stack, ref prev, filtered);
+                        continue;
+                    }
+                    case QueryType.FilterMask + 1:
                     {
                         stack.Push(frame);
                         type = predicateStream.ReadUInt();
@@ -219,35 +236,6 @@ public static class Aggregator
                         });
                         break;
                     }
-                    case PredicateType.BinaryAndMask:
-                    {
-                        if (frame is { LhsSet: true, RhsSet: true })
-                        {
-                            var intersected = IntersectSelect(frame.Lhs, frame.Rhs);
-                            if (!stack.TryPop(out var prev)) return intersected;
-                            SetFrame(ref stack, ref prev, intersected);
-                        }
-
-                        goto case 0;
-                    }
-                    case PredicateType.BinaryOrMask:
-                    {
-                        if (frame is { LhsSet: true, RhsSet: true })
-                        {
-                            var intersected = UnionSelect(frame.Lhs, frame.Rhs);
-                            if (!stack.TryPop(out var prev)) return intersected;
-                            SetFrame(ref stack, ref prev, intersected);
-                        }
-
-                        goto case 0;
-                    }
-                    case PredicateType.UnaryMask:
-                    {
-                        var filtered = Filter(predicateStream, in readers);
-                        if (!stack.TryPop(out var prev)) return filtered;
-                        SetFrame(ref stack, ref prev, filtered);
-                        continue;
-                    }
                     default:
                         throw new AggregateException($"Aggregator type not supported: {type}");
                 }
@@ -260,18 +248,59 @@ public static class Aggregator
             stack.Dispose();
         }
     }
-    
-    public static IEnumerable<DataRow>? RecursiveAggregate<T>(Stream predicateStream, ref readonly Span<T?> readers)
+
+    public static IEnumerable<DataRow>? ApplyPhysicalPlan<T>(ref readonly PhysicalPlan plan, ref readonly Span<T?> readers)
         where T : struct, BaseIndexer.IReadable
     {
-        var type = predicateStream.ReadUInt();
-        return type switch
+        var lSet = false;
+        IEnumerable<DataRow>? lhs = null;
+        IEnumerable<DataRow>? rhs = null;
+        var blueprints = plan.Blueprints;
+        for (var i = blueprints.Length - 1; i >= 0; i--)
         {
-            PredicateType.BinaryAndMask => RecursiveIntersect(predicateStream, in readers),
-            PredicateType.BinaryOrMask => RecursiveUnion(predicateStream, in readers),
-            PredicateType.UnaryMask => Filter(predicateStream, in readers),
-            _ => throw new AggregateException($"Aggregator type not supported: {type}")
-        };
+            ref readonly var blueprint = ref blueprints[i];
+            switch (blueprint.QueryOperationType)
+            {
+                case QueryType.IntersectMask:
+                {
+                    var results = IntersectSelect(lhs, rhs);
+                    lhs = results;
+                    rhs = null;
+                    lSet = true;
+                    break;
+                }
+                case QueryType.UnionMask:
+                {
+                    var results = UnionSelect(lhs, rhs);
+                    lhs = results;
+                    rhs = null;
+                    lSet = true;
+                    break;
+                }
+                case QueryType.FilterMask:
+                {
+                    var results = blueprint.Offset switch
+                    {
+                        < 0 => null,
+                        >= 0 => readers[blueprint.Offset]?.Fetch(in blueprint)
+                    };
+                    if (lSet)
+                    {
+                        rhs = results;
+                    }
+                    else
+                    {
+                        lhs = results;
+                        lSet = true;
+                    }
+                    break;
+                }
+                default:
+                    throw new AggregateException($"Aggregator type not supported: {blueprint.QueryOperationType}");
+            }
+        }
+
+        return lhs;
     }
 }
 
@@ -382,7 +411,7 @@ public static class AggregatorHelper
         var result = predicateStream.Aggregate(in readers);
         if (result == null)
         {
-            outStream.WriteValue(CommonProtocol.EndOfResultsSetFlag);
+            outStream.WriteValue(CommonProtocol.EndOfSetFlag);
             return;
         }
         var flag = CommonProtocol.HasRow;
@@ -392,7 +421,7 @@ public static class AggregatorHelper
             flag = CommonProtocol.ChainedFlag;
             row.Serialize(outStream);
         }
-        outStream.WriteValue(CommonProtocol.EndOfResultsSetFlag);
+        outStream.WriteValue(CommonProtocol.EndOfSetFlag);
     }
 
     public static PreparedLocalEnumerable<T> LocalAggregate<T, TReader>(this Stream predicateStream, ref readonly Span<TReader?> readers)
@@ -400,6 +429,14 @@ public static class AggregatorHelper
         where TReader : struct, BaseIndexer.IReadable
     {
         var set = predicateStream.Aggregate(in readers)?.ToHashSet();
+        return new(set);
+    }
+    
+    public static PreparedLocalEnumerable<T> LocalAggregate<T, TReader>(this ref readonly PhysicalPlan plan, ref readonly Span<TReader?> readers)
+        where T : IAstraSerializable
+        where TReader : struct, BaseIndexer.IReadable
+    {
+        var set = Aggregator.ApplyPhysicalPlan(in plan, in readers)?.ToHashSet();
         return new(set);
     }
 }

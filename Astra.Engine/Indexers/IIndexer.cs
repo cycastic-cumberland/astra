@@ -10,8 +10,6 @@ using Astra.Engine.Data;
 
 namespace Astra.Engine.Indexers;
 
-public class OperationNotSupported(string? msg = null) : Exception(msg);
-
 public interface ITransaction : IDisposable
 {
     public void Commit();

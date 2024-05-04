@@ -153,7 +153,7 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
 
                     if (!PerformConstraintCheck()) throw new ConstraintCheckFailedException();
                     var flag = stream.LoadByte();
-                    if (flag != CommonProtocol.EndOfResultsSetFlag) goto case -1;
+                    if (flag != CommonProtocol.EndOfSetFlag) goto case -1;
                     _stage = 4;
                     goto case 4;
                 }

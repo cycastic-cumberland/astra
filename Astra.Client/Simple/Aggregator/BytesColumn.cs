@@ -11,7 +11,7 @@ public class BytesColumn(int offset) : IAstraColumnQuery<byte[]>
     {
         using var wrapped = LocalStreamWrapper.Create();
         var stream = wrapped.LocalStream;
-        stream.WriteValue(PredicateType.UnaryMask);
+        stream.WriteValue(QueryType.FilterMask);
         stream.WriteValue(offset);
         stream.WriteValue(Operation.Equal);
         stream.WriteValue(DataType.BytesMask);
@@ -23,7 +23,7 @@ public class BytesColumn(int offset) : IAstraColumnQuery<byte[]>
     {
         using var wrapped = LocalStreamWrapper.Create();
         var stream = wrapped.LocalStream;
-        stream.WriteValue(PredicateType.UnaryMask);
+        stream.WriteValue(QueryType.FilterMask);
         stream.WriteValue(offset);
         stream.WriteValue(Operation.NotEqual);
         stream.WriteValue(DataType.BytesMask);

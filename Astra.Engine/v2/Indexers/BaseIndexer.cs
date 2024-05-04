@@ -1,6 +1,8 @@
 using System.Collections;
 using Astra.Common.Data;
 using Astra.Engine.v2.Data;
+using Astra.TypeErasure.Data;
+using Astra.TypeErasure.Planners;
 
 namespace Astra.Engine.v2.Indexers;
 
@@ -11,10 +13,11 @@ public abstract class BaseIndexer(ColumnSchema schema)
 
     protected abstract IEnumerator<DataRow> GetEnumerator();
     protected abstract bool Contains(DataRow row);
+    protected abstract IEnumerable<DataRow>? Fetch(ref readonly OperationBlueprint blueprint);
     protected abstract IEnumerable<DataRow>? Fetch(Stream predicateStream);
     protected abstract IEnumerable<DataRow>? Fetch(uint operation, Stream predicateStream);
     protected abstract bool Add(DataRow row);
-    protected abstract HashSet<DataRow>? Remove(Stream predicateStream);
+    protected abstract IEnumerable<DataRow>? Remove(Stream predicateStream);
     protected abstract bool Remove(DataRow row);
     protected abstract void Clear();
     protected abstract int Count { get; }
@@ -28,6 +31,7 @@ public abstract class BaseIndexer(ColumnSchema schema)
         public bool Contains(DataRow row);
         public int Count { get; }
         public IEnumerable<DataRow>? Fetch(Stream predicateStream);
+        public IEnumerable<DataRow>? Fetch(ref readonly OperationBlueprint blueprint);
         public IEnumerable<DataRow>? Fetch(uint operation, Stream predicateStream);
     }
     
@@ -56,6 +60,8 @@ public abstract class BaseIndexer(ColumnSchema schema)
         public int Count => _host.Count;
         
         public IEnumerable<DataRow>? Fetch(Stream predicateStream) => _host.Fetch(predicateStream);
+        
+        public IEnumerable<DataRow>? Fetch(ref readonly OperationBlueprint blueprint) => _host.Fetch(in blueprint);
         
         public IEnumerable<DataRow>? Fetch(uint operation, Stream predicateStream) => _host.Fetch(operation, predicateStream);
     }
@@ -86,11 +92,13 @@ public abstract class BaseIndexer(ColumnSchema schema)
         
         public IEnumerable<DataRow>? Fetch(Stream predicateStream) => _host.Fetch(predicateStream);
         
+        public IEnumerable<DataRow>? Fetch(ref readonly OperationBlueprint blueprint) => _host.Fetch(in blueprint);
+        
         public IEnumerable<DataRow>? Fetch(uint operation, Stream predicateStream) => _host.Fetch(operation, predicateStream);
 
         public bool Add(DataRow row) => _host.Add(row);
         
-        public HashSet<DataRow>? Remove(Stream predicateStream) => _host.Remove(predicateStream);
+        public IEnumerable<DataRow>? Remove(Stream predicateStream) => _host.Remove(predicateStream);
         public void Remove(DataRow predicateStream) => _host.Remove(predicateStream);
         
         public void Clear() => _host.Clear();

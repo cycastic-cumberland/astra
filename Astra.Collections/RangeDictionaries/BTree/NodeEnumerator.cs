@@ -7,7 +7,7 @@ public sealed partial class BTreeMap<TKey, TValue>
     // Supports depth first traversal for all nodes and no node
     public struct NodeEnumerator : IEnumerator<KeyValuePair<TKey, TValue>>
     {
-        private LocalStack<(INode node, int index)> _stack;
+        private ArrayStack<(INode node, int index)> _stack;
 
         public NodeEnumerator()
         {

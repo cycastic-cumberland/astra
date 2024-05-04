@@ -18,6 +18,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Astra.Common", "Astra.Commo
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Astra.Collections", "Astra.Collections\Astra.Collections.csproj", "{0F26B364-056A-478C-83D0-1408B77696F1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Astra.TypeErasure", "Astra.TypeErasure\Astra.TypeErasure.csproj", "{40C4724E-4DFC-4775-B7BE-E30A7DE36F30}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -60,5 +62,9 @@ Global
 		{0F26B364-056A-478C-83D0-1408B77696F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0F26B364-056A-478C-83D0-1408B77696F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0F26B364-056A-478C-83D0-1408B77696F1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{40C4724E-4DFC-4775-B7BE-E30A7DE36F30}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{40C4724E-4DFC-4775-B7BE-E30A7DE36F30}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{40C4724E-4DFC-4775-B7BE-E30A7DE36F30}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{40C4724E-4DFC-4775-B7BE-E30A7DE36F30}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal

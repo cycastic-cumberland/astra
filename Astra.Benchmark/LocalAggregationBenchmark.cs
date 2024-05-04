@@ -4,6 +4,7 @@ using Astra.Common.Data;
 using Astra.Common.Serializable;
 using Astra.Engine.Data;
 using Astra.Engine.v2.Data;
+using Astra.TypeErasure.Planners;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
@@ -14,6 +15,7 @@ public class LocalAggregationBenchmark
 {
     private DataRegistry _registry = null!;
     private ShinDataRegistry _newRegistry = null!;
+    private PhysicalPlan _plan;
     private const int Index = 1;
 
     [Params(100, 1_000, 10_000)]
@@ -25,6 +27,13 @@ public class LocalAggregationBenchmark
     public void GlobalSetUp()
     {
         DynamicSerializable.EnsureBuilt<SimpleSerializableStruct>();
+        _plan = PhysicalPlanBuilder.Column<int>(0).EqualsTo(Index).Build();
+    }
+    
+    [GlobalCleanup]
+    public void GlobalCleanup()
+    {
+        _plan.Dispose();
     }
     
     [IterationSetup]
@@ -139,6 +148,28 @@ public class LocalAggregationBenchmark
         var predicate = AstraTable<int, string, string, byte[], float>.Column1.EqualsLiteral(Index);
         var fetched = _newRegistry.Aggregate<SimpleSerializableStruct>(
             predicate.DumpMemory());
+        
+        foreach (var f in fetched)
+        {
+            ProfessionalTimeWaster(f.Value1);
+        }
+    }
+    
+    [Benchmark]
+    public void ManualDeserializationPlanned()
+    {
+        var fetched = _newRegistry.AggregateCompat<SimpleSerializableStruct>(ref _plan);
+        
+        foreach (var f in fetched)
+        {
+            ProfessionalTimeWaster(f.Value1);
+        }
+    }
+    
+    [Benchmark]
+    public void AutoDeserializationPlanned()
+    {
+        var fetched = _newRegistry.Aggregate<SimpleSerializableStruct>(ref _plan);
         
         foreach (var f in fetched)
         {

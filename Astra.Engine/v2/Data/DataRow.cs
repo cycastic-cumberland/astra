@@ -2,6 +2,8 @@ using System.Buffers;
 using System.IO.Hashing;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using Astra.TypeErasure;
+using Astra.TypeErasure.Data;
 
 namespace Astra.Engine.v2.Data;
 

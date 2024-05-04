@@ -387,7 +387,7 @@ public sealed partial class BTreeMap<TKey, TValue> where TKey : INumber<TKey>
         private static IEnumerable<KeyValuePair<TKey, TValue>> StackCollect(int depth, InternalNode node, 
             TKey leftBound, TKey rightBound, CollectionMode mode)
         {
-            using var stack = new LocalStack<StackCollectionTray>(depth);
+            using var stack = new ArrayStack<StackCollectionTray>(depth);
             stack.Push(new()
             {
                 Node = node,

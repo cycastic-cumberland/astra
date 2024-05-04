@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Collections;
+using System.Runtime.CompilerServices;
 using Astra.Collections.RangeDictionaries.BTree;
 using Astra.Common.Data;
 using Astra.Common.Protocols;
@@ -7,6 +8,8 @@ using Astra.Common.Serializable;
 using Astra.Common.StreamUtils;
 using Astra.Engine.Data;
 using Astra.Engine.v2.Indexers;
+using Astra.TypeErasure.Data;
+using Astra.TypeErasure.Planners;
 using Microsoft.Extensions.Logging;
 
 namespace Astra.Engine.v2.Data;
@@ -183,6 +186,8 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
     private readonly int _columnCount;
     private readonly int _indexedColumnCount;
 
+    internal BaseIndexer?[] Indexers => _indexers;
+
     public const int DefaultBinaryTreeDegree = 100;
     public int ColumnCount => _columnCount;
     public int IndexedColumnCount => _indexedColumnCount;
@@ -202,11 +207,15 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
         for (var i = 0; i < _tableSchema.Length; i++)
         {
             var specification = tableSpecification.Columns[i];
-            if (specification.Indexer.Type != IndexerType.None) 
+            bool isIndexed = false;
+            if (specification.Indexer.Type != IndexerType.None)
+            {
+                isIndexed = true;
                 indexed += 1;
+            }
             var shouldBeHashed = specification.ShouldBeHashed ?? specification.Indexer.Type != IndexerType.None;
             var schema = new ColumnSchema(specification.DataType.AstraDataType(),
-                specification.Name, shouldBeHashed, i, degree);
+                specification.Name, shouldBeHashed, isIndexed, i, degree);
             _tableSchema[i] = schema;
             _indexers[i] = specification.Indexer.Type switch
             {
@@ -286,11 +295,12 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
     
     private int Insert(Stream reader, ref readonly Writers writers)
     {
-        var rowCount = reader.ReadInt();
+        var flag = reader.ReadByte();
         var inserted = 0;
-        for (var i = 0; i < rowCount; i++)
+        while (flag != CommonProtocol.EndOfSetFlag && flag != -1)
         {
             _ = InsertOne(reader, in writers) ? ++inserted : 0;
+            flag = reader.ReadByte();
         }
         return inserted;
     }
@@ -302,6 +312,13 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
         using var readLock = AcquireReadLocks();
         var span = readLock.ReaderLocks;
         return predicateStream.LocalAggregate<T, BaseIndexer.Reader>(ref span);
+    }
+    
+    public PreparedLocalEnumerable<T> AggregateCompat<T>(ref readonly PhysicalPlan plan) where T : IAstraSerializable
+    {
+        using var readLock = AcquireReadLocks();
+        var span = readLock.ReaderLocks;
+        return plan.LocalAggregate<T, BaseIndexer.Reader>(ref span);
     }
     
     public PreparedLocalEnumerable<T> AggregateCompat<T>(ReadOnlyMemory<byte> predicateStream) where T : IAstraSerializable
@@ -325,6 +342,14 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
     {
         return new(AggregateCompat<FlexSerializable<T>>(predicateStream));
     }
+    
+    public WrappedEnumerable<T> Aggregate<T>(ref readonly PhysicalPlan plan)
+    {
+        return new(AggregateCompat<FlexSerializable<T>>(in plan));
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public WrappedEnumerable<T> Aggregate<T>(PhysicalPlan plan) => Aggregate<T>(ref plan);
     
     public WrappedEnumerable<T> Aggregate<T>(ReadOnlyMemory<byte> predicateStream)
     {
@@ -433,6 +458,11 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
     IEnumerable<T> IRegistry.Aggregate<T>(ReadOnlyMemory<byte> predicate)
     {
         return Aggregate<T>(predicate);
+    }
+    
+    IEnumerable<T> IRegistry.Aggregate<T>(PhysicalPlan plan)
+    {
+        return Aggregate<T>(plan);
     }
 
     IEnumerable<T> IRegistry.Aggregate<T>(Stream predicate)

@@ -1,5 +1,6 @@
 using Astra.Common.Data;
 using Astra.Engine.v2.Data;
+using Astra.TypeErasure.Planners;
 
 namespace Astra.Engine.v2.Indexers;
 
@@ -14,8 +15,12 @@ public class AutoIndexer() : BaseIndexer(null!)
     protected override IEnumerator<DataRow> GetEnumerator() => _data.GetEnumerator();
 
     protected override bool Contains(DataRow row) => _data.Contains(row);
+    protected override HashSet<DataRow>? Fetch(ref readonly OperationBlueprint blueprint)
+    {
+        throw new NotSupportedException();
+    }
 
-    protected override IEnumerable<DataRow>? Fetch(Stream predicateStream)
+    protected override HashSet<DataRow>? Fetch(Stream predicateStream)
     {
         throw new NotSupportedException();
     }
@@ -27,7 +32,7 @@ public class AutoIndexer() : BaseIndexer(null!)
 
     protected override bool Add(DataRow row) => _data.Add(row);
 
-    protected override HashSet<DataRow>? Remove(Stream predicateStream)
+    protected override IEnumerable<DataRow>? Remove(Stream predicateStream)
     {
         throw new NotSupportedException();
     }

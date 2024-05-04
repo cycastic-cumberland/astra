@@ -9,6 +9,7 @@ using Astra.Engine.Aggregator;
 using Astra.Engine.Indexers;
 using Astra.Engine.Resolvers;
 using Astra.Engine.Types;
+using Astra.TypeErasure.Planners;
 using Microsoft.Extensions.Logging;
 using Microsoft.IO;
 
@@ -589,6 +590,11 @@ public sealed class DataRegistry : IRegistry<DataRegistry>
         return new(this, predicateStream);
     }
 
+    public IEnumerable<T> Aggregate<T>(PhysicalPlan builder)
+    {
+        throw new NotSupportedException();
+    }
+
     IEnumerable<T> IRegistry.Aggregate<T>(Stream predicateStream)
     {
         return Aggregate<T>(predicateStream);
@@ -717,11 +723,12 @@ public sealed class DataRegistry : IRegistry<DataRegistry>
     
     private int Insert(Stream reader, AutoIndexer.WriteHandler autoIndexerLock, IndexersWriteLock writeLock)
     {
-        var rowCount = reader.ReadInt();
+        var flag = reader.ReadByte();
         var inserted = 0;
-        for (var i = 0; i < rowCount; i++)
+        while (flag != CommonProtocol.EndOfSetFlag)
         {
             _ = InsertOne(reader, autoIndexerLock, writeLock) ? ++inserted : 0;
+            flag = reader.ReadByte();
         }
         return inserted;
     }

@@ -1,4 +1,5 @@
 using Astra.Common.Data;
+using Astra.TypeErasure.Planners;
 using Microsoft.Extensions.Logging;
 
 namespace Astra.Engine;
@@ -14,6 +15,7 @@ public interface IRegistry : IDisposable
     public int Clear();
     public IEnumerable<T> Aggregate<T>(ReadOnlyMemory<byte> predicate);
     public IEnumerable<T> Aggregate<T>(Stream predicate);
+    public IEnumerable<T> Aggregate<T>(PhysicalPlan builder);
     public IEnumerator<T> GetEnumerator<T>();
     public void ConsumeStream<TIn, TOut>(TIn dataIn, TOut dataOut) where TIn : Stream where TOut : Stream;
 }

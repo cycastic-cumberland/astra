@@ -1,10 +1,12 @@
 using Astra.Collections.RangeDictionaries;
 using Astra.Collections.RangeDictionaries.BTree;
+using Astra.Common;
 using Astra.Common.Data;
 using Astra.Common.Protocols;
 using Astra.Common.StreamUtils;
-using Astra.Engine.Indexers;
 using Astra.Engine.v2.Data;
+using Astra.TypeErasure.Data;
+using Astra.TypeErasure.Planners;
 
 namespace Astra.Engine.v2.Indexers;
 
@@ -33,6 +35,12 @@ public class NumericIndexer : BaseIndexer
         _data.TryGetValue(cond, out var rows);
         return rows;
     }
+    
+    private HashSet<DataRow>? CollectExact(ref readonly OperationBlueprint blueprint)
+    {
+        _data.TryGetValue(blueprint.Cell1, out var rows);
+        return rows;
+    }
 
     protected override IEnumerator<DataRow> GetEnumerator()
     {
@@ -48,6 +56,20 @@ public class NumericIndexer : BaseIndexer
     protected override bool Contains(DataRow row)
     {
         return _data.TryGetValue(row.Span[Schema.Index], out var set) && set.Contains(row);
+    }
+
+    protected override IEnumerable<DataRow>? Fetch(ref readonly OperationBlueprint blueprint)
+    {
+        return blueprint.PredicateOperationType switch
+        {
+            Operation.Equal => CollectExact(in blueprint),
+            Operation.ClosedBetween => ClosedBetween(in blueprint),
+            Operation.GreaterThan => GreaterThan(in blueprint),
+            Operation.GreaterOrEqualsTo => GreaterThanOrEqualTo(in blueprint),
+            Operation.LesserThan => LessThan(in blueprint),
+            Operation.LesserOrEqualsTo => LessThanOrEqualTo(in blueprint),
+            _ => throw new OperationNotSupported($"Operation not supported: {blueprint.PredicateOperationType}")
+        };
     }
 
     protected override IEnumerable<DataRow>? Fetch(Stream predicateStream)
@@ -66,6 +88,11 @@ public class NumericIndexer : BaseIndexer
             }
         }
     }
+    
+    private IEnumerable<DataRow> ClosedBetween(ref readonly OperationBlueprint blueprint)
+    {
+        return ClosedBetween(blueprint.Cell1, blueprint.Cell2);
+    }
      
     private IEnumerable<DataRow> ClosedBetween(Stream predicateStream)
     {
@@ -74,7 +101,7 @@ public class NumericIndexer : BaseIndexer
         var right = DataCell.FromStream(Schema.Type.Value, predicateStream);
         return ClosedBetween(left, right);
     }
-    
+
     public IEnumerable<DataRow> GreaterThan(DataCell left)
     {
         foreach (var (_, set) in _data.CollectFrom(left, false))
@@ -84,6 +111,11 @@ public class NumericIndexer : BaseIndexer
                 yield return row;
             }
         }
+    }
+    
+    private IEnumerable<DataRow> GreaterThan(ref readonly OperationBlueprint blueprint)
+    {
+        return GreaterThan(blueprint.Cell1);
     }
     
     private IEnumerable<DataRow> GreaterThan(Stream predicateStream)
@@ -104,6 +136,11 @@ public class NumericIndexer : BaseIndexer
         }
     }
     
+    private IEnumerable<DataRow> GreaterThanOrEqualTo(ref readonly OperationBlueprint blueprint)
+    {
+        return GreaterThanOrEqualTo(blueprint.Cell1);
+    }
+    
     private IEnumerable<DataRow> GreaterThanOrEqualTo(Stream predicateStream)
     {
         predicateStream.CheckDataType(Schema.Type);
@@ -122,6 +159,11 @@ public class NumericIndexer : BaseIndexer
         }
     }
     
+    private IEnumerable<DataRow> LessThan(ref readonly OperationBlueprint blueprint)
+    {
+        return LessThan(blueprint.Cell1);
+    }
+    
     private IEnumerable<DataRow> LessThan(Stream predicateStream)
     {
         predicateStream.CheckDataType(Schema.Type);
@@ -138,6 +180,11 @@ public class NumericIndexer : BaseIndexer
                 yield return row;
             }
         }
+    }
+    
+    private IEnumerable<DataRow> LessThanOrEqualTo(ref readonly OperationBlueprint blueprint)
+    {
+        return LessThanOrEqualTo(blueprint.Cell1);
     }
     
     private IEnumerable<DataRow> LessThanOrEqualTo(Stream predicateStream)

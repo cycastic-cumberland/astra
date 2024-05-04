@@ -1,8 +1,12 @@
+using Astra.Common;
 using Astra.Common.Data;
 using Astra.Common.Protocols;
 using Astra.Common.StreamUtils;
 using Astra.Engine.Indexers;
 using Astra.Engine.v2.Data;
+using Astra.TypeErasure;
+using Astra.TypeErasure.Data;
+using Astra.TypeErasure.Planners;
 
 namespace Astra.Engine.v2.Indexers;
 
@@ -28,6 +32,12 @@ public class GenericIndexer(ColumnSchema schema) : BaseIndexer(schema)
         _data.TryGetValue(cond, out var rows);
         return rows;
     }
+    
+    private HashSet<DataRow>? CollectExact(ref readonly OperationBlueprint blueprint)
+    {
+        _data.TryGetValue(blueprint.Cell1, out var rows);
+        return rows;
+    }
 
     protected override IEnumerator<DataRow> GetEnumerator()
     {
@@ -44,14 +54,23 @@ public class GenericIndexer(ColumnSchema schema) : BaseIndexer(schema)
     {
         return _data.TryGetValue(row.Span[Schema.Index], out var set) && set.Contains(row);
     }
-    
-    protected override IEnumerable<DataRow>? Fetch(Stream predicateStream)
+
+    protected override HashSet<DataRow>? Fetch(ref readonly OperationBlueprint blueprint)
+    {
+        return blueprint.PredicateOperationType switch
+        {
+            Operation.Equal => CollectExact(in blueprint),
+            _ => throw new OperationNotSupported($"Operation not supported: {blueprint.PredicateOperationType}")
+        };
+    }
+
+    protected override HashSet<DataRow>? Fetch(Stream predicateStream)
     {
         var op = predicateStream.ReadUInt();
         return Fetch(op, predicateStream);
     }
 
-    protected override IEnumerable<DataRow>? Fetch(uint operation, Stream predicateStream)
+    protected override HashSet<DataRow>? Fetch(uint operation, Stream predicateStream)
     {
         return operation switch
         {

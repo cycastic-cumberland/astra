@@ -25,9 +25,9 @@ public interface IAggregatorStream
         var type = predicateStream.ReadUInt();
         var ret = type switch
         {
-            PredicateType.BinaryAndMask => new IntersectAggregator().ParseStream(predicateStream, indexersLock),
-            PredicateType.BinaryOrMask => new UnionAggregator().ParseStream(predicateStream, indexersLock),
-            PredicateType.UnaryMask => new UnaryAggregator().ParseStream(predicateStream, indexersLock),
+            QueryType.IntersectMask => new IntersectAggregator().ParseStream(predicateStream, indexersLock),
+            QueryType.UnionMask => new UnionAggregator().ParseStream(predicateStream, indexersLock),
+            QueryType.FilterMask => new UnaryAggregator().ParseStream(predicateStream, indexersLock),
             _ => throw new AggregateException($"Aggregator type not supported: {type}")
         };
 
@@ -215,7 +215,7 @@ public static class AstraAggregatorHelper
         var result = predicateStream.Aggregate(indexersLock);
         if (result == null)
         {
-            outStream.WriteValue(CommonProtocol.EndOfResultsSetFlag);
+            outStream.WriteValue(CommonProtocol.EndOfSetFlag);
             return;
         }
 
@@ -233,6 +233,6 @@ public static class AstraAggregatorHelper
                 });
             }
         }
-        outStream.WriteValue(CommonProtocol.EndOfResultsSetFlag);
+        outStream.WriteValue(CommonProtocol.EndOfSetFlag);
     }
 }

@@ -1,4 +1,6 @@
 using Astra.Engine.v2.Data;
+using Astra.TypeErasure;
+using Astra.TypeErasure.Data;
 
 namespace Astra.Tests.Misc;
 

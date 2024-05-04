@@ -11,7 +11,7 @@ public class StringColumn(int offset) : IAstraColumnQuery<string>
     {
         using var wrapped = LocalStreamWrapper.Create();
         var stream = wrapped.LocalStream;
-        stream.WriteValue(PredicateType.UnaryMask);
+        stream.WriteValue(QueryType.FilterMask);
         stream.WriteValue(offset);
         stream.WriteValue(Operation.Equal);
         stream.WriteValue(DataType.StringMask);
@@ -23,7 +23,7 @@ public class StringColumn(int offset) : IAstraColumnQuery<string>
     {
         using var wrapped = LocalStreamWrapper.Create();
         var stream = wrapped.LocalStream;
-        stream.WriteValue(PredicateType.UnaryMask);
+        stream.WriteValue(QueryType.FilterMask);
         stream.WriteValue(offset);
         stream.WriteValue(Operation.NotEqual);
         stream.WriteValue(DataType.StringMask);

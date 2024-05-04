@@ -14,6 +14,7 @@
     <ItemGroup>
       <ProjectReference Include="..\Astra.Collections\Astra.Collections.csproj" />
       <ProjectReference Include="..\Astra.Common\Astra.Common.csproj" />
+      <ProjectReference Include="..\Astra.TypeErasure\Astra.TypeErasure.csproj" />
     </ItemGroup>
 
     <ItemGroup>

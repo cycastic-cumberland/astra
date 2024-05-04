@@ -13,7 +13,7 @@ public abstract class NumericColumn<T>(int offset, uint mask) : IAstraColumnQuer
     {
         using var wrapped = LocalStreamWrapper.Create();
         var stream = wrapped.LocalStream;
-        stream.WriteValue(PredicateType.UnaryMask);
+        stream.WriteValue(QueryType.FilterMask);
         stream.WriteValue(offset);
         stream.WriteValue(Operation.Equal);
         stream.WriteValue(mask);
@@ -25,7 +25,7 @@ public abstract class NumericColumn<T>(int offset, uint mask) : IAstraColumnQuer
     {
         using var wrapped = LocalStreamWrapper.Create();
         var stream = wrapped.LocalStream;
-        stream.WriteValue(PredicateType.UnaryMask);
+        stream.WriteValue(QueryType.FilterMask);
         stream.WriteValue(offset);
         stream.WriteValue(Operation.NotEqual);
         stream.WriteValue(mask);
@@ -37,7 +37,7 @@ public abstract class NumericColumn<T>(int offset, uint mask) : IAstraColumnQuer
     {
         using var wrapped = LocalStreamWrapper.Create();
         var stream = wrapped.LocalStream;
-        stream.WriteValue(PredicateType.UnaryMask);
+        stream.WriteValue(QueryType.FilterMask);
         stream.WriteValue(offset);
         stream.WriteValue(Operation.ClosedBetween);
         stream.WriteValue(mask);
@@ -50,7 +50,7 @@ public abstract class NumericColumn<T>(int offset, uint mask) : IAstraColumnQuer
     {
         using var wrapped = LocalStreamWrapper.Create();
         var stream = wrapped.LocalStream;
-        stream.WriteValue(PredicateType.UnaryMask);
+        stream.WriteValue(QueryType.FilterMask);
         stream.WriteValue(offset);
         stream.WriteValue(Operation.GreaterThan);
         stream.WriteValue(mask);
@@ -62,7 +62,7 @@ public abstract class NumericColumn<T>(int offset, uint mask) : IAstraColumnQuer
     {
         using var wrapped = LocalStreamWrapper.Create();
         var stream = wrapped.LocalStream;
-        stream.WriteValue(PredicateType.UnaryMask);
+        stream.WriteValue(QueryType.FilterMask);
         stream.WriteValue(offset);
         stream.WriteValue(Operation.GreaterOrEqualsTo);
         stream.WriteValue(mask);
@@ -74,7 +74,7 @@ public abstract class NumericColumn<T>(int offset, uint mask) : IAstraColumnQuer
     {
         using var wrapped = LocalStreamWrapper.Create();
         var stream = wrapped.LocalStream;
-        stream.WriteValue(PredicateType.UnaryMask);
+        stream.WriteValue(QueryType.FilterMask);
         stream.WriteValue(offset);
         stream.WriteValue(Operation.LesserThan);
         stream.WriteValue(mask);
@@ -86,7 +86,7 @@ public abstract class NumericColumn<T>(int offset, uint mask) : IAstraColumnQuer
     {
         using var wrapped = LocalStreamWrapper.Create();
         var stream = wrapped.LocalStream;
-        stream.WriteValue(PredicateType.UnaryMask);
+        stream.WriteValue(QueryType.FilterMask);
         stream.WriteValue(offset);
         stream.WriteValue(Operation.LesserOrEqualsTo);
         stream.WriteValue(mask);

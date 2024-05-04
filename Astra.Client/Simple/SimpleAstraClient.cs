@@ -10,6 +10,7 @@ using Astra.Common.Hashes;
 using Astra.Common.Protocols;
 using Astra.Common.Serializable;
 using Astra.Common.StreamUtils;
+using Astra.TypeErasure.Planners;
 using Microsoft.IO;
 
 namespace Astra.Client.Simple;
@@ -253,6 +254,7 @@ public class SimpleAstraClient : IAstraClient
             var attemptResult = BitConverter.ToUInt32(outBuffer.Reader[..sizeof(uint)]);
             if (attemptResult != CommunicationProtocol.AllowedConnection)
                 throw new AuthenticationAttemptRejectedException();
+            networkClient.NoDelay = true;
             _client = new(networkClient, networkStream, false);
         }
         catch (Exception)
@@ -271,93 +273,46 @@ public class SimpleAstraClient : IAstraClient
         }
     }
     
-    public async Task<int> InsertSerializableAsync<T>(T value, CancellationToken cancellationToken = default) where T : IAstraSerializable
+    public Task<int> InsertSerializableAsync<T>(T value, CancellationToken cancellationToken = default) where T : IAstraSerializable
     {
-        var (client, clientStream, reversed) = _client ?? throw new NotConnectedException();
-        _inStream.Position = 0;
-        if (reversed)
-            value.SerializeStream(new ReverseStreamWrapper(_inStream));
-        else value.SerializeStream(new ForwardStreamWrapper(_inStream));
-        await clientStream.WriteValueAsync(InsertHeaderSize + _inStream.Position, cancellationToken);
-        await clientStream.WriteValueAsync(Command.CreateWriteHeader(1U), cancellationToken); // 1 command
-        await clientStream.WriteValueAsync(Command.UnsortedInsert, cancellationToken); // Command type (insert)
-        await clientStream.WriteValueAsync(1, cancellationToken); // 1 row
-        await clientStream.WriteAsync(new ReadOnlyMemory<byte>(_inStream.GetBuffer(),
-            0, (int)_inStream.Position), cancellationToken);
-//         var timer = Stopwatch.StartNew();
-//         while (client.Available < sizeof(long))
-//         {
-// #if DEBUG
-//                 await Task.Delay(100, cancellationToken);
-// #else
-//             Thread.Yield();
-// #endif
-//             if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
-//                 throw new TimeoutException();
-//         }
-//
-//         var outStreamSize = await clientStream.ReadLongAsync(cancellationToken);
-//         timer.Restart();
-//         while (client.Available < outStreamSize)
-//         {
-// #if DEBUG
-//                 await Task.Delay(100, cancellationToken);
-// #else
-//             Thread.Yield();
-// #endif
-//             if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
-//                 throw new TimeoutException();
-//         }
-//         _ = await clientStream.ReadAsync(_shortOutStream.AsMemory()[..(int)outStreamSize], cancellationToken);
-//         _shortOutStream.Position = 0;
-        var faulted = (byte)clientStream.ReadByte();
-        if (faulted != 0) throw new FaultedRequestException();
-        var inserted = clientStream.ReadInt();
-        return inserted;
+        return BulkInsertSerializableInternalAsync([value], cancellationToken);
+    }
+
+    private static void WriteInBulk<T, TStream>(IEnumerable<T> values, TStream stream) 
+        where T : IAstraSerializable
+        where TStream : IStreamWrapper
+    {
+        var flag = CommonProtocol.HasRow;
+        foreach (var value in values)
+        {
+            stream.SaveValue(flag);
+            flag = CommonProtocol.ChainedFlag;
+            value.SerializeStream(stream);
+        }
+        stream.SaveValue(CommonProtocol.EndOfSetFlag);
     }
 
     private async Task<int> BulkInsertSerializableInternalAsync<T>(IEnumerable<T> values,
         CancellationToken cancellationToken = default) where T : IAstraSerializable
     {
-        
-        var (client, clientStream, reversed) = _client ?? throw new NotConnectedException();
-        FlushStream(client, clientStream);
-        _inStream.Position = 0;
-        var count = 0;
-        if (reversed)
+        var (_, clientStream, reversed) = _client ?? throw new NotConnectedException();
+        using (var bufferedStream = new WriteForwardBufferedStream(clientStream))
         {
-            var wrapper = new ReverseStreamWrapper(_inStream);
-            foreach (var value in values)
+            await bufferedStream.WriteValueAsync(InsertHeaderSize + _inStream.Position, cancellationToken);
+            await bufferedStream.WriteValueAsync(Command.CreateWriteHeader(1U), cancellationToken); // 1 command
+            await bufferedStream.WriteValueAsync(Command.UnsortedInsert, cancellationToken); // Command type (insert)
+            if (reversed)
             {
-                value.SerializeStream(wrapper);
-                count++;
+                var wrapped = new ReverseStreamWrapper(bufferedStream);
+                WriteInBulk(values, wrapped);
             }
-        }
-        else
-        {
-            var wrapper = new ForwardStreamWrapper(_inStream);
-            foreach (var value in values)
+            else
             {
-                value.SerializeStream(wrapper);
-                count++;
+                var wrapped = new ForwardStreamWrapper(bufferedStream);
+                WriteInBulk(values, wrapped);
             }
+            bufferedStream.Flush();
         }
-
-        if (count == 0) return 0;
-
-        await clientStream.WriteValueAsync(InsertHeaderSize + _inStream.Position, cancellationToken);
-        await clientStream.WriteValueAsync(Command.CreateWriteHeader(1U), cancellationToken); // 1 command
-        await clientStream.WriteValueAsync(Command.UnsortedInsert, cancellationToken); // Command type (insert)
-        await clientStream.WriteValueAsync(count, cancellationToken); // `count` rows
-        await clientStream.WriteAsync(new ReadOnlyMemory<byte>(_inStream.GetBuffer(),
-            0, (int)_inStream.Position), cancellationToken);
-        // await client.WaitForData<TimeoutException>(sizeof(long), ConnectionSettings!.Value.Timeout);
-        //
-        // var outStreamSize = await clientStream.ReadLongAsync(cancellationToken);
-        // await client.WaitForData<TimeoutException>(outStreamSize, ConnectionSettings!.Value.Timeout);
-        //
-        // _ = await clientStream.ReadAsync(_shortOutStream.AsMemory()[..(int)outStreamSize], cancellationToken);
-        // _shortOutStream.Position = 0;
         var faulted = (byte)clientStream.ReadByte();
         if (faulted != 0) throw new FaultedRequestException();
         var inserted = clientStream.ReadInt();
@@ -386,11 +341,14 @@ public class SimpleAstraClient : IAstraClient
         CancellationToken cancellationToken = default)
     {
         var (_, clientStream, _) = _client ?? throw new NotConnectedException();
-        // FlushStream(client, clientStream);
-        await clientStream.WriteValueAsync(HeaderSize + predicateStream.Length, cancellationToken);
-        await clientStream.WriteValueAsync(Command.CreateReadHeader(1U), cancellationToken); // 1 command
-        await clientStream.WriteValueAsync(Command.UnsortedAggregate, cancellationToken); // Command type (aggregate)
-        await clientStream.WriteAsync(predicateStream, cancellationToken);
+        using (var bufferedStream = new WriteForwardBufferedStream(clientStream, 256))
+        {
+            await bufferedStream.WriteValueAsync(HeaderSize + predicateStream.Length, cancellationToken);
+            await bufferedStream.WriteValueAsync(Command.CreateReadHeader(1U), cancellationToken); // 1 command
+            await bufferedStream.WriteValueAsync(Command.UnsortedAggregate, cancellationToken); // Command type (aggregate)
+            await bufferedStream.WriteAsync(predicateStream, cancellationToken);
+            bufferedStream.Flush();
+        }
         // await client.WaitForData<TimeoutException>(sizeof(long), ConnectionSettings!.Value.Timeout, cancellationToken: cancellationToken);
         // var outStreamSize = await clientStream.ReadLongAsync(cancellationToken);
         // var outCluster = BytesCluster.Rent((int)outStreamSize);
@@ -436,6 +394,23 @@ public class SimpleAstraClient : IAstraClient
         return AggregateInternalAsync<T>(predicate.DumpMemory(), cancellationToken);
     }
     
+    public async ValueTask<DynamicResultsSet<T>> AggregateAsync<T>(PhysicalPlanBuilder builder,
+        CancellationToken cancellationToken = default)
+    {
+        var (_, clientStream, _) = _client ?? throw new NotConnectedException();
+        using (var bufferedStream = new WriteForwardBufferedStream(clientStream, 256))
+        {
+            await bufferedStream.WriteValueAsync(HeaderSize, cancellationToken);
+            await bufferedStream.WriteValueAsync(Command.CreateReadHeader(1U), cancellationToken); // 1 command
+            await bufferedStream.WriteValueAsync(Command.UnsortedAggregate, cancellationToken); // Command type (aggregate)
+            bufferedStream.Flush();
+        }
+        builder.ToStream(new ForwardStreamWrapper(clientStream));
+        var faulted = (byte)clientStream.ReadByte();
+        if (faulted != 0) throw new FaultedRequestException();
+        return new(this, ConnectionSettings!.Value.Timeout);
+    }
+    
     public ValueTask<ResultsSet<T>> AggregateCompatAsync<T, TPredicate>(TPredicate predicate,
         CancellationToken cancellationToken = default) 
         where T : IAstraSerializable
@@ -462,33 +437,6 @@ public class SimpleAstraClient : IAstraClient
         await clientStream.WriteValueAsync(HeaderSize, cancellationToken);
         await clientStream.WriteValueAsync(Command.CreateReadHeader(1U), cancellationToken); // 1 command
         await clientStream.WriteValueAsync(Command.CountAll, cancellationToken); // Command type (count all)
-//         var timer = Stopwatch.StartNew();
-//         while (client.Available < sizeof(long))
-//         {
-// #if DEBUG
-//                 await Task.Delay(100, cancellationToken);
-// #else
-//             Thread.Yield();
-// #endif
-//             if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
-//                 throw new TimeoutException();
-//         }
-//
-//         var outStreamSize = await clientStream.ReadLongAsync(cancellationToken);
-//         timer.Restart();
-//         while (client.Available < outStreamSize)
-//         {
-// #if DEBUG
-//                 await Task.Delay(100, cancellationToken);
-// #else
-//             Thread.Yield();
-// #endif
-//             if (timer.ElapsedMilliseconds > ConnectionSettings!.Value.Timeout)
-//                 throw new TimeoutException();
-//         }
-//         var outCluster = BytesCluster.Rent((int)outStreamSize);
-//         await clientStream.ReadExactlyAsync(outCluster.WriterMemory, cancellationToken);
-//         using var stream = outCluster.Promote();
         var faulted = (byte)clientStream.ReadByte();
         if (faulted != 0) throw new FaultedRequestException();
         return clientStream.ReadInt();

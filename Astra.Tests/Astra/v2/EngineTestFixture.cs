@@ -5,6 +5,7 @@ using Astra.Common.StreamUtils;
 using Astra.Engine.Data;
 using Astra.Engine.Data.Attributes;
 using Astra.Engine.v2.Data;
+using Astra.TypeErasure.Planners;
 using Microsoft.Extensions.Logging;
 
 namespace Astra.Tests.Astra.v2;
@@ -14,7 +15,7 @@ public class EngineTestFixture
 {
     public struct TinySerializableStruct : IAstraSerializable
     {
-        [Indexed(Indexer = IndexerType.Generic)]
+        [Indexed(Indexer = IndexerType.BTree)]
         public int Value1 { get; set; }
         [Indexed(Indexer = IndexerType.None)]
         public string Value2 { get; set; }
@@ -98,7 +99,7 @@ public class EngineTestFixture
             },
         ]);
         Assert.That(inserted, Is.EqualTo(2));
-        var deserialized = from o in _registry where o.Value1 == 2 select o;
+        var deserialized = from o in _registry where o.Value1 > 1 && o.Value1 < 3 select o;
         var pass = true;
         foreach (var row in deserialized)
         {
@@ -144,11 +145,12 @@ public class EngineTestFixture
         Assert.That(_typeErasedRegistry.RowsCount, Is.Zero);
         _typeErasedRegistry.BulkInsertCompat(data);
         Assert.That(_typeErasedRegistry.RowsCount, Is.EqualTo(data.Length));
-        var predicate = AstraTable<int, string, string>.Column1.EqualsLiteral(1);
+        using var plan = PhysicalPlanBuilder.Column<int>(0).GreaterThan(0)
+            .And(PhysicalPlanBuilder.Column<int>(0).LessThan(2)).Build();
+        ref readonly var planRef = ref plan;
         {
             var count = 0;
-            var fetched = _typeErasedRegistry.AggregateCompat<TinySerializableStruct>(
-                predicate.DumpMemory());
+            var fetched = _typeErasedRegistry.AggregateCompat<TinySerializableStruct>(in planRef);
             foreach (var f in fetched)
             {
                 count += 1;
@@ -159,8 +161,7 @@ public class EngineTestFixture
         }
         {
             var count = 0;
-            var fetched = _typeErasedRegistry.Aggregate<TinySerializableStruct>(
-                predicate.DumpMemory());
+            var fetched = _typeErasedRegistry.Aggregate<TinySerializableStruct>(in planRef);
             foreach (var f in fetched)
             {
                 count += 1;

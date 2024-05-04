@@ -222,6 +222,8 @@ public class TcpServer : IDisposable
     {
         var cancellationToken = _cancellationTokenSource.Token;
         var stream = client.GetStream();
+        client.NoDelay = true;
+        using var bufferedStream = new WriteForwardBufferedStream(stream);
         var stopwatch = new Stopwatch();
         var threshold = (long)sizeof(long);
         var waiting = true;
@@ -261,7 +263,7 @@ public class TcpServer : IDisposable
             stopwatch.Start();
             try
             {
-                _registry.ConsumeStream(stream, stream);
+                _registry.ConsumeStream(stream, bufferedStream);
             }
             catch (Exception e)
             {
@@ -273,6 +275,7 @@ public class TcpServer : IDisposable
             {
                 stopwatch.Stop();
                 _logger.LogDebug("Request resolved after {} us", stopwatch.Elapsed.TotalMicroseconds);
+                bufferedStream.Flush();
                 stopwatch.Reset();
             }
             threshold = sizeof(long);

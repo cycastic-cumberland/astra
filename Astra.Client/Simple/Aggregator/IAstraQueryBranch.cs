@@ -25,7 +25,7 @@ public readonly struct GenericAstraQueryBranch(ReadOnlyMemory<byte> bytes) : IAs
     public GenericAstraQueryBranch And(GenericAstraQueryBranch other)
     {
         using var stream = MemoryStreamPool.Allocate();
-        stream.WriteValue(PredicateType.BinaryAndMask);
+        stream.WriteValue(QueryType.IntersectMask);
         stream.Write(Dump());
         stream.Write(other.Dump());
         return new(stream.GetBuffer()[..(int)stream.Length]);
@@ -34,7 +34,7 @@ public readonly struct GenericAstraQueryBranch(ReadOnlyMemory<byte> bytes) : IAs
     public GenericAstraQueryBranch Or(GenericAstraQueryBranch other)
     {
         using var stream = MemoryStreamPool.Allocate();
-        stream.WriteValue(PredicateType.BinaryOrMask);
+        stream.WriteValue(QueryType.UnionMask);
         stream.Write(Dump());
         stream.Write(other.Dump());
         return new(stream.GetBuffer()[..(int)stream.Length]);

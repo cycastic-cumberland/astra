@@ -4,14 +4,14 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Astra.Collections;
 
-public struct LocalStack<T> : IDisposable, ICollection<T>, IReadOnlyCollection<T>
+public struct ArrayStack<T> : IDisposable, ICollection<T>, IReadOnlyCollection<T>
 {
     private readonly T[] _realArray;
     private readonly Memory<T> _memory;
     private Span<T> Span => _memory.Span;
     private int _cursor;
 
-    public LocalStack(int capacity)
+    public ArrayStack(int capacity)
     {
         _realArray = capacity <= 0 ? Array.Empty<T>() : ArrayPool<T>.Shared.Rent(capacity);
         _memory = new(_realArray, 0, capacity);

@@ -4,6 +4,7 @@ using Astra.Client.Simple.Aggregator;
 using Astra.Common.Data;
 using Astra.Server;
 using Astra.Server.Authentication;
+using Astra.TypeErasure.Planners;
 
 namespace Astra.Tests.Astra.v2;
 
@@ -131,8 +132,9 @@ public class AggregationTestFixture
                 Value4 = [1, 2, 3, 4]
             },
         });
-        using (var fetch1 = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
-                   AstraTable<int, string, string, byte[], float>.Column1.EqualsLiteral(2)))
+        Thread.Sleep(500);
+        using (var fetch1 = 
+               await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(PhysicalPlanBuilder.Column<int>(0).EqualsTo(2)))
         {
             var count1 = 0;
             foreach (var f in fetch1)
@@ -214,6 +216,7 @@ public class AggregationTestFixture
                 Value5 = -1.2f
             },
         });
+        Thread.Sleep(500);
         
         Assert.That(await _simpleAstraClient.CountAllAsync(), Is.EqualTo(5));
 

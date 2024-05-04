@@ -5,22 +5,22 @@ using System.IO.Hashing;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Astra.Collections;
+using Astra.Common;
 using Astra.Common.Data;
 using Astra.Common.Hashes;
 using Astra.Common.StreamUtils;
 
-namespace Astra.Engine.v2.Data;
+namespace Astra.TypeErasure.Data;
 
-[StructLayout(LayoutKind.Explicit)]
+[StructLayout(LayoutKind.Explicit, Size = 24)]
 [DebuggerDisplay("Value = {Value}, Type = {TypeString}")]
 public readonly struct DataCell : INumber<DataCell>
 {
     public static readonly DataCell MinValue = new(double.MinValue);
-    public static readonly DataCell MaxValue = new(double.MinValue);
+    public static readonly DataCell MaxValue = new(double.MaxValue);
     private static class CellTypes
     {
-        public const byte Byte      = 0;
-        public const byte Char      = 1;
+        public const byte Unset     = 0;
         public const byte DWord     = 2;
         public const byte QWord     = 3;
         public const byte Single    = 4;
@@ -31,10 +31,6 @@ public readonly struct DataCell : INumber<DataCell>
     
     [FieldOffset(0)] 
     public readonly byte CellType;
-    [FieldOffset(8)]
-    public readonly byte Byte;
-    [FieldOffset(8)]
-    public readonly char Char;
     [FieldOffset(8)]
     public readonly int DWord;
     [FieldOffset(8)]
@@ -51,6 +47,7 @@ public readonly struct DataCell : INumber<DataCell>
     
     public object Value => CellType switch
     {
+        CellTypes.Unset => unchecked((nuint)QWord),
         CellTypes.DWord => DWord,
         CellTypes.QWord => QWord,
         CellTypes.Single => Single,
@@ -60,18 +57,24 @@ public readonly struct DataCell : INumber<DataCell>
         _ => throw new ArgumentOutOfRangeException()
     };
 
-    public DataCell(byte value) 
-    {
-        Pointer = null!;
-        Byte = value;
-        CellType = CellTypes.Byte;
-    }
+    public DataType DataType => CellTypeToAstraDataType(CellType);
     
-    public DataCell(char value) 
+    public static DataType CellTypeToAstraDataType(byte cellType) => cellType switch
     {
-        Pointer = null!;
-        Char = value;
-        CellType = CellTypes.Char;
+        CellTypes.DWord => DataType.DWord,
+        CellTypes.QWord => DataType.QWord,
+        CellTypes.Single => DataType.Single,
+        CellTypes.Double => DataType.Double,
+        CellTypes.Text => DataType.String,
+        CellTypes.Bytes => DataType.Bytes,
+        _ => throw new ArgumentOutOfRangeException()
+    };
+
+    public DataCell(byte type, long raw, object? pointer)
+    {
+        CellType = type;
+        QWord = raw;
+        Pointer = pointer!;
     }
     
     public DataCell(int value) 
@@ -118,8 +121,6 @@ public readonly struct DataCell : INumber<DataCell>
     {
         return CellType switch
         {
-            CellTypes.Byte => Byte.ToString(),
-            CellTypes.Char => new(Char, 1),
             CellTypes.DWord => DWord.ToString(),
             CellTypes.QWord => QWord.ToString(),
             CellTypes.Single => Single.ToString(CultureInfo.InvariantCulture),
@@ -137,8 +138,33 @@ public readonly struct DataCell : INumber<DataCell>
 
     public bool TryFormat(Span<char> destination, out int charsWritten, ReadOnlySpan<char> format, IFormatProvider? provider)
     {
-        charsWritten = 0;
-        return false;
+        switch (CellType)
+        {
+            case CellTypes.DWord:
+                return DWord.TryFormat(destination, out charsWritten, format, provider);
+            case CellTypes.QWord:
+                return QWord.TryFormat(destination, out charsWritten, format, provider);
+            case CellTypes.Single:
+                return Single.TryFormat(destination, out charsWritten, format, provider);
+            case CellTypes.Double:
+                return Double.TryFormat(destination, out charsWritten, format, provider);
+            case CellTypes.Text:
+            {
+                var str = (string)Pointer;
+                str.CopyTo(destination);
+                charsWritten = str.Length;
+                return true;
+            }
+            case CellTypes.Bytes:
+            {
+                var str = Pointer.ToString();
+                str!.CopyTo(destination);
+                charsWritten = str.Length;
+                return true;
+            }
+            default:
+                throw new NotSupportedException($"Unsupported type: {CellType}");
+        }
     }
 
     public int CompareTo(object? obj)
@@ -342,10 +368,10 @@ public readonly struct DataCell : INumber<DataCell>
     {
         return CellType switch
         {
-            CellTypes.DWord => HashCode.Combine(CellType, DWord),
-            CellTypes.QWord => HashCode.Combine(CellType, QWord),
-            CellTypes.Single => HashCode.Combine(CellType, Single),
-            CellTypes.Double => HashCode.Combine(CellType, Double),
+            CellTypes.DWord => ((double)DWord).GetHashCode(),
+            CellTypes.QWord => ((double)QWord).GetHashCode(),
+            CellTypes.Single => ((double)Single).GetHashCode(),
+            CellTypes.Double => Double.GetHashCode(),
             CellTypes.Text => HashCode.Combine(CellType, (string)Pointer),
             CellTypes.Bytes => HashCode.Combine(CellType, XxHash32.HashToUInt32((byte[])Pointer)),
             _ => throw new UnreachableException($"Unsupported cell type: {CellType}")
@@ -411,6 +437,35 @@ public readonly struct DataCell : INumber<DataCell>
             }
         }
     }
+    
+    public void Write<T>(ref readonly T stream) where T : IStreamWrapper
+    {
+        switch (CellType)
+        {
+            case CellTypes.DWord:
+                stream.SaveValue(DWord);
+                return;
+            case CellTypes.QWord:
+                stream.SaveValue(QWord);
+                return;
+            case CellTypes.Single:
+                stream.SaveValue(Single);
+                return;
+            case CellTypes.Double:
+                stream.SaveValue(Double);
+                return;
+            case CellTypes.Text:
+            {
+                stream.SaveValue((string)Pointer);
+                return;
+            }
+            case CellTypes.Bytes:
+            {
+                stream.SaveValue((byte[])Pointer);
+                return;
+            }
+        }
+    }
 
     public static bool operator ==(DataCell left, DataCell right)
     {
@@ -442,7 +497,7 @@ public readonly struct DataCell : INumber<DataCell>
                 throw new NotSupportedException($"Unsupported type: {typeCode}");
         }
     }
-
+    
     public static DataCell Parse(string s, IFormatProvider? provider)
     {
         return Parse(s.AsSpan(), provider);
@@ -1121,7 +1176,7 @@ public readonly struct DataCell : INumber<DataCell>
         return Parse(s, provider);
     }
 
-    public static bool TryConvertFromChecked<TOther>(TOther value, out DataCell result) where TOther : INumberBase<TOther>
+    public static bool TryCreate<TOther>(TOther value, out DataCell result)
     {
         switch (Type.GetTypeCode(typeof(TOther)))
         {
@@ -1149,6 +1204,11 @@ public readonly struct DataCell : INumber<DataCell>
                 result = new();
                 return false;
         }
+    }
+    
+    public static bool TryConvertFromChecked<TOther>(TOther value, out DataCell result) where TOther : INumberBase<TOther>
+    {
+        return TryCreate(value, out result);
     }
 
     public static bool TryConvertFromSaturating<TOther>(TOther value, out DataCell result) where TOther : INumberBase<TOther>
