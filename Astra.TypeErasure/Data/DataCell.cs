@@ -12,7 +12,7 @@ using Astra.Common.StreamUtils;
 
 namespace Astra.TypeErasure.Data;
 
-[StructLayout(LayoutKind.Explicit, Size = 24)]
+[StructLayout(LayoutKind.Explicit)]
 [DebuggerDisplay("Value = {Value}, Type = {TypeString}")]
 public readonly struct DataCell : INumber<DataCell>
 {
@@ -151,15 +151,26 @@ public readonly struct DataCell : INumber<DataCell>
             case CellTypes.Text:
             {
                 var str = (string)Pointer;
-                str.CopyTo(destination);
+                if (destination.Length < str.Length)
+                {
+                    charsWritten = 0;
+                    return false;
+                }
                 charsWritten = str.Length;
+                str.AsSpan().CopyTo(destination);
                 return true;
             }
             case CellTypes.Bytes:
             {
-                var str = Pointer.ToString();
-                str!.CopyTo(destination);
-                charsWritten = str.Length;
+                var bytes = (byte[])Pointer;
+                if (destination.Length < bytes.Length * 2)
+                {
+                    charsWritten = 0;
+                    return false;
+                }
+
+                ((ReadOnlySpan<byte>)bytes).ToHexStringUpper(destination);
+                charsWritten = bytes.Length * 2;
                 return true;
             }
             default:

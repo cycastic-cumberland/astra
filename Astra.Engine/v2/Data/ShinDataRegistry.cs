@@ -179,7 +179,7 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
     }
 
     private readonly ILogger<ShinDataRegistry> _logger;
-    private readonly ColumnSchema[] _tableSchema;
+    private readonly DatastoreContext _context;
     private readonly BaseIndexer?[] _indexers;
     private readonly AutoIndexer _autoIndexer;
     private readonly RWLock _globalLock = RWLock.Create();
@@ -199,12 +199,12 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
         _autoIndexer = new();
         loggerFactory ??= LoggerFactory.Create(_ => { });
         _logger = loggerFactory.CreateLogger<ShinDataRegistry>();
-        _tableSchema = new ColumnSchema[tableSpecification.Columns.Length];
-        _indexers = new BaseIndexer[_tableSchema.Length];
+        _context = new(new ColumnSchema[tableSpecification.Columns.Length]);
+        _indexers = new BaseIndexer[_context.TableSchema.Length];
         var degree = tableSpecification.BinaryTreeDegree < BTreeMap.MinDegree
             ? DefaultBinaryTreeDegree
             : tableSpecification.BinaryTreeDegree;
-        for (var i = 0; i < _tableSchema.Length; i++)
+        for (var i = 0; i < _context.TableSchema.Length; i++)
         {
             var specification = tableSpecification.Columns[i];
             bool isIndexed = false;
@@ -216,7 +216,7 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
             var shouldBeHashed = specification.ShouldBeHashed ?? specification.Indexer.Type != IndexerType.None;
             var schema = new ColumnSchema(specification.DataType.AstraDataType(),
                 specification.Name, shouldBeHashed, isIndexed, i, degree);
-            _tableSchema[i] = schema;
+            _context.TableSchema[i] = schema;
             _indexers[i] = specification.Indexer.Type switch
             {
                 IndexerType.None => null,
@@ -266,7 +266,7 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
 
     private bool InsertOne(Stream reader, ref readonly Writers writers)
     {
-        var row = DataRow.Deserialize(_tableSchema, reader);
+        var row = DataRow.Deserialize(_context, reader);
         try
         {
             if (!writers.AutoIndexerLock.Add(row))
@@ -503,7 +503,7 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
         {
             case Command.UnsortedAggregate:
             {
-                OutputLayout(dataOut, _tableSchema);
+                OutputLayout(dataOut,  _context.TableSchema);
                 dataIn.Aggregate(dataOut, ref span);
                 break;
             }
@@ -516,6 +516,13 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
             {
                 var count = ConditionalCount(dataIn, ref span);
                 dataOut.WriteValue(count);
+                break;
+            }
+            case Command.ReversedPlanAggregate:
+            {
+                var plan = new ReversedPhysicalPlanEnumerable(dataIn,  _context.TableSchema);
+                OutputLayout(dataOut, _context.TableSchema);
+                plan.Aggregate(dataOut, ref span);
                 break;
             }
             case Command.UnsortedInsert:
@@ -535,7 +542,7 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
         {
             case Command.UnsortedAggregate:
             {
-                OutputLayout(dataOut, _tableSchema);
+                OutputLayout(dataOut,  _context.TableSchema);
                 dataIn.Aggregate(dataOut, ref span);
                 break;
             }
@@ -566,6 +573,13 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
             {
                 var deleted = Clear(in locksRef);
                 dataOut.WriteValue(deleted);
+                break;
+            }
+            case Command.ReversedPlanAggregate:
+            {
+                var plan = new ReversedPhysicalPlanEnumerable(dataIn,  _context.TableSchema);
+                OutputLayout(dataOut,  _context.TableSchema);
+                plan.Aggregate(dataOut, ref span);
                 break;
             }
             default:

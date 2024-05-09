@@ -6,7 +6,7 @@ using Astra.TypeErasure.Data;
 
 namespace Astra.TypeErasure.Planners;
 
-[StructLayout(LayoutKind.Explicit, Size = 40)]
+[StructLayout(LayoutKind.Explicit)]
 public struct OperationBlueprint
 {
     [FieldOffset(0)] 

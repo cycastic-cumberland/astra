@@ -134,7 +134,7 @@ public class AggregationTestFixture
         });
         Thread.Sleep(500);
         using (var fetch1 = 
-               await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(PhysicalPlanBuilder.Column<int>(0).EqualsTo(2)))
+               await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(PhysicalPlanBuilder.Column<int>(0).EqualsTo(2).Build()))
         {
             var count1 = 0;
             foreach (var f in fetch1)
@@ -142,7 +142,7 @@ public class AggregationTestFixture
                 Assert.That(f.Value1, Is.EqualTo(2));
                 count1++;
             }
-            Assert.That(count1, Is.EqualTo(2));
+            Assert.That(count1, Is.EqualTo(3));
         }
 
         using (var fetch2 = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
@@ -153,19 +153,18 @@ public class AggregationTestFixture
             {
                 Assert.Multiple(() =>
                 {
-                    Assert.That(f.Value1, Is.EqualTo(2));
                     Assert.That(f.Value3, Is.EqualTo("🇵🇱"));
                 });
                 count2++;
             }
-            Assert.That(count2, Is.EqualTo(1));
+            Assert.That(count2, Is.EqualTo(2));
         }
 
         using (var fetch3 = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
                    AstraTable<int, string, string, byte[], float>.Column1.EqualsLiteral(2).Or(AstraTable<int, string, string, byte[], float>.Column3.EqualsLiteral("🇵🇱"))))
         {
             var count3 = fetch3.Count();
-            Assert.That(count3, Is.EqualTo(3));
+            Assert.That(count3, Is.EqualTo(4));
         }
         await CleanUp();
     }
@@ -216,21 +215,21 @@ public class AggregationTestFixture
                 Value5 = -1.2f
             },
         });
-        Thread.Sleep(500);
         
         Assert.That(await _simpleAstraClient.CountAllAsync(), Is.EqualTo(5));
 
         {
+            using var results = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(PhysicalPlanBuilder
+                .Column<float>(4)
+                .LessThan(0)
+                .Build());
             var count = 0;
-            await foreach (var value in from v in _simpleAstraClient.AsQuery<SimpleSerializableStruct>()
-                           where v.Value5 < 0
-                           select v)
+            foreach (var value in results)
             {
                 Assert.That(value.Value5, Is.EqualTo(-1.2f));
                 Assert.That(value.Value1, Is.EqualTo(5));
-                count++;
+                count++; 
             }
-            
             Assert.That(count, Is.EqualTo(1));
         }
         

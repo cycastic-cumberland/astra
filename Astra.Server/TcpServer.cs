@@ -300,6 +300,10 @@ public class TcpServer : IDisposable
             await stream.WriteValueAsync(1, cancellationToken);
             await stream.WriteValueAsync(CommunicationProtocol.ServerIdentification, cancellationToken);
             await stream.WriteValueAsync(CommonProtocol.AstraCommonVersion, token: cancellationToken);
+            if (_registry is ShinDataRegistry)
+                await stream.WriteValueAsync(CommonProtocol.ConnectionFlags.UseV2, token: cancellationToken);
+            else
+                await stream.WriteValueAsync(CommonProtocol.ConnectionFlags.None, token: cancellationToken);
             var timer = Stopwatch.StartNew();
             while (client.Available < sizeof(ulong))
             {

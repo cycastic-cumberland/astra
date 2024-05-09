@@ -1,13 +1,13 @@
+using System.Runtime.CompilerServices;
+
 namespace Astra.Common.Hashes;
 
 public static class HexHelper
 {
     private const string HexDigitsUpper = "0123456789ABCDEF";
     private const string HexDigitsLower = "0123456789abcdef";
-    public static string ToHexStringUpper(this ReadOnlySpan<byte> span)
+    public static string ToHexStringUpper(this ReadOnlySpan<byte> span, Span<char> target)
     {
-        // Use stack memory to store the buffer, which is faster but increase the chance of stack overflow
-        Span<char> target = stackalloc char[span.Length * 2];
         var i = 0;
         foreach (var b in span)
         {
@@ -18,6 +18,10 @@ public static class HexHelper
         }
         return new string(target);
     }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static string ToHexStringUpper(this ReadOnlySpan<byte> span) =>
+        span.ToHexStringUpper(stackalloc char[span.Length * 2]);
     public static string ToHexStringUpperSeparated(this ReadOnlySpan<byte> span, char separator = '.')
     {
         Span<char> target = stackalloc char[span.Length * 2 + span.Length - 1];

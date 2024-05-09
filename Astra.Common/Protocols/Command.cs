@@ -15,6 +15,7 @@ public static class Command
     public const uint CountAll = 5U;
     public const uint ConditionalCount = 6U;
     public const uint Clear = 7U;
+    public const uint ReversedPlanAggregate = 8U;
 
     private const uint WriteModeMask = 1U << 31;
     private const uint CommandCountMask = ~WriteModeMask;

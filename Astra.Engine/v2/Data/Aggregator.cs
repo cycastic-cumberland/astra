@@ -173,6 +173,53 @@ public static class Aggregator
         stack.Add(frame with {Rhs = target, RhsSet = true});
     }
 
+    private static void ApplyBlueprint<T>(ref readonly OperationBlueprint blueprint, 
+        ref readonly Span<T?> readers,
+        ref bool lSet,
+        ref IEnumerable<DataRow>? lhs, ref IEnumerable<DataRow>? rhs)
+        where T : struct, BaseIndexer.IReadable
+    {
+        switch (blueprint.QueryOperationType)
+        {
+            case QueryType.IntersectMask:
+            {
+                var results = IntersectSelect(lhs, rhs);
+                lhs = results;
+                rhs = null;
+                lSet = true;
+                break;
+            }
+            case QueryType.UnionMask:
+            {
+                var results = UnionSelect(lhs, rhs);
+                lhs = results;
+                rhs = null;
+                lSet = true;
+                break;
+            }
+            case QueryType.FilterMask:
+            {
+                var results = blueprint.Offset switch
+                {
+                    < 0 => null,
+                    _ => readers[blueprint.Offset]?.Fetch(in blueprint)
+                };
+                if (lSet)
+                {
+                    rhs = results;
+                }
+                else
+                {
+                    lhs = results;
+                    lSet = true;
+                }
+                break;
+            }
+            default:
+                throw new AggregateException($"Aggregator type not supported: {blueprint.QueryOperationType}");
+        }
+    }
+
     public static IEnumerable<DataRow>? Aggregate<T>(Stream predicateStream, ref readonly Span<T?> readers)
         where T : struct, BaseIndexer.IReadable
     { 
@@ -259,47 +306,23 @@ public static class Aggregator
         for (var i = blueprints.Length - 1; i >= 0; i--)
         {
             ref readonly var blueprint = ref blueprints[i];
-            switch (blueprint.QueryOperationType)
-            {
-                case QueryType.IntersectMask:
-                {
-                    var results = IntersectSelect(lhs, rhs);
-                    lhs = results;
-                    rhs = null;
-                    lSet = true;
-                    break;
-                }
-                case QueryType.UnionMask:
-                {
-                    var results = UnionSelect(lhs, rhs);
-                    lhs = results;
-                    rhs = null;
-                    lSet = true;
-                    break;
-                }
-                case QueryType.FilterMask:
-                {
-                    var results = blueprint.Offset switch
-                    {
-                        < 0 => null,
-                        >= 0 => readers[blueprint.Offset]?.Fetch(in blueprint)
-                    };
-                    if (lSet)
-                    {
-                        rhs = results;
-                    }
-                    else
-                    {
-                        lhs = results;
-                        lSet = true;
-                    }
-                    break;
-                }
-                default:
-                    throw new AggregateException($"Aggregator type not supported: {blueprint.QueryOperationType}");
-            }
+            ApplyBlueprint(in blueprint, in readers, ref lSet, ref lhs, ref rhs);
         }
 
+        return lhs;
+    }
+    
+    public static IEnumerable<DataRow>? ApplyPhysicalPlan<T>(ReversedPhysicalPlanEnumerable enumerable,
+        ref readonly Span<T?> readers) where T : struct, BaseIndexer.IReadable
+    {
+        var lSet = false;
+        IEnumerable<DataRow>? lhs = null;
+        IEnumerable<DataRow>? rhs = null;
+        foreach (var blueprint in enumerable)
+        {
+            ref readonly var blueprintRef = ref blueprint;
+            ApplyBlueprint(in blueprintRef, in readers, ref lSet, ref lhs, ref rhs);
+        }
         return lhs;
     }
 }
@@ -408,7 +431,27 @@ public static class AggregatorHelper
     public static void Aggregate<T>(this Stream predicateStream, Stream outStream, ref readonly Span<T?> readers)
         where T : struct, BaseIndexer.IReadable
     {
-        var result = predicateStream.Aggregate(in readers);
+        var result = Aggregator.Aggregate(predicateStream, in readers);
+        if (result == null)
+        {
+            outStream.WriteValue(CommonProtocol.EndOfSetFlag);
+            return;
+        }
+        var flag = CommonProtocol.HasRow;
+        foreach (var row in result)
+        {
+            outStream.WriteValue(flag);
+            flag = CommonProtocol.ChainedFlag;
+            row.Serialize(outStream);
+        }
+        outStream.WriteValue(CommonProtocol.EndOfSetFlag);
+    }
+    
+    public static void Aggregate<T>(this ReversedPhysicalPlanEnumerable enumerable, Stream outStream, 
+        ref readonly Span<T?> readers)
+        where T : struct, BaseIndexer.IReadable
+    {
+        var result = Aggregator.ApplyPhysicalPlan(enumerable, in readers);
         if (result == null)
         {
             outStream.WriteValue(CommonProtocol.EndOfSetFlag);

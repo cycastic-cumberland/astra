@@ -152,12 +152,12 @@ public struct PhysicalPlanBuilder
         return new(blueprints, length, Affected);
     }
 
-    public void ToStream<T>(T stream) where T : IStreamWrapper
+    public void ToStream<T>(T stream, bool reversed = false) where T : IStreamWrapper
     {
         Blueprints.Consume(out var blueprints, out var length);
         try
         {
-            PhysicalPlan.ToStream(new(blueprints, 0, length), stream);
+            PhysicalPlan.ToStream(new(blueprints, 0, length), stream, reversed);
         }
         finally
         {

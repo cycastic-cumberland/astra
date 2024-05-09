@@ -13,20 +13,14 @@ public class WriteForwardBufferedStream : Stream
     
     private readonly Stream _targetStream;
 
-    public WriteForwardBufferedStream(Stream targetStream, int bufferSize = 
-#if DEBUG
-        128
-#else
-        1024
-#endif
-    )
+    public WriteForwardBufferedStream(Stream targetStream, int bufferSize = 1024)
     {
         _buffer = ArrayPool<byte>.Shared.Rent(bufferSize);
         _targetStream = targetStream;
     }
     public override void Flush()
     {
-        _targetStream.Write(Buffer[.._index]);
+        _targetStream.Write(Buffer);
         _index = 0;
     }
 
@@ -65,7 +59,7 @@ public class WriteForwardBufferedStream : Stream
             else
             {
                 chunkSize = remaining;
-                buffer[..chunkSize].CopyTo(new(_buffer, _index, chunkSize));
+                buffer.CopyTo(new(_buffer, _index, chunkSize));
             }
             _index += chunkSize;
             remaining -= chunkSize;

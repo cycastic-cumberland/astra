@@ -4,6 +4,7 @@ namespace Astra.Common.StreamUtils;
 
 public readonly struct ForwardStreamWrapper(Stream stream) : IStreamWrapper
 {
+    private Stream Debug => stream;
     public void SaveValue(byte value)
     {
         stream.WriteValue(value);

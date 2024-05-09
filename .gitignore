@@ -6,4 +6,5 @@ riderModule.iml
 .idea/
 .vs/
 Astra.Experiments/
+BenchmarkDotNet.Artifacts/
 *.DotSettings.user

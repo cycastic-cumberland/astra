@@ -70,58 +70,23 @@ public readonly struct PhysicalPlan : IDisposable
             }
         }
     }
-    
-    public static PhysicalPlan CreatePlan(ColumnSchema[] tableSchema, Stream query)
+
+    public void ToStream<T>(T stream, bool reversed = false) where T : IStreamWrapper
     {
-        var affected = new SortedSet<int>();
-        using var blueprintList = new ArrayList<OperationBlueprint>();
-        var stuff = 1;
-        while (stuff > 0)
-        {
-            var type = query.ReadUInt();
-            switch (type)
-            {
-                // case QueryType.EndOfQuery:
-                //     goto outOfLoop;
-                case QueryType.IntersectMask:
-                {
-                    stuff += 2;
-                    blueprintList.Add(new OperationBlueprint
-                    {
-                        QueryOperationType = QueryType.IntersectMask
-                    });
-                    break;
-                }
-                case QueryType.UnionMask:
-                {
-                    stuff += 2;
-                    blueprintList.Add(new OperationBlueprint
-                    {
-                        QueryOperationType = QueryType.UnionMask
-                    });
-                    break;
-                }
-                case QueryType.FilterMask:
-                {
-                    stuff -= 1;
-                    var blueprint = new OperationBlueprint();
-                    ResolveFilterOperation(ref blueprint, affected, tableSchema, query);
-                    blueprintList.Add(blueprint);
-                    break;
-                }
-                default:
-                    throw new AggregateException($"Operation type type not supported: {type}");
-            }
-        }
-
-        // outOfLoop: 
-        blueprintList.Consume(out var blueprints, out var blueprintLength);
-        return new(blueprints, blueprintLength, affected);
+        ToStream(Blueprints, stream, reversed);
     }
-
-    public void ToStream<T>(T stream) where T : IStreamWrapper => ToStream(Blueprints, stream);
     
-    public static void ToStream<T>(ReadOnlySpan<OperationBlueprint> blueprints, T stream) where T : IStreamWrapper
+    public static void ToStream<T>(ReadOnlySpan<OperationBlueprint> blueprints, T stream, bool reversed = false) where T : IStreamWrapper
+    {
+        if (reversed)
+        {
+            ToStreamReversed(blueprints, stream);
+            return;
+        }
+        ToStreamForward(blueprints, stream);
+    }
+    
+    public static void ToStreamForward<T>(ReadOnlySpan<OperationBlueprint> blueprints, T stream) where T : IStreamWrapper
     {
         for (var i = 0; i < blueprints.Length; i++)
         {
@@ -129,6 +94,16 @@ public readonly struct PhysicalPlan : IDisposable
             OperationBlueprint.ToStream(in blueprint, ref stream);
         }
         // stream.SaveValue(QueryType.EndOfQuery);
+    }
+    
+    public static void ToStreamReversed<T>(ReadOnlySpan<OperationBlueprint> blueprints, T stream) where T : IStreamWrapper
+    {
+        for (var i = blueprints.Length - 1; i >= 0; i--)
+        {
+            ref readonly var blueprint = ref blueprints[i];
+            OperationBlueprint.ToStream(in blueprint, ref stream);
+        }
+        stream.SaveValue(QueryType.EndOfQuery);
     }
 
     public void Dispose()

@@ -9,19 +9,19 @@ namespace Astra.Engine.v2.Data;
 
 public class DataRow : IDisposable, IEquatable<DataRow>
 {
-    private readonly ColumnSchema[] _tableSchema;
     private readonly DataCell[] _pool;
     private readonly int _length;
+    private readonly ulong _rowId;
     private readonly int _cachedHash;
 
     public ReadOnlySpan<DataCell> Span => new(_pool, 0, _length);
 
-    public DataRow(DataCell[] pool, ColumnSchema[] tableSchema)
+    public DataRow(DataCell[] pool, DatastoreContext context)
     {
-        _tableSchema = tableSchema;
         _pool = pool;
-        _length = tableSchema.Length;
-        _cachedHash = CalculateHash();
+        _length = context.TableSchema.Length;
+        _rowId = context.NewRowId();
+        _cachedHash = _rowId.GetHashCode();
     }
     
     public void Dispose()
@@ -29,28 +29,12 @@ public class DataRow : IDisposable, IEquatable<DataRow>
         ArrayPool<DataCell>.Shared.Return(_pool);
     }
 
-    private int CalculateHash()
-    {
-        Span<byte> hashesSpan = stackalloc byte[sizeof(int) * _length];
-        var span = Span;
-        for (var i = 0; i < span.Length; i++)
-        {
-            var hash = 0;
-            if (_tableSchema[i].ShouldBeHashed)
-            {
-                ref readonly var value = ref span[i];
-                hash = value.GetHashCode();
-            }
-            unsafe
-            {
-                new ReadOnlySpan<byte>(&hash, sizeof(int)).CopyTo(hashesSpan[(i * sizeof(int))..]);
-            }
-        }
-
-        return unchecked((int)XxHash32.HashToUInt32(hashesSpan));
-    }
-
     public bool Equals(DataRow? other)
+    {
+        return other != null && _rowId == other._rowId;
+    }
+    
+    public bool EqualityCheck(DataRow? other)
     {
         if (other == null) return false;
         var mySpan = Span;
@@ -58,7 +42,6 @@ public class DataRow : IDisposable, IEquatable<DataRow>
         if (mySpan.Length != theirSpan.Length) return false;
         for (var i = 0; i < _length; i++)
         {
-            if (!_tableSchema[i].ShouldBeHashed) continue;
             ref readonly var lhs = ref mySpan[i];
             if (!lhs.Equals(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(other._pool), (nint)i))) 
                 return false;
@@ -79,17 +62,17 @@ public class DataRow : IDisposable, IEquatable<DataRow>
         }
     }
 
-    public static DataRow Deserialize(ColumnSchema[] tableSchema, Stream stream)
+    public static DataRow Deserialize(DatastoreContext context, Stream stream)
     {
-        var array = ArrayPool<DataCell>.Shared.Rent(tableSchema.Length);
-        for (var i = 0; i < tableSchema.Length; i++)
+        var array = ArrayPool<DataCell>.Shared.Rent(context.TableSchema.Length);
+        for (var i = 0; i < context.TableSchema.Length; i++)
         {
-            var schema = tableSchema[i];
+            var schema = context.TableSchema[i];
             var cell = DataCell.FromStream(schema.Type.Value, stream);
             array[i] = cell;
         }
 
-        return new(array, tableSchema);
+        return new(array, context);
     }
 
     public override bool Equals(object? obj)

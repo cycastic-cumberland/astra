@@ -4,6 +4,7 @@ using Astra.Client.Simple.Aggregator;
 using Astra.Common.Data;
 using Astra.Server;
 using Astra.Server.Authentication;
+using Astra.TypeErasure.Planners;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
@@ -12,6 +13,8 @@ namespace Astra.Benchmark;
 [SimpleJob(RuntimeMoniker.Net80)]
 public class NetworkAggregationBenchmark
 {
+    [Params(100, 1_000)]
+    public uint AggregatedRows;
     private static readonly RegistrySchemaSpecifications Schema = new()
     {
         Columns = new ColumnSchemaSpecifications[] 
@@ -44,7 +47,9 @@ public class NetworkAggregationBenchmark
     private Task _serverTask = Task.CompletedTask;
     private Task _newServerTask = Task.CompletedTask;
     private GenericAstraQueryBranch _predicate;
+    private PhysicalPlan _plan;
     private GenericAstraQueryBranch _fakePredicate;
+    private PhysicalPlan _fakePlan;
     
     public async Task GlobalSetupAsync()
     {
@@ -78,7 +83,9 @@ public class NetworkAggregationBenchmark
             Port = TcpServer.DefaultPort + 1,
         });
         _predicate = AstraTable<int, string, string>.Column1.EqualsLiteral(Index);
+        _plan = PhysicalPlanBuilder.Column<int>(0).EqualsTo(Index).Build();
         _fakePredicate = AstraTable<int, string, string>.Column1.EqualsLiteral(-Index);
+        _fakePlan = PhysicalPlanBuilder.Column<int>(0).EqualsTo(-Index).Build();
     }
     
     public Task GlobalCleanupAsync()
@@ -103,9 +110,6 @@ public class NetworkAggregationBenchmark
     {
         GlobalCleanupAsync().Wait();
     }
-    
-    [Params(100, 1_000, 10_000)]
-    public uint AggregatedRows;
     private uint GibberishRows => AggregatedRows / 2;
     
     private const int Index = 1;
@@ -182,12 +186,12 @@ public class NetworkAggregationBenchmark
     
     private async Task TransmissionBenchmarkNewAsync()
     {
-        using var a = await _client2.AggregateCompatAsync<SimpleSerializableStruct, GenericAstraQueryBranch>(_fakePredicate);
+        using var a = await _client2.AggregateAsync<SimpleSerializableStruct>(_fakePlan);
     }
     
     private async Task SimpleAggregationAndManualDeserializationBenchmarkNewAsync()
     {
-        using var fetched = await _client2.AggregateCompatAsync<SimpleSerializableStruct, GenericAstraQueryBranch>(_predicate);
+        using var fetched = await _client2.AggregateCompatAsync<SimpleSerializableStruct>(_predicate);
         foreach (var f in fetched)
         {
             ProfessionalTimeWaster(f.Value1);
@@ -196,7 +200,7 @@ public class NetworkAggregationBenchmark
 
     private async Task SimpleAggregationAndAutoDeserializationBenchmarkNewAsync()
     {
-        using var fetched = await _client2.AggregateAsync<SimpleSerializableStruct, GenericAstraQueryBranch>(_predicate);
+        using var fetched = await _client2.AggregateAsync<SimpleSerializableStruct>(_plan);
         foreach (var f in fetched)
         {
             ProfessionalTimeWaster(f.Value1);
@@ -226,7 +230,7 @@ public class NetworkAggregationBenchmark
     {
         TransmissionBenchmarkNewAsync().Wait();
     }
-
+    
     [Benchmark]
     public void ManualDeserializationNew()
     {

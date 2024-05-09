@@ -98,23 +98,46 @@ public class EngineTestFixture
                 Value3 = "test4",
             },
         ]);
-        Assert.That(inserted, Is.EqualTo(2));
+        Assert.That(inserted, Is.EqualTo(3));
         var deserialized = from o in _registry where o.Value1 > 1 && o.Value1 < 3 select o;
-        var pass = true;
+        var stage = 1U;
         foreach (var row in deserialized)
         {
-            if (!pass) Assert.Fail();
-            Assert.Multiple(() =>
+            switch (stage)
             {
-                Assert.That(row.Value1, Is.EqualTo(2));
-                Assert.That(row.Value2, Is.EqualTo("🇵🇱"));
-                Assert.That(row.Value3, Is.EqualTo("test4"));
-            });
-            pass = false;
+                case 0:
+                {
+                    stage++;
+                    break;
+                }
+                case 1:
+                {
+                    Assert.Multiple(() =>
+                    {
+                        Assert.That(row.Value1, Is.EqualTo(2));
+                        Assert.That(row.Value2, Is.EqualTo("🇵🇱"));
+                        Assert.That(row.Value3, Is.EqualTo("test4"));
+                    });
+                    goto case 0U;
+                }
+                case 2:
+                {
+                    Assert.Multiple(() =>
+                    {
+                        Assert.That(row.Value1, Is.EqualTo(2));
+                        Assert.That(row.Value2, Is.EqualTo("test6"));
+                        Assert.That(row.Value3, Is.EqualTo("test4"));
+                    });
+                    goto case 0U;
+                }
+                default:
+                    Assert.Fail();
+                    break;
+            }
         }
 
         var deleted = _registry.Delete(from o in _registry where o.Value1 == 2 select o);
-        Assert.That(deleted, Is.EqualTo(1));
+        Assert.That(deleted, Is.EqualTo(2));
         Assert.That(_registry.Count, Is.EqualTo(1));
     }
 
