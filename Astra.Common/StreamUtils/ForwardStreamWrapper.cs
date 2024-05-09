@@ -4,7 +4,6 @@ namespace Astra.Common.StreamUtils;
 
 public readonly struct ForwardStreamWrapper(Stream stream) : IStreamWrapper
 {
-    private Stream Debug => stream;
     public void SaveValue(byte value)
     {
         stream.WriteValue(value);
@@ -80,12 +79,17 @@ public readonly struct ForwardStreamWrapper(Stream stream) : IStreamWrapper
         return stream.WriteValueAsync(value, cancellationToken);
     }
 
+    public void SaveValue(StringRef value)
+    {
+        stream.WriteValue(value);
+    }
+
     public void SaveValue(byte[] value)
     {
         stream.WriteValue(value);
     }
 
-    public void SaveValue(ReadOnlyMemory<byte> value)
+    public void SaveValue(ReadOnlySpan<byte> value)
     {
         stream.WriteValue(value);
     }

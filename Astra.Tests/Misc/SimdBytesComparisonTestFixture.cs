@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using Astra.Collections;
+using Astra.Common;
 
 namespace Astra.Tests.Misc;
 

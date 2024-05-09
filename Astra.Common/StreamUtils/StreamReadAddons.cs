@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Astra.Common.Data;
@@ -86,6 +87,25 @@ public static class StreamReadAddons
         var str = Encoding.UTF8.GetString(strBytes.Reader);
         return str;
     }
+    
+    public static (int length, char[] buffer) ReadStringToBuffer(this Stream reader)
+    {
+        var strLen = ReadInt(reader);
+        using var strBytes = BytesCluster.Rent(strLen);
+        reader.ReadExactly(strBytes.Writer);
+        var charCount = Encoding.UTF8.GetCharCount(strBytes.Reader);
+        var buffer = ArrayPool<char>.Shared.Rent(charCount);
+        try
+        {
+            charCount = Encoding.UTF8.GetChars(strBytes.Reader, buffer.AsSpan()[..charCount]);
+            return (charCount, buffer);
+        }
+        catch
+        {
+            ArrayPool<char>.Shared.Return(buffer);
+            throw;
+        }
+    }
 
     public static DateTime ReadDateTime(this Stream reader)
     {
@@ -104,6 +124,22 @@ public static class StreamReadAddons
         var array = new byte[length];
         reader.ReadExactly(array);
         return array;
+    }
+    
+    public static (int length, byte[]) ReadSequenceToBuffer(this Stream reader)
+    {
+        var length = (int)reader.ReadLong();
+        var array = ArrayPool<byte>.Shared.Rent(length);
+        try
+        {
+            reader.ReadExactly(array.AsSpan()[..length]);
+        }
+        catch
+        {
+            ArrayPool<byte>.Shared.Return(array);
+            throw;
+        }
+        return (length, array);
     }
     
     public static BytesCluster ReadCluster(this Stream reader)

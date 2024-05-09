@@ -123,26 +123,34 @@ public static class StreamWriteAddons
         writer.WriteUnmanagedValue(value);
     }
 
-    private static void WriteShortString(this Stream writer, string value)
+    private static void WriteShortString(this Stream writer, ReadOnlySpan<char> value)
     {
         // Reference: https://www.rfc-editor.org/rfc/rfc3629 (Section 3. UTF-8 definition)
         // TLDR: The max number of bytes per UTF-8 character is 4 
         Span<byte> bytes = stackalloc byte[value.Length * 4];
-        var written = Encoding.UTF8.GetBytes(value.AsSpan(), bytes);
+        var written = Encoding.UTF8.GetBytes(value, bytes);
         writer.WriteValue(written);
         writer.Write(bytes[..written]);
     }
     
-    private static void WriteLongString(this Stream writer, string value)
+    private static void WriteLongString(this Stream writer, ReadOnlySpan<char> value)
     {
-        var strArr = Encoding.UTF8.GetBytes(value);
-        writer.WriteValue(strArr.Length);
-        writer.Write(strArr);
+        using var buffer = BytesCluster.Rent(value.Length * 4);
+        var bytes = buffer.Writer;
+        var written = Encoding.UTF8.GetBytes(value, bytes);
+        writer.WriteValue(written);
+        writer.Write(bytes[..written]);
     }
     
     public static void WriteValue(this Stream writer, string? value)
     {
         if (value == null) throw new ArgumentException(nameof(value));
+        if (value.Length < CommonProtocol.LongStringThreshold) writer.WriteShortString(value);
+        else writer.WriteLongString(value);
+    }
+    
+    public static void WriteValue(this Stream writer, StringRef value)
+    {
         if (value.Length < CommonProtocol.LongStringThreshold) writer.WriteShortString(value);
         else writer.WriteLongString(value);
     }
@@ -175,11 +183,14 @@ public static class StreamWriteAddons
         writer.Write(array);
     }
     
-    public static void WriteValue(this Stream writer, ReadOnlyMemory<byte> array)
+    public static void WriteValue(this Stream writer, ReadOnlySpan<byte> array)
     {
         writer.WriteValue((long)array.Length);
-        writer.Write(array.Span);
+        writer.Write(array);
     }
+
+    public static void WriteValue(this Stream writer, ReadOnlyMemory<byte> array)
+        => writer.WriteValue(array.Span);
 
     public static async ValueTask WriteValueAsync(this Stream writer, byte[] value, CancellationToken token = default)
     {

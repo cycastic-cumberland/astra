@@ -1,10 +1,11 @@
+using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO.Hashing;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Astra.Collections;
 using Astra.Common;
 using Astra.Common.Data;
 using Astra.Common.Hashes;
@@ -14,7 +15,7 @@ namespace Astra.TypeErasure.Data;
 
 [StructLayout(LayoutKind.Explicit)]
 [DebuggerDisplay("Value = {Value}, Type = {TypeString}")]
-public readonly struct DataCell : INumber<DataCell>
+public readonly struct DataCell : INumber<DataCell>, IDisposable
 {
     public static readonly DataCell MinValue = new(double.MinValue);
     public static readonly DataCell MaxValue = new(double.MaxValue);
@@ -52,14 +53,14 @@ public readonly struct DataCell : INumber<DataCell>
         CellTypes.QWord => QWord,
         CellTypes.Single => Single,
         CellTypes.Double => Double,
-        CellTypes.Text => Pointer,
-        CellTypes.Bytes => Pointer,
+        CellTypes.Text => ExtractText().ToString(),
+        CellTypes.Bytes => ExtractBytes().ToArray(),
         _ => throw new ArgumentOutOfRangeException()
     };
 
-    public DataType DataType => CellTypeToAstraDataType(CellType);
+    public DataType DataType => TypeToAstraDataType(CellType);
     
-    public static DataType CellTypeToAstraDataType(byte cellType) => cellType switch
+    public static DataType TypeToAstraDataType(byte cellType) => cellType switch
     {
         CellTypes.DWord => DataType.DWord,
         CellTypes.QWord => DataType.QWord,
@@ -107,13 +108,60 @@ public readonly struct DataCell : INumber<DataCell>
     
     public DataCell(string value)
     {
-        Pointer = value;
+        var buffer = ArrayPool<char>.Shared.Rent(value.Length);
+        var length = value.Length;
+        try
+        {
+            unsafe
+            {
+                fixed (void* dest = buffer, source = value)
+                {
+                    Buffer.MemoryCopy(source, dest, buffer.Length * sizeof(char), length * sizeof(char));
+                }
+            }
+        }
+        catch
+        {
+            ArrayPool<char>.Shared.Return(buffer);
+            throw;
+        }
+        
+        Pointer = buffer;
+        DWord = length;
         CellType = CellTypes.Text;
     }
     
+    private DataCell(int length, char[] buffer)
+    {
+        Pointer = buffer;
+        DWord = length;
+        CellType = CellTypes.Text;
+    }
+    
+    
     public DataCell(byte[] value)
     {
+        var buffer = ArrayPool<byte>.Shared.Rent(value.Length);
+        var length = value.Length;
+        try
+        {
+            Buffer.BlockCopy(value, 0, buffer, 0, length);
+        }
+        catch
+        {
+            ArrayPool<byte>.Shared.Return(buffer);
+            throw;
+        }
+
+        Pointer = buffer;
+        DWord = length;
+        CellType = CellTypes.Bytes;
+    }
+    
+    private DataCell(int length, byte[] value)
+    {
         Pointer = value;
+        DWord = length;
         CellType = CellTypes.Bytes;
     }
 
@@ -125,8 +173,8 @@ public readonly struct DataCell : INumber<DataCell>
             CellTypes.QWord => QWord.ToString(),
             CellTypes.Single => Single.ToString(CultureInfo.InvariantCulture),
             CellTypes.Double => Double.ToString(CultureInfo.InvariantCulture),
-            CellTypes.Text => (string)Pointer,
-            CellTypes.Bytes => new ReadOnlySpan<byte>((byte[])Pointer).ToHexString(),
+            CellTypes.Text => ExtractText().ToString(),
+            CellTypes.Bytes => ExtractBytes().ToHexString(),
             _ => string.Empty
         };
     }
@@ -150,7 +198,7 @@ public readonly struct DataCell : INumber<DataCell>
                 return Double.TryFormat(destination, out charsWritten, format, provider);
             case CellTypes.Text:
             {
-                var str = (string)Pointer;
+                var str = ExtractText();
                 if (destination.Length < str.Length)
                 {
                     charsWritten = 0;
@@ -162,14 +210,14 @@ public readonly struct DataCell : INumber<DataCell>
             }
             case CellTypes.Bytes:
             {
-                var bytes = (byte[])Pointer;
+                var bytes = ExtractBytes();
                 if (destination.Length < bytes.Length * 2)
                 {
                     charsWritten = 0;
                     return false;
                 }
 
-                ((ReadOnlySpan<byte>)bytes).ToHexStringUpper(destination);
+                bytes.ToHexStringUpper(destination);
                 charsWritten = bytes.Length * 2;
                 return true;
             }
@@ -244,14 +292,14 @@ public readonly struct DataCell : INumber<DataCell>
     private int CompareText(ref readonly DataCell other)
     {
         if (other.CellType == CellTypes.Text)
-            return (string)Pointer == (string)other.Pointer ? 0 : -1;
+            return ExtractText() == other.ExtractText() ? 0 : -1;
         throw new MismatchedDataTypeException();
     }
     
     private int CompareBytes(ref readonly DataCell other)
     {
         if (other.CellType == CellTypes.Bytes)
-            return BytesComparisonHelper.Equals((byte[])Pointer, (byte[])other.Pointer) ? 0 : -1;
+            return BytesComparisonHelper.Equals(ExtractBytes(), other.ExtractBytes()) ? 0 : -1;
         throw new MismatchedDataTypeException();
     }
     
@@ -330,14 +378,14 @@ public readonly struct DataCell : INumber<DataCell>
     private bool EqualsText(ref readonly DataCell other)
     {
         if (other.CellType == CellTypes.Text)
-            return (string)Pointer == (string)other.Pointer;
+            return ExtractText() == other.ExtractText();
         throw new MismatchedDataTypeException();
     }
     
     private bool EqualsBytes(ref readonly DataCell other)
     {
         if (other.CellType == CellTypes.Bytes)
-            return BytesComparisonHelper.Equals((byte[])Pointer, (byte[])other.Pointer);
+            return BytesComparisonHelper.Equals(ExtractBytes(), other.ExtractBytes());
         throw new MismatchedDataTypeException();
     }
     
@@ -383,41 +431,10 @@ public readonly struct DataCell : INumber<DataCell>
             CellTypes.QWord => ((double)QWord).GetHashCode(),
             CellTypes.Single => ((double)Single).GetHashCode(),
             CellTypes.Double => Double.GetHashCode(),
-            CellTypes.Text => HashCode.Combine(CellType, (string)Pointer),
-            CellTypes.Bytes => HashCode.Combine(CellType, XxHash32.HashToUInt32((byte[])Pointer)),
+            CellTypes.Text => ExtractText().GetHashCode(),
+            CellTypes.Bytes => unchecked((int)XxHash32.HashToUInt32(ExtractBytes())),
             _ => throw new UnreachableException($"Unsupported cell type: {CellType}")
         };
-    }
-
-    public void WriteHash(Stream stream)
-    {
-        switch (CellType)
-        {
-            case CellTypes.DWord:
-                stream.WriteValue(DWord);
-                return;
-            case CellTypes.QWord:
-                stream.WriteValue(QWord);
-                return;
-            case CellTypes.Single:
-                stream.WriteValue(Single);
-                return;
-            case CellTypes.Double:
-                stream.WriteValue(Double);
-                return;
-            case CellTypes.Text:
-            {
-                var hash = Hash128.HashXx128((string)Pointer);
-                hash.CopyTo(stream);
-                return;
-            }
-            case CellTypes.Bytes:
-            {
-                var hash = Hash128.HashXx128((byte[])Pointer);
-                hash.CopyTo(stream);
-                return;
-            }
-        }
     }
 
     public void Write(Stream stream)
@@ -438,12 +455,12 @@ public readonly struct DataCell : INumber<DataCell>
                 return;
             case CellTypes.Text:
             {
-                stream.WriteValue((string)Pointer);
+                stream.WriteValue(ExtractText());
                 return;
             }
             case CellTypes.Bytes:
             {
-                stream.WriteValue((byte[])Pointer);
+                stream.WriteValue(ExtractBytes());
                 return;
             }
         }
@@ -467,12 +484,12 @@ public readonly struct DataCell : INumber<DataCell>
                 return;
             case CellTypes.Text:
             {
-                stream.SaveValue((string)Pointer);
+                stream.SaveValue(ExtractText());
                 return;
             }
             case CellTypes.Bytes:
             {
-                stream.SaveValue((byte[])Pointer);
+                stream.SaveValue(ExtractBytes());
                 return;
             }
         }
@@ -501,9 +518,15 @@ public readonly struct DataCell : INumber<DataCell>
             case DataType.DoubleMask:
                 return new(stream.ReadDouble());
             case DataType.StringMask:
-                return new(stream.ReadString());
+            {
+                var (length, buffer) = stream.ReadStringToBuffer();
+                return new(length, buffer);
+            }
             case DataType.BytesMask:
-                return new(stream.ReadSequence());
+            {
+                var (length, buffer) = stream.ReadSequenceToBuffer();
+                return new(length, buffer);
+            }
             default:
                 throw new NotSupportedException($"Unsupported type: {typeCode}");
         }
@@ -1187,7 +1210,7 @@ public readonly struct DataCell : INumber<DataCell>
         return Parse(s, provider);
     }
 
-    public static bool TryCreate<TOther>(TOther value, out DataCell result)
+    public static bool TryCreate<TOther>(TOther value, out DataCell result) where TOther : notnull
     {
         switch (Type.GetTypeCode(typeof(TOther)))
         {
@@ -1249,12 +1272,12 @@ public readonly struct DataCell : INumber<DataCell>
                 result = (TOther)(object)value.Double;
                 return true;
             case TypeCode.String:
-                result = (TOther)value.Pointer;
+                result = (TOther)(object)value.ExtractText().ToString();
                 return true;
             default:
                 if (typeof(TOther) == typeof(byte[]))
                 {
-                    result = (TOther)value.Pointer;
+                    result = (TOther)(object)value.ExtractBytes().ToArray();
                     return true;
                 }
                 result = default;
@@ -1285,4 +1308,29 @@ public readonly struct DataCell : INumber<DataCell>
     public static DataCell One => new(1.0);
     public static int Radix => 2;
     public static DataCell Zero => new(0.0);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void Dispose()
+    {
+        switch (CellType)
+        {
+            case CellTypes.Text:
+            {
+                var buffer = (char[])Pointer;
+                ArrayPool<char>.Shared.Return(buffer);
+                break;
+            }
+            case CellTypes.Bytes:
+            {
+                var buffer = (byte[])Pointer;
+                ArrayPool<byte>.Shared.Return(buffer);
+                break;
+            }
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private ReadOnlySpan<byte> ExtractBytes() => new((byte[])Pointer, 0, DWord);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private StringRef ExtractText() => new(new((char[])Pointer, 0, DWord));
 }

@@ -148,21 +148,23 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
         return stream.WriteAsync(bytes, cancellationToken);
     }
 
-    private void WriteShortString(string value)
+    private void WriteShortString(ReadOnlySpan<char> value)
     {
         // Reference: https://www.rfc-editor.org/rfc/rfc3629 (Section 3. UTF-8 definition)
         // TLDR: The max number of bytes per UTF-8 character is 4 
         Span<byte> bytes = stackalloc byte[value.Length * 4];
-        var written = Encoding.UTF8.GetBytes(value.AsSpan(), bytes);
+        var written = Encoding.UTF8.GetBytes(value, bytes);
         SaveValue(written);
         stream.Write(bytes[..written]);
     }
     
-    private void WriteLongString(string value)
+    private void WriteLongString(ReadOnlySpan<char> value)
     {
-        var strArr = Encoding.UTF8.GetBytes(value);
-        SaveValue(strArr.Length);
-        stream.Write(strArr);
+        using var buffer = BytesCluster.Rent(value.Length * 4);
+        var bytes = buffer.Writer;
+        var written = Encoding.UTF8.GetBytes(value, bytes);
+        SaveValue(written);
+        stream.Write(bytes[..written]);
     }
 
     public void SaveValue(string value)
@@ -179,17 +181,23 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
         await stream.WriteAsync(bytes, cancellationToken);
     }
 
+    public void SaveValue(StringRef value)
+    {
+        if (value.Length < CommonProtocol.LongStringThreshold) WriteShortString(value);
+        else WriteLongString(value);
+    }
+
     public void SaveValue(byte[] value)
     {
         SaveValue(value.LongLength);
         stream.Write(value);
     }
 
-    public void SaveValue(ReadOnlyMemory<byte> value)
+    public void SaveValue(ReadOnlySpan<byte> value)
     {
-        stream.Write(value.Span);
+        SaveValue((long)value.Length);
+        stream.Write(value);
     }
-
     public async ValueTask SaveValueAsync(byte[] value, CancellationToken cancellationToken = default)
     {
         await SaveValueAsync(value.LongLength, cancellationToken);

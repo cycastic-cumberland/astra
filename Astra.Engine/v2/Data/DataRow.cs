@@ -26,6 +26,12 @@ public class DataRow : IDisposable, IEquatable<DataRow>
     
     public void Dispose()
     {
+        var span = Span;
+        for (var i = 0; i < _length; i++)
+        {
+            ref readonly var cell = ref span[i];
+            cell.Dispose();
+        }
         ArrayPool<DataCell>.Shared.Return(_pool);
     }
 

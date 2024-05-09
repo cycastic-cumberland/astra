@@ -1,7 +1,7 @@
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 
-namespace Astra.Collections;
+namespace Astra.Common;
 
 file static class IntrinsicsBytesComparer
 {

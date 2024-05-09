@@ -19,8 +19,9 @@ public interface IStreamWrapper
     public ValueTask SaveValueAsync(double value, CancellationToken cancellationToken = default);
     public void SaveValue(string value);
     public ValueTask SaveValueAsync(string value, CancellationToken cancellationToken = default);
+    public void SaveValue(StringRef value);
     public void SaveValue(byte[] value);
-    public void SaveValue(ReadOnlyMemory<byte> value);
+    public void SaveValue(ReadOnlySpan<byte> value);
     public ValueTask SaveValueAsync(byte[] value, CancellationToken cancellationToken = default);
     public void SaveValue(BytesCluster value);
     public ValueTask SaveValueAsync(BytesCluster value, CancellationToken cancellationToken = default);
