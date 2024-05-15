@@ -1,12 +1,11 @@
 using System.Buffers;
-using Astra.Collections;
 using Astra.Common;
 using Astra.Common.Data;
 using Astra.Common.Protocols;
 using Astra.Common.StreamUtils;
 using Astra.TypeErasure.Data;
 
-namespace Astra.TypeErasure.Planners;
+namespace Astra.TypeErasure.Planners.Physical;
 
 public readonly struct PhysicalPlan : IDisposable
 {

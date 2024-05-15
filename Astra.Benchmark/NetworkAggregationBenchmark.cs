@@ -5,6 +5,7 @@ using Astra.Common.Data;
 using Astra.Server;
 using Astra.Server.Authentication;
 using Astra.TypeErasure.Planners;
+using Astra.TypeErasure.Planners.Physical;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
@@ -147,8 +148,6 @@ public class NetworkAggregationBenchmark
     {
         IterationSetupAsync().Wait();
     }
-    
-    private ulong _a;
 
     [IterationCleanup]
     public void IterationCleanup()

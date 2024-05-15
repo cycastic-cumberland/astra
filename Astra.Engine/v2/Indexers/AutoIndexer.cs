@@ -1,6 +1,8 @@
+using System.Reflection;
 using Astra.Common.Data;
 using Astra.Engine.v2.Data;
 using Astra.TypeErasure.Planners;
+using Astra.TypeErasure.Planners.Physical;
 
 namespace Astra.Engine.v2.Indexers;
 
@@ -45,6 +47,11 @@ public class AutoIndexer() : BaseIndexer(null!)
     protected override void Clear()
     {
         _data.Clear();
+    }
+
+    internal override MethodInfo GetFetchImplementation(uint operation)
+    {
+        throw new NotSupportedException();
     }
 
     protected override int Count => _data.Count;

@@ -31,30 +31,30 @@ public interface IAstraClient : IDisposable
     /// <summary>
     /// Asynchronously inserts a serializable object into the Astra database.
     /// </summary>
-    /// <typeparam name="T">The type of the serializable object implementing <see cref="IAstraSerializable"/>.</typeparam>
+    /// <typeparam name="T">The type of the serializable object implementing <see cref="IStreamSerializable"/>.</typeparam>
     /// <param name="value">The object to insert into the database.</param>
     /// <param name="cancellationToken">The cancellation token to observe while waiting for the task to complete.</param>
     /// <returns>A task representing the asynchronous operation, returning the number of inserted rows.</returns>
-    public Task<int> InsertSerializableAsync<T>(T value, CancellationToken cancellationToken = default) where T : IAstraSerializable;
+    public Task<int> InsertSerializableAsync<T>(T value, CancellationToken cancellationToken = default) where T : IStreamSerializable;
     
     /// <summary>
     /// Asynchronously inserts a collection of serializable objects into the Astra database.
     /// </summary>
-    /// <typeparam name="T">The type of the serializable objects implementing <see cref="IAstraSerializable"/>.</typeparam>
+    /// <typeparam name="T">The type of the serializable objects implementing <see cref="IStreamSerializable"/>.</typeparam>
     /// <param name="values">The collection of objects to insert into the database.</param>
     /// <param name="cancellationToken">The cancellation token to observe while waiting for the task to complete.</param>
     /// <returns>A task representing the asynchronous operation, returning the number of inserted rows.</returns>
-    public Task<int> BulkInsertSerializableAsync<T>(IEnumerable<T> values, CancellationToken cancellationToken = default) where T : IAstraSerializable;
+    public Task<int> BulkInsertSerializableAsync<T>(IEnumerable<T> values, CancellationToken cancellationToken = default) where T : IStreamSerializable;
 
     /// <summary>
     /// Asynchronously aggregate data from Astra database and cast them to <typeparamref name="T"/>.
     /// </summary>
-    /// <typeparam name="T">The type of the deserializable objects implementing <see cref="IAstraSerializable"/>.</typeparam>
+    /// <typeparam name="T">The type of the deserializable objects implementing <see cref="IStreamSerializable"/>.</typeparam>
     /// <param name="predicate">The predicate used for aggregation.</param>
     /// <param name="cancellationToken">The cancellation token to observe while waiting for the task to complete.</param>
     /// <returns>A task representing the asynchronous operation, returning the coroutine that will deserialize the retrieved data.</returns>
     public Task<IEnumerable<T>> AggregateAsync<T>(IAstraQueryBranch predicate, CancellationToken cancellationToken = default) 
-        where T : IAstraSerializable;
+        where T : IStreamSerializable;
 
     /// <summary>
     /// Asynchronously count all rows from Astra database.

@@ -7,9 +7,12 @@ using Astra.Common.Protocols;
 using Astra.Common.Serializable;
 using Astra.Common.StreamUtils;
 using Astra.Engine.Data;
+using Astra.Engine.v2.Codegen;
 using Astra.Engine.v2.Indexers;
 using Astra.TypeErasure.Data;
+using Astra.TypeErasure.Data.Codegen;
 using Astra.TypeErasure.Planners;
+using Astra.TypeErasure.Planners.Physical;
 using Microsoft.Extensions.Logging;
 
 namespace Astra.Engine.v2.Data;
@@ -84,9 +87,9 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
 
     public struct WrappedEnumerator<T> : IEnumerator<T>
     {
-        private PreparedLocalEnumerator<FlexSerializable<T>> _enumerator;
+        private PreparedLocalEnumerator<FlexWrapper<T>> _enumerator;
 
-        public WrappedEnumerator(PreparedLocalEnumerator<FlexSerializable<T>> enumerator)
+        public WrappedEnumerator(PreparedLocalEnumerator<FlexWrapper<T>> enumerator)
         {
             _enumerator = enumerator;
         }
@@ -104,7 +107,7 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
         object IEnumerator.Current => Current!;
     }
 
-    public readonly struct WrappedEnumerable<T>(PreparedLocalEnumerable<FlexSerializable<T>> enumerable) : IEnumerable<T>
+    public readonly struct WrappedEnumerable<T>(PreparedLocalEnumerable<FlexWrapper<T>> enumerable) : IEnumerable<T>
     {
         public WrappedEnumerator<T> GetEnumerator()
         {
@@ -126,7 +129,7 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
     {
         private readonly ShinDataRegistry _host;
         private Readers _readers;
-        private PreparedLocalEnumerator<FlexSerializable<T>> _enumerator;
+        private PreparedLocalEnumerator<FlexWrapper<T>> _enumerator;
         private uint _stage;
 
         public Enumerator(ShinDataRegistry host)
@@ -264,9 +267,8 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
         }
     }
 
-    private bool InsertOne(Stream reader, ref readonly Writers writers)
+    private bool InsertRow(DataRow row, ref readonly Writers writers)
     {
-        var row = DataRow.Deserialize(_context, reader);
         try
         {
             if (!writers.AutoIndexerLock.Add(row))
@@ -292,6 +294,18 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
             throw;
         }
     }
+
+    private bool InsertOne(Stream reader, ref readonly Writers writers)
+    {
+        var row = DataRow.Deserialize(_context, reader);
+        return InsertRow(row, in writers);
+    }
+
+    private bool InsertOne<T>(T data, ref readonly Writers writers) where T : ICellsSerializable
+    {
+        var row = DataRow.Create(_context, data);
+        return InsertRow(row, in writers);
+    }
     
     private int Insert(Stream reader, ref readonly Writers writers)
     {
@@ -307,21 +321,28 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
     
     private static readonly ThreadLocal<ReadOnlyBufferStream?> LocalBuffer = new();
 
-    public PreparedLocalEnumerable<T> AggregateCompat<T>(Stream predicateStream) where T : IAstraSerializable
+    public PreparedLocalEnumerable<T> AggregateCompat<T>(Stream predicateStream) where T : ICellsSerializable
     {
         using var readLock = AcquireReadLocks();
         var span = readLock.ReaderLocks;
         return predicateStream.LocalAggregate<T, BaseIndexer.Reader>(ref span);
     }
     
-    public PreparedLocalEnumerable<T> AggregateCompat<T>(ref readonly PhysicalPlan plan) where T : IAstraSerializable
+    public PreparedLocalEnumerable<T> AggregateCompat<T>(ref readonly PhysicalPlan plan) where T : ICellsSerializable
     {
         using var readLock = AcquireReadLocks();
         var span = readLock.ReaderLocks;
         return plan.LocalAggregate<T, BaseIndexer.Reader>(ref span);
     }
     
-    public PreparedLocalEnumerable<T> AggregateCompat<T>(ReadOnlyMemory<byte> predicateStream) where T : IAstraSerializable
+    public PreparedLocalEnumerable<T> AggregateCompat<T>(ref readonly CompiledPhysicalPlan plan) where T : ICellsSerializable
+    {
+        using var readLock = AcquireReadLocks();
+        var span = readLock.ReaderLocks;
+        return plan.LocalAggregate<T, BaseIndexer.Reader>(span);
+    }
+    
+    public PreparedLocalEnumerable<T> AggregateCompat<T>(ReadOnlyMemory<byte> predicateStream) where T : ICellsSerializable
     {
         var stream = LocalBuffer.Value ?? new();
         LocalBuffer.Value = null;
@@ -340,12 +361,17 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
     
     public WrappedEnumerable<T> Aggregate<T>(Stream predicateStream)
     {
-        return new(AggregateCompat<FlexSerializable<T>>(predicateStream));
+        return new(AggregateCompat<FlexWrapper<T>>(predicateStream));
     }
     
     public WrappedEnumerable<T> Aggregate<T>(ref readonly PhysicalPlan plan)
     {
-        return new(AggregateCompat<FlexSerializable<T>>(in plan));
+        return new(AggregateCompat<FlexWrapper<T>>(in plan));
+    }
+    
+    public WrappedEnumerable<T> Aggregate<T>(ref readonly CompiledPhysicalPlan plan)
+    {
+        return new(AggregateCompat<FlexWrapper<T>>(in plan));
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -353,7 +379,7 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
     
     public WrappedEnumerable<T> Aggregate<T>(ReadOnlyMemory<byte> predicateStream)
     {
-        return new(AggregateCompat<FlexSerializable<T>>(predicateStream));
+        return new(AggregateCompat<FlexWrapper<T>>(predicateStream));
     }
 
     private static int Delete<T>(T enumerator, ref readonly Writers writerLocks) where T : IEnumerator<DataRow>
@@ -402,37 +428,30 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
         return Delete(predicateStream, in locksRef);
     }
 
-    public bool InsertCompat<T>(T value) where T : IAstraSerializable
+    public bool InsertCompat<T>(T value) where T : ICellsSerializable
     {
-        using var inStream = MemoryStreamPool.Allocate();
-        value.SerializeStream(new ForwardStreamWrapper(inStream));
-        inStream.Position = 0;
         using var writerLocks = AcquireWriteLocks();
         ref readonly var locksRef = ref writerLocks;
-        return InsertOne(inStream, in locksRef);
+        return InsertOne(value, in locksRef);
     }
     
-    public int BulkInsertCompat<T>(IEnumerable<T> values) where T : IAstraSerializable
+    public int BulkInsertCompat<T>(IEnumerable<T> values) where T : ICellsSerializable
     {
-        using var inStream = LocalStreamWrapper.Create();
-        var wrapper = new ForwardStreamWrapper(inStream.LocalStream);
-        var count = 0;
         using var writerLocks = AcquireWriteLocks();
         ref readonly var locksRef = ref writerLocks;
+        var count = 0;
         foreach (var value in values)
         {
-            inStream.LocalStream.SetLength(0);
-            value.SerializeStream(wrapper);
-            inStream.LocalStream.Position = 0;
-            _ = InsertOne(inStream.LocalStream, in locksRef) ? count++ : 0;
+            if (InsertOne(value, in locksRef)) count++;
         }
+
         return count;
     }
 
-    public bool Insert<T>(T value) => InsertCompat(new FlexSerializable<T> { Target = value });
+    public bool Insert<T>(T value) => InsertCompat(new FlexWrapper<T> { Target = value });
 
     public int BulkInsert<T>(IEnumerable<T> values) =>
-        BulkInsertCompat(from value in values select new FlexSerializable<T> { Target = value });
+        BulkInsertCompat(from value in values select new FlexWrapper<T> { Target = value });
 
     private int Clear(ref readonly Writers writerLocks)
     {
@@ -608,5 +627,11 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
             ref readonly var locksRef = ref readLocks;
             ReadOnce(dataIn, dataOut, in locksRef);
         }
+    }
+
+    public CompiledPhysicalPlan Compile(PhysicalPlan plan)
+    {
+        var executor = PlanCompiler.Compile(ref plan, this);
+        return new(plan, executor, this);
     }
 }

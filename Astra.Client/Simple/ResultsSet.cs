@@ -10,7 +10,7 @@ namespace Astra.Client.Simple;
 public class ConstraintCheckFailedException(string? msg = null) : Exception(msg);
 
 public class ResultsSet<T> : IEnumerable<T>, IDisposable
-    where T : IAstraSerializable
+    where T : IStreamSerializable
 {
     public readonly struct Enumerator : IEnumerator<T>
     {

@@ -10,6 +10,7 @@ using Astra.Common.Protocols;
 using Astra.Common.Serializable;
 using Astra.Common.StreamUtils;
 using Astra.TypeErasure.Planners;
+using Astra.TypeErasure.Planners.Physical;
 using Microsoft.IO;
 
 namespace Astra.Client.Simple;
@@ -294,13 +295,13 @@ public class SimpleAstraClient : IAstraClient
         }
     }
     
-    public Task<int> InsertSerializableAsync<T>(T value, CancellationToken cancellationToken = default) where T : IAstraSerializable
+    public Task<int> InsertSerializableAsync<T>(T value, CancellationToken cancellationToken = default) where T : IStreamSerializable
     {
         return BulkInsertSerializableInternalAsync([value], cancellationToken);
     }
 
     private static void WriteInBulk<T, TStream>(IEnumerable<T> values, TStream stream) 
-        where T : IAstraSerializable
+        where T : IStreamSerializable
         where TStream : IStreamWrapper
     {
         var flag = CommonProtocol.HasRow;
@@ -314,7 +315,7 @@ public class SimpleAstraClient : IAstraClient
     }
 
     private async Task<int> BulkInsertSerializableInternalAsync<T>(IEnumerable<T> values,
-        CancellationToken cancellationToken = default) where T : IAstraSerializable
+        CancellationToken cancellationToken = default) where T : IStreamSerializable
     {
         var (client, clientStream, reversed) = _client ?? throw new NotConnectedException();
         FlushStream(client, clientStream);
@@ -347,7 +348,7 @@ public class SimpleAstraClient : IAstraClient
     }
 
     public Task<int> BulkInsertSerializableCompatAsync<T>(IEnumerable<T> values,
-        CancellationToken cancellationToken = default) where T : IAstraSerializable
+        CancellationToken cancellationToken = default) where T : IStreamSerializable
     {
         return BulkInsertSerializableInternalAsync(values, cancellationToken);
     }
@@ -380,7 +381,7 @@ public class SimpleAstraClient : IAstraClient
         if (faulted != 0) throw new FaultedRequestException();
     }
     
-    private async ValueTask<ResultsSet<T>> AggregateCompatInternalAsync<T>(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default) where T : IAstraSerializable
+    private async ValueTask<ResultsSet<T>> AggregateCompatInternalAsync<T>(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default) where T : IStreamSerializable
     {
         await SendPredicateInternal(predicateStream, cancellationToken);
         return new(this, ConnectionSettings!.Value.Timeout);
@@ -393,7 +394,7 @@ public class SimpleAstraClient : IAstraClient
     }
 
     public ValueTask<ResultsSet<T>> AggregateCompatAsync<T>(IAstraQueryBranch predicate,
-        CancellationToken cancellationToken = default) where T : IAstraSerializable
+        CancellationToken cancellationToken = default) where T : IStreamSerializable
     {
         return AggregateCompatInternalAsync<T>(predicate.DumpMemory(), cancellationToken);
     }
@@ -405,7 +406,7 @@ public class SimpleAstraClient : IAstraClient
     }
     
     public ValueTask<ResultsSet<T>> AggregateCompatAsync<T>(GenericAstraQueryBranch predicate,
-        CancellationToken cancellationToken = default) where T : IAstraSerializable
+        CancellationToken cancellationToken = default) where T : IStreamSerializable
     {
         return AggregateCompatInternalAsync<T>(predicate.DumpMemory(), cancellationToken);
     }
@@ -445,7 +446,7 @@ public class SimpleAstraClient : IAstraClient
     
     public ValueTask<ResultsSet<T>> AggregateCompatAsync<T, TPredicate>(TPredicate predicate,
         CancellationToken cancellationToken = default) 
-        where T : IAstraSerializable
+        where T : IStreamSerializable
         where TPredicate : IAstraQueryBranch
     {
         return AggregateCompatInternalAsync<T>(predicate.DumpMemory(), cancellationToken);

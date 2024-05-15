@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Astra.Example;
 
-internal struct SimpleSerializableStruct : IAstraSerializable
+internal struct SimpleSerializableStruct : IStreamSerializable
 {
     public int Value1 { get; set; }
     public string Value2 { get; set; }

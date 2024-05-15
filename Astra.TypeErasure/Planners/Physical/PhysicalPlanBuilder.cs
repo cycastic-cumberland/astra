@@ -5,7 +5,7 @@ using Astra.Common.Protocols;
 using Astra.Common.StreamUtils;
 using Astra.TypeErasure.Data;
 
-namespace Astra.TypeErasure.Planners;
+namespace Astra.TypeErasure.Planners.Physical;
 
 public struct Column<T>
 {

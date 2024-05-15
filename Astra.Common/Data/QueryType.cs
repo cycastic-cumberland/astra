@@ -1,6 +1,5 @@
 namespace Astra.Common.Data;
 
-// Such dumbass names...
 public static class QueryType
 {
     public const uint EndOfQuery = 0;

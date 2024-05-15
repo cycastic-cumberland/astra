@@ -4,9 +4,10 @@ using Astra.Collections;
 using Astra.Common.Data;
 using Astra.Common.Protocols;
 using Astra.Common.StreamUtils;
+using Astra.Engine.v2.Codegen;
 using Astra.Engine.v2.Indexers;
-using Astra.TypeErasure.Planners;
-using Microsoft.IO;
+using Astra.TypeErasure.Data;
+using Astra.TypeErasure.Planners.Physical;
 
 namespace Astra.Engine.v2.Data;
 
@@ -97,7 +98,7 @@ public static class Aggregator
         }
     }
 
-    private static IEnumerable<DataRow>? IntersectSelect(IEnumerable<DataRow>? left, IEnumerable<DataRow>? right)
+    public static IEnumerable<DataRow>? IntersectSelect(IEnumerable<DataRow>? left, IEnumerable<DataRow>? right)
     {
         return left switch
         {
@@ -107,15 +108,7 @@ public static class Aggregator
             _ => Intersect(left, right)
         };
     }
-    
-    private static IEnumerable<DataRow>? RecursiveIntersect<T>(Stream predicateStream, ref readonly Span<T?> readers)
-        where T : struct, BaseIndexer.IReadable
-    {
-        var left = Aggregate(predicateStream, in readers);
-        var right = Aggregate(predicateStream, in readers);
-        return IntersectSelect(left, right);
-    }
-    
+
     private static IEnumerable<DataRow> Union(IEnumerable<DataRow> lhs,
         IEnumerable<DataRow> rhs)
     {
@@ -126,7 +119,7 @@ public static class Aggregator
         return UnionInternal(lhs, rhs);
     }
     
-    private static IEnumerable<DataRow>? UnionSelect(IEnumerable<DataRow>? left, IEnumerable<DataRow>? right)
+    public static IEnumerable<DataRow>? UnionSelect(IEnumerable<DataRow>? left, IEnumerable<DataRow>? right)
     {
         return left switch
         {
@@ -136,14 +129,7 @@ public static class Aggregator
             _ => Union(left, right)
         };
     }
-    
-    private static IEnumerable<DataRow>? RecursiveUnion<T>(Stream predicateStream, ref readonly Span<T?> readers)
-        where T : struct, BaseIndexer.IReadable
-    {
-        var left = Aggregate(predicateStream, in readers);
-        var right = Aggregate(predicateStream, in readers);
-        return UnionSelect(left, right);
-    }
+
     private static IEnumerable<DataRow>? Filter<T>(Stream predicateStream, ref readonly Span<T?> readers)
         where T : struct, BaseIndexer.IReadable
     {
@@ -328,12 +314,11 @@ public static class Aggregator
 }
 
 public struct PreparedLocalEnumerator<T> : IEnumerator<T>
-    where T : IAstraSerializable
+    where T : ICellsSerializable
 {
     private readonly HashSet<DataRow>? _result;
     private IEnumerator<DataRow> _enumerator = null!;
     private T _current = default!;
-    private RecyclableMemoryStream _buffer = null!;
     private int _stage;
 
     public PreparedLocalEnumerator(HashSet<DataRow>? result)
@@ -345,8 +330,6 @@ public struct PreparedLocalEnumerator<T> : IEnumerator<T>
     public void Dispose()
     {
         _enumerator?.Dispose();
-        _buffer?.Dispose();
-        _buffer = null!;
     }
 
     public bool MoveNext()
@@ -356,7 +339,6 @@ public struct PreparedLocalEnumerator<T> : IEnumerator<T>
             case 1:
             {
                 if (_result == null) return false;
-                _buffer = MemoryStreamPool.Allocate();
                 _enumerator = _result.GetEnumerator();
                 _stage = 2;
                 goto case 2;
@@ -364,21 +346,16 @@ public struct PreparedLocalEnumerator<T> : IEnumerator<T>
             case 2:
             {
                 if (!_enumerator.MoveNext()) goto case 3;
-                _buffer.Position = 0;
                 var row = _enumerator.Current;
-                row.Serialize(_buffer);
-                _buffer.Position = 0;
                 var value = Activator.CreateInstance<T>();
-                value.DeserializeStream(new ForwardStreamWrapper(_buffer));
+                value.DeserializeFromCells(row.Span);
                 _current = value;
                 return true;
             }
             case 3:
             {
                 _enumerator.Dispose();
-                _buffer.Dispose();
                 _enumerator = null!;
-                _buffer = null!;
                 goto case -1;
             }
             case -1:
@@ -403,7 +380,7 @@ public struct PreparedLocalEnumerator<T> : IEnumerator<T>
 }
 
 public readonly struct PreparedLocalEnumerable<T> : IEnumerable<T> 
-    where T : IAstraSerializable
+    where T : ICellsSerializable
 {
     private readonly HashSet<DataRow>? _result;
     
@@ -468,7 +445,7 @@ public static class AggregatorHelper
     }
 
     public static PreparedLocalEnumerable<T> LocalAggregate<T, TReader>(this Stream predicateStream, ref readonly Span<TReader?> readers)
-        where T : IAstraSerializable
+        where T : ICellsSerializable
         where TReader : struct, BaseIndexer.IReadable
     {
         var set = predicateStream.Aggregate(in readers)?.ToHashSet();
@@ -476,10 +453,18 @@ public static class AggregatorHelper
     }
     
     public static PreparedLocalEnumerable<T> LocalAggregate<T, TReader>(this ref readonly PhysicalPlan plan, ref readonly Span<TReader?> readers)
-        where T : IAstraSerializable
+        where T : ICellsSerializable
         where TReader : struct, BaseIndexer.IReadable
     {
         var set = Aggregator.ApplyPhysicalPlan(in plan, in readers)?.ToHashSet();
+        return new(set);
+    }
+    
+    public static PreparedLocalEnumerable<T> LocalAggregate<T, TReader>(this ref readonly CompiledPhysicalPlan plan, ReadOnlySpan<TReader?> readers)
+            where T : ICellsSerializable
+            where TReader : struct, BaseIndexer.IReadable
+    {
+        var set = plan.Executor.Execute(readers)?.ToHashSet();
         return new(set);
     }
 }

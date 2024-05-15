@@ -1,29 +1,23 @@
+using System.Diagnostics;
+using System.Reflection;
 using Astra.Common;
 using Astra.Common.Data;
 using Astra.Common.Protocols;
 using Astra.Common.StreamUtils;
-using Astra.Engine.Indexers;
 using Astra.Engine.v2.Data;
-using Astra.TypeErasure;
 using Astra.TypeErasure.Data;
-using Astra.TypeErasure.Planners;
+using Astra.TypeErasure.Planners.Physical;
 
 namespace Astra.Engine.v2.Indexers;
 
 public class GenericIndexer(ColumnSchema schema) : BaseIndexer(schema)
 {
     private static readonly uint[] GenericFeatures = [ Operation.Equal ];
-    // private static readonly uint[] NumericFeatures = [ 
-    //     Operation.Equal, 
-    //     Operation.ClosedBetween,
-    //     Operation.GreaterThan,
-    //     Operation.GreaterOrEqualsTo,
-    //     Operation.LessThan,
-    //     Operation.LesserOrEqualsTo
-    // ];
     
     private readonly Dictionary<DataCell, HashSet<DataRow>> _data = new();
-
+    private readonly MethodInfo _collectExactImpl = typeof(GenericIndexer).GetMethod(nameof(CollectExact),
+                                                        [typeof(DataCell).MakeByRefType()]) ??
+                                                    throw new UnreachableException();
 
     private HashSet<DataRow>? CollectExact(Stream predicateStream)
     {
@@ -36,6 +30,12 @@ public class GenericIndexer(ColumnSchema schema) : BaseIndexer(schema)
     private HashSet<DataRow>? CollectExact(ref readonly OperationBlueprint blueprint)
     {
         _data.TryGetValue(blueprint.Cell1, out var rows);
+        return rows;
+    }
+    
+    public HashSet<DataRow>? CollectExact(ref readonly DataCell value)
+    {
+        _data.TryGetValue(value, out var rows);
         return rows;
     }
 
@@ -110,6 +110,15 @@ public class GenericIndexer(ColumnSchema schema) : BaseIndexer(schema)
     protected override void Clear()
     {
         _data.Clear();
+    }
+
+    internal override MethodInfo GetFetchImplementation(uint operation)
+    {
+        return operation switch
+        {
+            Operation.Equal => _collectExactImpl,
+            _ => throw new OperationNotSupported($"Operation not supported: {operation}")
+        };
     }
 
     protected override int Count => _data.Count;

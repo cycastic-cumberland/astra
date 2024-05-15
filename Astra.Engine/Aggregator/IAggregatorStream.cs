@@ -53,7 +53,7 @@ file static class LocalAggregatorEnumerator
 
 public struct PreparedLocalAggregatorEnumerator<T, TIndexerLock> : IEnumerator<T>
     where TIndexerLock : struct, DataRegistry.IIndexersLock
-    where T : IAstraSerializable
+    where T : IStreamSerializable
 {
     private readonly IEnumerable<ImmutableDataRow> _enumerable;
     private IEnumerator<ImmutableDataRow> _enumerator = null!;
@@ -133,7 +133,7 @@ public struct PreparedLocalAggregatorEnumerator<T, TIndexerLock> : IEnumerator<T
 
 public struct LocalAggregatorEnumerator<T, TIndexerLock> : IEnumerator<T>
     where TIndexerLock : struct, DataRegistry.IIndexersLock
-    where T : IAstraSerializable
+    where T : IStreamSerializable
 {
     private readonly Stream _predicateStream;
     private readonly TIndexerLock _indexerLock;

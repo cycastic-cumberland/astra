@@ -3,7 +3,7 @@ using Astra.Common.StreamUtils;
 
 namespace Astra.Common.Serializable;
 
-public struct FlexSerializable<T> : IAstraSerializable
+public struct FlexSerializable<T> : IStreamSerializable
 {
     private T _target;
 

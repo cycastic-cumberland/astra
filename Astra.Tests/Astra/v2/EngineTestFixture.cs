@@ -5,37 +5,54 @@ using Astra.Common.StreamUtils;
 using Astra.Engine.Data;
 using Astra.Engine.Data.Attributes;
 using Astra.Engine.v2.Data;
+using Astra.TypeErasure.Data;
 using Astra.TypeErasure.Planners;
+using Astra.TypeErasure.Planners.Physical;
 using Microsoft.Extensions.Logging;
 
 namespace Astra.Tests.Astra.v2;
 
+public struct TinySerializableStruct : IStreamSerializable, ICellsSerializable
+{
+    [Indexed(Indexer = IndexerType.BTree)]
+    public int Value1 { get; set; }
+    [Indexed(Indexer = IndexerType.None)]
+    public string Value2 { get; set; }
+    [Indexed(Indexer = IndexerType.Generic)]
+    public string Value3 { get; set; }
+
+    public void SerializeStream<TStream>(TStream writer) where TStream : IStreamWrapper
+    {
+        writer.SaveValue(Value1);
+        writer.SaveValue(Value2);
+        writer.SaveValue(Value3);
+    }
+
+    public void DeserializeStream<TStream>(TStream reader) where TStream : IStreamWrapper
+    {
+        Value1 = reader.LoadInt();
+        Value2 = reader.LoadString();
+        Value3 = reader.LoadString();
+    }
+
+    public void SerializeToCells(Span<DataCell> cells)
+    {
+        cells[0] = new(Value1);
+        cells[1] = new(Value2);
+        cells[2] = new(Value3);
+    }
+
+    public void DeserializeFromCells(ReadOnlySpan<DataCell> cells)
+    {
+        Value1 = cells[0].DWord;
+        Value2 = cells[1].GetString();
+        Value3 = cells[2].GetString();
+    }
+}
+
 [TestFixture]
 public class EngineTestFixture
 {
-    public struct TinySerializableStruct : IAstraSerializable
-    {
-        [Indexed(Indexer = IndexerType.BTree)]
-        public int Value1 { get; set; }
-        [Indexed(Indexer = IndexerType.None)]
-        public string Value2 { get; set; }
-        [Indexed(Indexer = IndexerType.Generic)]
-        public string Value3 { get; set; }
-
-        public void SerializeStream<TStream>(TStream writer) where TStream : IStreamWrapper
-        {
-            writer.SaveValue(Value1);
-            writer.SaveValue(Value2);
-            writer.SaveValue(Value3);
-        }
-
-        public void DeserializeStream<TStream>(TStream reader) where TStream : IStreamWrapper
-        {
-            Value1 = reader.LoadInt();
-            Value2 = reader.LoadString();
-            Value3 = reader.LoadString();
-        }
-    }
     private ILoggerFactory _loggerFactory = null!;
     private ShinDataRegistry<TinySerializableStruct> _registry = null!;
     private ShinDataRegistry _typeErasedRegistry = null!;
@@ -168,12 +185,13 @@ public class EngineTestFixture
         Assert.That(_typeErasedRegistry.RowsCount, Is.Zero);
         _typeErasedRegistry.BulkInsertCompat(data);
         Assert.That(_typeErasedRegistry.RowsCount, Is.EqualTo(data.Length));
-        using var plan = PhysicalPlanBuilder.Column<int>(0).GreaterThan(0)
+        var plan = PhysicalPlanBuilder.Column<int>(0).GreaterThan(0)
             .And(PhysicalPlanBuilder.Column<int>(0).LessThan(2)).Build();
-        ref readonly var planRef = ref plan;
+        using var compiledPlan = _typeErasedRegistry.Compile(plan);
+        ref readonly var compiledPlanRef = ref compiledPlan;
         {
             var count = 0;
-            var fetched = _typeErasedRegistry.AggregateCompat<TinySerializableStruct>(in planRef);
+            var fetched = _typeErasedRegistry.AggregateCompat<TinySerializableStruct>(in compiledPlanRef);
             foreach (var f in fetched)
             {
                 count += 1;
@@ -184,7 +202,7 @@ public class EngineTestFixture
         }
         {
             var count = 0;
-            var fetched = _typeErasedRegistry.Aggregate<TinySerializableStruct>(in planRef);
+            var fetched = _typeErasedRegistry.Aggregate<TinySerializableStruct>(in compiledPlanRef);
             foreach (var f in fetched)
             {
                 count += 1;

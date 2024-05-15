@@ -3,8 +3,9 @@ using Astra.Client.Simple.Aggregator;
 using Astra.Common.Data;
 using Astra.Common.Serializable;
 using Astra.Engine.Data;
+using Astra.Engine.v2.Codegen;
 using Astra.Engine.v2.Data;
-using Astra.TypeErasure.Planners;
+using Astra.TypeErasure.Planners.Physical;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
@@ -16,6 +17,7 @@ public class LocalAggregationBenchmark
     private DataRegistry _registry = null!;
     private ShinDataRegistry _newRegistry = null!;
     private PhysicalPlan _plan;
+    private CompiledPhysicalPlan _compiledPlan;
     private const int Index = 1;
 
     [Params(100, 1_000, 10_000)]
@@ -66,6 +68,10 @@ public class LocalAggregationBenchmark
         };
         _registry = new(specs);
         _newRegistry = new(specs);
+        
+        var plan = PhysicalPlanBuilder.Column<int>(0).EqualsTo(Index).Build();
+        _compiledPlan = _newRegistry.Compile(plan);
+        
         var data = new SimpleSerializableStruct[AggregatedRows + GibberishRows];
         for (var i = 0; i < AggregatedRows; i++)
         {
@@ -96,8 +102,10 @@ public class LocalAggregationBenchmark
     {
         _registry.Dispose();
         _newRegistry.Dispose();
+        _compiledPlan.Dispose();
         _registry = null!;
         _newRegistry = null!;
+        _compiledPlan = default;
     }
 
     [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
@@ -130,32 +138,6 @@ public class LocalAggregationBenchmark
     }
     
     [Benchmark]
-    public void ManualDeserializationNew()
-    {
-        var predicate = AstraTable<int, string, string, byte[], float>.Column1.EqualsLiteral(Index);
-        var fetched = _newRegistry.AggregateCompat<SimpleSerializableStruct>(
-            predicate.DumpMemory());
-        
-        foreach (var f in fetched)
-        {
-            ProfessionalTimeWaster(f.Value1);
-        }
-    }
-    
-    [Benchmark]
-    public void AutoDeserializationNew()
-    {
-        var predicate = AstraTable<int, string, string, byte[], float>.Column1.EqualsLiteral(Index);
-        var fetched = _newRegistry.Aggregate<SimpleSerializableStruct>(
-            predicate.DumpMemory());
-        
-        foreach (var f in fetched)
-        {
-            ProfessionalTimeWaster(f.Value1);
-        }
-    }
-    
-    [Benchmark]
     public void ManualDeserializationPlanned()
     {
         var fetched = _newRegistry.AggregateCompat<SimpleSerializableStruct>(ref _plan);
@@ -170,6 +152,28 @@ public class LocalAggregationBenchmark
     public void AutoDeserializationPlanned()
     {
         var fetched = _newRegistry.Aggregate<SimpleSerializableStruct>(ref _plan);
+        
+        foreach (var f in fetched)
+        {
+            ProfessionalTimeWaster(f.Value1);
+        }
+    }
+    
+    [Benchmark]
+    public void ManualDeserializationPlannedCompiled()
+    {
+        var fetched = _newRegistry.AggregateCompat<SimpleSerializableStruct>(ref _compiledPlan);
+        
+        foreach (var f in fetched)
+        {
+            ProfessionalTimeWaster(f.Value1);
+        }
+    }
+    
+    [Benchmark]
+    public void AutoDeserializationPlannedCompiled()
+    {
+        var fetched = _newRegistry.Aggregate<SimpleSerializableStruct>(ref _compiledPlan);
         
         foreach (var f in fetched)
         {

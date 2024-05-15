@@ -3,7 +3,7 @@ using Astra.Common.StreamUtils;
 
 namespace Astra.Common.Serializable;
 
-public sealed class GenericStatelessSerializable<T> : IStatelessSerializable<T>
+public sealed class GenericStatelessStreamSerializable<T> : IStatelessStreamSerializable<T>
 {
     public void SerializeStream<TStream>(TStream writer, T value) where TStream : IStreamWrapper
     {
@@ -127,5 +127,5 @@ public sealed class GenericStatelessSerializable<T> : IStatelessSerializable<T>
         return (T)boxed!;
     }
 
-    public static readonly GenericStatelessSerializable<T> Default = new();
+    public static readonly GenericStatelessStreamSerializable<T> Default = new();
 }

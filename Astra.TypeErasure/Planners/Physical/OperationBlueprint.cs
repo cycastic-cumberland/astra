@@ -4,7 +4,7 @@ using Astra.Common.Data;
 using Astra.Common.StreamUtils;
 using Astra.TypeErasure.Data;
 
-namespace Astra.TypeErasure.Planners;
+namespace Astra.TypeErasure.Planners.Physical;
 
 [StructLayout(LayoutKind.Explicit)]
 public struct OperationBlueprint

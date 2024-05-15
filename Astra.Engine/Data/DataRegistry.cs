@@ -10,6 +10,7 @@ using Astra.Engine.Indexers;
 using Astra.Engine.Resolvers;
 using Astra.Engine.Types;
 using Astra.TypeErasure.Planners;
+using Astra.TypeErasure.Planners.Physical;
 using Microsoft.Extensions.Logging;
 using Microsoft.IO;
 
@@ -115,7 +116,7 @@ public sealed class DataRegistry : IRegistry<DataRegistry>
         }
     }
 
-    private readonly struct AutoReadLock(DataRegistry registry, ILogger<AutoReadLock> logger) : IIndexersLock
+    private readonly struct AutoReadLock(DataRegistry registry) : IIndexersLock
     {
         public int Count => registry._synthesizers.Length;
         public void Dispose()
@@ -177,13 +178,13 @@ public sealed class DataRegistry : IRegistry<DataRegistry>
     }
     
     public struct StreamBasedAggregationEnumerator<T> : IEnumerator<T>
-        where T : IAstraSerializable
+        where T : IStreamSerializable
     {
         private AutoReadLock _lock;
         private LocalAggregatorEnumerator<T, AutoReadLock> _enumerator;
         internal StreamBasedAggregationEnumerator(DataRegistry host, Stream stream)
         {
-            _lock = new(host, host._readLogger);
+            _lock = new(host);
             _enumerator = new (stream, _lock);
         }
 
@@ -209,7 +210,7 @@ public sealed class DataRegistry : IRegistry<DataRegistry>
     }
     
     public readonly struct StreamBasedAggregationEnumerable<T> : IEnumerable<T>
-        where T : IAstraSerializable
+        where T : IStreamSerializable
     {
         private readonly DataRegistry _host;
         private readonly Stream _stream;
@@ -286,7 +287,7 @@ public sealed class DataRegistry : IRegistry<DataRegistry>
     }
 
     public struct BufferBasedAggregationEnumerator<T> : IEnumerator<T>
-        where T : IAstraSerializable
+        where T : IStreamSerializable
     {
         private readonly ReadOnlyBufferStream _bufferStream;
         private StreamBasedAggregationEnumerator<T> _enumerator;
@@ -320,7 +321,7 @@ public sealed class DataRegistry : IRegistry<DataRegistry>
     }
 
     public readonly struct BufferBasedAggregationEnumerable<T> : IEnumerable<T>
-        where T : IAstraSerializable
+        where T : IStreamSerializable
     {
         private readonly DataRegistry _host;
         private readonly ReadOnlyMemory<byte> _predicate;
@@ -406,7 +407,7 @@ public sealed class DataRegistry : IRegistry<DataRegistry>
         public Enumerator(DataRegistry host)
         {
             _auto = host._autoIndexer.Read();
-            _read = new(host, host._readLogger);
+            _read = new(host);
             _enumerator = new(_read, _auto.FetchAllUnsafe());
         }
 
@@ -575,12 +576,12 @@ public sealed class DataRegistry : IRegistry<DataRegistry>
         }
     }
     
-    public StreamBasedAggregationEnumerable<T> AggregateCompat<T>(Stream predicateStream) where T : IAstraSerializable
+    public StreamBasedAggregationEnumerable<T> AggregateCompat<T>(Stream predicateStream) where T : IStreamSerializable
     {
         return new(this, predicateStream);
     }
     
-    public BufferBasedAggregationEnumerable<T> AggregateCompat<T>(ReadOnlyMemory<byte> predicateStream) where T : IAstraSerializable
+    public BufferBasedAggregationEnumerable<T> AggregateCompat<T>(ReadOnlyMemory<byte> predicateStream) where T : IStreamSerializable
     {
         return new(this, predicateStream);
     }
@@ -622,7 +623,7 @@ public sealed class DataRegistry : IRegistry<DataRegistry>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public int ConditionalCount(Stream predicateStream)
     {
-        using var readLock = new AutoReadLock(this, _readLogger);
+        using var readLock = new AutoReadLock(this);
         return ConditionalCountInternal(predicateStream, readLock);
     }
 
@@ -795,7 +796,7 @@ public sealed class DataRegistry : IRegistry<DataRegistry>
         {
             case Command.UnsortedAggregate:
             {
-                using var readLock = new AutoReadLock(this, _readLogger);
+                using var readLock = new AutoReadLock(this);
                 OutputLayout(dataOut, _synthesizers);
                 dataIn.AggregateStream(dataOut, readLock);
                 break;
@@ -807,7 +808,7 @@ public sealed class DataRegistry : IRegistry<DataRegistry>
             }
             case Command.ConditionalCount:
             {
-                using var readLock = new AutoReadLock(this, _readLogger);
+                using var readLock = new AutoReadLock(this);
                 var count = ConditionalCountInternal(dataIn, readLock);
                 dataOut.WriteValue(count);
                 break;
@@ -848,7 +849,7 @@ public sealed class DataRegistry : IRegistry<DataRegistry>
             ReadOnce(dataIn, dataOut);
     }
 
-    public bool InsertCompat<T>(T value) where T : IAstraSerializable
+    public bool InsertCompat<T>(T value) where T : IStreamSerializable
     {
         using var inStream = MemoryStreamPool.Allocate();
         value.SerializeStream(new ForwardStreamWrapper(inStream));
@@ -863,7 +864,7 @@ public sealed class DataRegistry : IRegistry<DataRegistry>
         return InsertCompat(new FlexSerializable<T> { Target = value });
     }
     
-    public int BulkInsertCompat<T>(IEnumerable<T> values) where T : IAstraSerializable
+    public int BulkInsertCompat<T>(IEnumerable<T> values) where T : IStreamSerializable
     {
         var inStream = LocalBulkInsertStream.Value ?? MemoryStreamPool.Allocate();
         var wrapper = new ForwardStreamWrapper(inStream);

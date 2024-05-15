@@ -1,5 +1,6 @@
 using Astra.Common.Data;
 using Astra.TypeErasure.Planners;
+using Astra.TypeErasure.Planners.Physical;
 using Microsoft.Extensions.Logging;
 
 namespace Astra.Engine;

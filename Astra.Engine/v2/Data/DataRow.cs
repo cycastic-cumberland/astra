@@ -1,14 +1,13 @@
 using System.Buffers;
-using System.IO.Hashing;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using Astra.TypeErasure;
 using Astra.TypeErasure.Data;
 
 namespace Astra.Engine.v2.Data;
 
 public class DataRow : IDisposable, IEquatable<DataRow>
 {
+    private readonly DatastoreContext _context;
     private readonly DataCell[] _pool;
     private readonly int _length;
     private readonly ulong _rowId;
@@ -19,6 +18,7 @@ public class DataRow : IDisposable, IEquatable<DataRow>
     public DataRow(DataCell[] pool, DatastoreContext context)
     {
         _pool = pool;
+        _context = context;
         _length = context.TableSchema.Length;
         _rowId = context.NewRowId();
         _cachedHash = _rowId.GetHashCode();
@@ -37,7 +37,7 @@ public class DataRow : IDisposable, IEquatable<DataRow>
 
     public bool Equals(DataRow? other)
     {
-        return other != null && _rowId == other._rowId;
+        return other != null && _rowId == other._rowId && _context == other._context;
     }
     
     public bool EqualityCheck(DataRow? other)
@@ -71,14 +71,37 @@ public class DataRow : IDisposable, IEquatable<DataRow>
     public static DataRow Deserialize(DatastoreContext context, Stream stream)
     {
         var array = ArrayPool<DataCell>.Shared.Rent(context.TableSchema.Length);
-        for (var i = 0; i < context.TableSchema.Length; i++)
+        try
         {
-            var schema = context.TableSchema[i];
-            var cell = DataCell.FromStream(schema.Type.Value, stream);
-            array[i] = cell;
-        }
+            for (var i = 0; i < context.TableSchema.Length; i++)
+            {
+                var schema = context.TableSchema[i];
+                var cell = DataCell.FromStream(schema.Type.Value, stream);
+                array[i] = cell;
+            }
 
-        return new(array, context);
+            return new(array, context);
+        }
+        catch
+        {
+            ArrayPool<DataCell>.Shared.Return(array);
+            throw;
+        }
+    }
+
+    public static DataRow Create<T>(DatastoreContext context, T data) where T : ICellsSerializable
+    {
+        var array = ArrayPool<DataCell>.Shared.Rent(context.TableSchema.Length);
+        try
+        {
+            data.SerializeToCells(new(array, 0, context.TableSchema.Length));
+            return new(array, context);
+        }
+        catch
+        {
+            ArrayPool<DataCell>.Shared.Return(array);
+            throw;
+        }
     }
 
     public override bool Equals(object? obj)

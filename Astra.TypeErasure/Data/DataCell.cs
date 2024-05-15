@@ -19,7 +19,7 @@ public readonly struct DataCell : INumber<DataCell>, IDisposable
 {
     public static readonly DataCell MinValue = new(double.MinValue);
     public static readonly DataCell MaxValue = new(double.MaxValue);
-    private static class CellTypes
+    public static class CellTypes
     {
         public const byte Unset     = 0;
         public const byte DWord     = 2;
@@ -106,7 +106,12 @@ public readonly struct DataCell : INumber<DataCell>, IDisposable
         CellType = CellTypes.Double;
     }
     
-    public DataCell(string value)
+    public DataCell(string value) : this((ReadOnlySpan<char>)value)
+    {
+        
+    }
+    
+    public DataCell(ReadOnlySpan<char> value)
     {
         var buffer = ArrayPool<char>.Shared.Rent(value.Length);
         var length = value.Length;
@@ -138,14 +143,19 @@ public readonly struct DataCell : INumber<DataCell>, IDisposable
         CellType = CellTypes.Text;
     }
     
-    
-    public DataCell(byte[] value)
+    public DataCell(ReadOnlySpan<byte> value)
     {
         var buffer = ArrayPool<byte>.Shared.Rent(value.Length);
         var length = value.Length;
         try
         {
-            Buffer.BlockCopy(value, 0, buffer, 0, length);
+            unsafe
+            {
+                fixed (void* dest = buffer, source = value)
+                {
+                    Buffer.MemoryCopy(source, dest, buffer.Length * sizeof(byte), length * sizeof(char));
+                }
+            }
         }
         catch
         {
@@ -156,6 +166,11 @@ public readonly struct DataCell : INumber<DataCell>, IDisposable
         Pointer = buffer;
         DWord = length;
         CellType = CellTypes.Bytes;
+    }
+
+    public DataCell(byte[] value) : this((ReadOnlySpan<byte>)value)
+    {
+        
     }
     
     private DataCell(int length, byte[] value)
@@ -1312,7 +1327,7 @@ public readonly struct DataCell : INumber<DataCell>, IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Dispose()
     {
-        switch (CellType)
+        switch (unchecked(CellType))
         {
             case CellTypes.Text:
             {
@@ -1330,7 +1345,10 @@ public readonly struct DataCell : INumber<DataCell>, IDisposable
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private ReadOnlySpan<byte> ExtractBytes() => new((byte[])Pointer, 0, DWord);
+    public ReadOnlySpan<byte> ExtractBytes() => new((byte[])Pointer, 0, DWord);
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private StringRef ExtractText() => new(new((char[])Pointer, 0, DWord));
+    public StringRef ExtractText() => new(new((char[])Pointer, 0, DWord));
+
+    public byte[] GetBytes() => ExtractBytes().ToArray();
+    public string GetString() => new(ExtractText());
 }

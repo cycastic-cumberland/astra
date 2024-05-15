@@ -5,6 +5,7 @@ using Astra.Common.Data;
 using Astra.Server;
 using Astra.Server.Authentication;
 using Astra.TypeErasure.Planners;
+using Astra.TypeErasure.Planners.Physical;
 
 namespace Astra.Tests.Astra.v2;
 

@@ -26,7 +26,7 @@ file static class DynamicSerializableHelpers
         var builder = DynamicSerializableModuleBuilder.DefineType(name,
             TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.Sealed);
 
-        var interfaceType = typeof(IStatelessSerializable<>).MakeGenericType(type);
+        var interfaceType = typeof(IStatelessStreamSerializable<>).MakeGenericType(type);
         builder.AddInterfaceImplementation(interfaceType);
         
         return builder;
@@ -169,7 +169,7 @@ file static class DynamicSerializableHelpers<T>
         ilGenerator.Emit(OpCodes.Ret);
     }
     
-    private static IStatelessSerializable<T> BuildDynamicType()
+    private static IStatelessStreamSerializable<T> BuildDynamicType()
     {
         if (!typeof(T).IsPublic)
         {
@@ -180,7 +180,7 @@ file static class DynamicSerializableHelpers<T>
         var typeBuilder = DynamicSerializableHelpers.CreateType(typeof(T));
         var properties = TypeHelpers.ToAccessibleProperties<T>().ToArray();
         {
-            var serializationMethod = typeBuilder.DefineMethod(nameof(IStatelessSerializable<int>.SerializeStream),
+            var serializationMethod = typeBuilder.DefineMethod(nameof(IStatelessStreamSerializable<int>.SerializeStream),
                 MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig);
             var genericBuilder = serializationMethod.DefineGenericParameters(DynamicSerializableHelpers.TypeParameterNames)[0];
             genericBuilder.SetInterfaceConstraints(DynamicSerializableHelpers.GenericConstraint);
@@ -193,7 +193,7 @@ file static class DynamicSerializableHelpers<T>
                 MakeSerializationMethod(serializationMethod.GetILGenerator(), properties, genericBuilder);
         }
         {
-            var deserializationMethod = typeBuilder.DefineMethod(nameof(IStatelessSerializable<int>.DeserializeStream),
+            var deserializationMethod = typeBuilder.DefineMethod(nameof(IStatelessStreamSerializable<int>.DeserializeStream),
                 MethodAttributes.Public | MethodAttributes.Virtual | MethodAttributes.HideBySig);
             var genericBuilder = deserializationMethod.DefineGenericParameters(DynamicSerializableHelpers.TypeParameterNames)[0];
             genericBuilder.SetInterfaceConstraints(DynamicSerializableHelpers.GenericConstraint);
@@ -207,22 +207,22 @@ file static class DynamicSerializableHelpers<T>
 
         var dynamicType = typeBuilder.CreateType();
         var obj = Activator.CreateInstance(dynamicType) ?? throw new NullReferenceException();
-        return (IStatelessSerializable<T>)obj;
+        return (IStatelessStreamSerializable<T>)obj;
     }
 
-    public static readonly IStatelessSerializable<T> DynamicSerializer = BuildDynamicType();
-    public static GenericStatelessSerializable<T> FallbackSerializer => GenericStatelessSerializable<T>.Default;
+    public static readonly IStatelessStreamSerializable<T> DynamicSerializer = BuildDynamicType();
+    public static GenericStatelessStreamSerializable<T> FallbackSerializer => GenericStatelessStreamSerializable<T>.Default;
 
-    public static IStatelessSerializable<T> DefaultSerializer => typeof(T).IsPublic
+    public static IStatelessStreamSerializable<T> DefaultSerializer => typeof(T).IsPublic
         ? DynamicSerializer
         : FallbackSerializer;
 }
 
 public static class DynamicSerializable
 {
-    public static GenericStatelessSerializable<T> GetFallbackSerializer<T>() => DynamicSerializableHelpers<T>.FallbackSerializer;
-    public static IStatelessSerializable<T> GetDefaultSerializer<T>() => DynamicSerializableHelpers<T>.DefaultSerializer;
-    public static IStatelessSerializable<T> GetDynamicSerializer<T>() => DynamicSerializableHelpers<T>.DynamicSerializer;
+    public static GenericStatelessStreamSerializable<T> GetFallbackSerializer<T>() => DynamicSerializableHelpers<T>.FallbackSerializer;
+    public static IStatelessStreamSerializable<T> GetDefaultSerializer<T>() => DynamicSerializableHelpers<T>.DefaultSerializer;
+    public static IStatelessStreamSerializable<T> GetDynamicSerializer<T>() => DynamicSerializableHelpers<T>.DynamicSerializer;
     public static void EnsureBuilt<T>() => GetDefaultSerializer<T>();
     
 

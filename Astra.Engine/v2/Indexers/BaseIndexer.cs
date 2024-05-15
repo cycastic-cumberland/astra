@@ -1,8 +1,10 @@
 using System.Collections;
+using System.Reflection;
 using Astra.Common.Data;
 using Astra.Engine.v2.Data;
 using Astra.TypeErasure.Data;
 using Astra.TypeErasure.Planners;
+using Astra.TypeErasure.Planners.Physical;
 
 namespace Astra.Engine.v2.Indexers;
 
@@ -20,6 +22,7 @@ public abstract class BaseIndexer(ColumnSchema schema)
     protected abstract IEnumerable<DataRow>? Remove(Stream predicateStream);
     protected abstract bool Remove(DataRow row);
     protected abstract void Clear();
+    internal abstract MethodInfo GetFetchImplementation(uint operation);
     protected abstract int Count { get; }
     public abstract FeaturesList SupportedReadOperations { get; }
     public abstract FeaturesList SupportedWriteOperations { get; }
@@ -33,6 +36,7 @@ public abstract class BaseIndexer(ColumnSchema schema)
         public IEnumerable<DataRow>? Fetch(Stream predicateStream);
         public IEnumerable<DataRow>? Fetch(ref readonly OperationBlueprint blueprint);
         public IEnumerable<DataRow>? Fetch(uint operation, Stream predicateStream);
+        public BaseIndexer Host { get; }
     }
     
     public readonly struct Reader : IReadable
@@ -64,6 +68,7 @@ public abstract class BaseIndexer(ColumnSchema schema)
         public IEnumerable<DataRow>? Fetch(ref readonly OperationBlueprint blueprint) => _host.Fetch(in blueprint);
         
         public IEnumerable<DataRow>? Fetch(uint operation, Stream predicateStream) => _host.Fetch(operation, predicateStream);
+        public BaseIndexer Host => _host;
     }
 
     public readonly struct Writer : IReadable
@@ -102,6 +107,7 @@ public abstract class BaseIndexer(ColumnSchema schema)
         public void Remove(DataRow predicateStream) => _host.Remove(predicateStream);
         
         public void Clear() => _host.Clear();
+        public BaseIndexer Host => _host;
     }
 
     public Reader Read() => new(this);
