@@ -43,7 +43,7 @@ public class ParallelClientsTestFixture
             Indexer = IndexerType.BTree,
         },
     ];
-    private SimpleAstraClientConnectionSettings _connectionSettings;
+    private AstraClientConnectionSettings _connectionSettings;
     
     private TcpServer _server = null!;
     private Task _serverTask = null!;
@@ -89,7 +89,7 @@ public class ParallelClientsTestFixture
     
     private async Task SimpleValueTypeInsertionTestAsync()
     {
-        using var simpleAstraClient = new SimpleAstraClient();
+        using var simpleAstraClient = new AstraClient();
         await simpleAstraClient.ConnectAsync(_connectionSettings);
         var inserted = await simpleAstraClient.BulkInsertSerializableCompatAsync(new SimpleSerializableStruct[]
         {

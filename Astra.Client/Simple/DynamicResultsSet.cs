@@ -33,7 +33,7 @@ public readonly struct DynamicResultsSet<T> : IEnumerable<T>, IDisposable
 
     private readonly ResultsSet<FlexSerializable<T>> _set;
 
-    public DynamicResultsSet(SimpleAstraClient client, int timeout)
+    public DynamicResultsSet(AstraClient client, int timeout)
     {
         _set = new(client, timeout, CompiledTypeCodes.AsMemory());
     }

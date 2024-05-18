@@ -71,6 +71,7 @@ public readonly struct DataCell : INumber<DataCell>, IDisposable
         _ => throw new ArgumentOutOfRangeException()
     };
 
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public DataCell(byte type, long raw, object? pointer)
     {
         CellType = type;

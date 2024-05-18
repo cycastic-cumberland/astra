@@ -4,7 +4,6 @@ using Astra.Client.Simple.Aggregator;
 using Astra.Common.Data;
 using Astra.Server;
 using Astra.Server.Authentication;
-using Astra.TypeErasure.Planners;
 using Astra.TypeErasure.Planners.Physical;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
@@ -43,8 +42,8 @@ public class NetworkAggregationBenchmark
     
     private TcpServer _server = null!;
     private TcpServer _newServer = null!;
-    private SimpleAstraClient _client = null!;
-    private SimpleAstraClient _client2 = null!;
+    private AstraClient _client = null!;
+    private AstraClient _client2 = null!;
     private Task _serverTask = Task.CompletedTask;
     private Task _newServerTask = Task.CompletedTask;
     private GenericAstraQueryBranch _predicate;

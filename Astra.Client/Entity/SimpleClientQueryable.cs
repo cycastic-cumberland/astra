@@ -6,10 +6,10 @@ namespace Astra.Client.Entity;
 
 public readonly struct SimpleClientQueryable<T> : IQueryProvider
 {
-    private readonly SimpleAstraClient _client;
-    internal SimpleAstraClient Client => _client;
+    private readonly AstraClient _client;
+    internal AstraClient Client => _client;
 
-    internal SimpleClientQueryable(SimpleAstraClient client) => _client = client;
+    internal SimpleClientQueryable(AstraClient client) => _client = client;
 
 
     internal ValueTask<DynamicResultsSet<T>> RunQuery(ReadOnlyMemory<byte> predicates, CancellationToken cancellationToken)

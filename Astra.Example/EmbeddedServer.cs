@@ -82,7 +82,7 @@ public class EmbeddedServer
             publicKey = Convert.ToBase64String(rsa.ExportRSAPublicKey());
             privateKey = Convert.ToBase64String(rsa.ExportRSAPrivateKey());
         }
-        var connectionSettings = new SimpleAstraClientConnectionSettings
+        var connectionSettings = new AstraClientConnectionSettings
         {
             Address = "127.0.0.1",
             Port = port,
@@ -103,7 +103,7 @@ public class EmbeddedServer
         
         logger.LogInformation("Example: Embedded TCP server with Public-private key authentication");
         
-        using var client = new SimpleAstraClient();
+        using var client = new AstraClient();
         await client.ConnectAsync(connectionSettings);
         var inserted = await client.BulkInsertSerializableCompatAsync(new SimpleSerializableStruct[]
         {

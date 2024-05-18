@@ -17,7 +17,7 @@ namespace Astra.Client.Simple;
 
 
 // Side job: handle endianness 
-public class SimpleAstraClient : IAstraClient
+public class AstraClient : IAstraClient
 {
     public class EndianModeNotSupportedException(string? msg = null) : NotSupportedException(msg);
     public class HandshakeFailedException(string? msg = null) : Exception(msg);
@@ -83,8 +83,8 @@ public class SimpleAstraClient : IAstraClient
     
     internal readonly struct ExclusivityCheck : IDisposable
     {
-        private readonly SimpleAstraClient _client;
-        public ExclusivityCheck(SimpleAstraClient client)
+        private readonly AstraClient _client;
+        public ExclusivityCheck(AstraClient client)
         {
             if (client._exclusivity)
                 throw new ConcurrencyException("Multiple readers cannot exist at the same time");
@@ -115,10 +115,10 @@ public class SimpleAstraClient : IAstraClient
         _inStream.Dispose();
     }
 
-    public SimpleAstraClientConnectionSettings? ConnectionSettings { get; private set; }
+    public AstraClientConnectionSettings? ConnectionSettings { get; private set; }
     public bool IsConnected => _client?.IsConnected ?? false;
 
-    public async Task ConnectAsync(SimpleAstraClientConnectionSettings settings, CancellationToken cancellationToken = default)
+    public async Task ConnectAsync(AstraClientConnectionSettings settings, CancellationToken cancellationToken = default)
     {
         _client?.Dispose();
         _client = null;

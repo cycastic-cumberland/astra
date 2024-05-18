@@ -4,7 +4,7 @@ namespace Astra.Client.Entity;
 
 public static class ClientHelpers
 {
-    public static SimpleClientQueryable<T> AsQuery<T>(this SimpleAstraClient client)
+    public static SimpleClientQueryable<T> AsQuery<T>(this AstraClient client)
     {
         return new(client);
     }

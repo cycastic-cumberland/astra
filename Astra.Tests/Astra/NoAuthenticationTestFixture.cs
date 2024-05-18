@@ -44,7 +44,7 @@ public class NoAuthenticationTestFixture
             Indexer = IndexerType.BTree,
         },
     ];
-    private SimpleAstraClientConnectionSettings _connectionSettings;
+    private AstraClientConnectionSettings _connectionSettings;
     
     private TcpServer _server = null!;
     private Task _serverTask = null!;
@@ -80,7 +80,7 @@ public class NoAuthenticationTestFixture
     [Test]
     public async Task ConnectionTest()
     {
-        using var simpleAstraClient = new SimpleAstraClient();
+        using var simpleAstraClient = new AstraClient();
         await simpleAstraClient.ConnectAsync(_connectionSettings);
     }
 }

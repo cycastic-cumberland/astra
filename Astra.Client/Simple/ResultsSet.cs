@@ -19,7 +19,7 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
         public Enumerator(ResultsSet<T> host)
         {
             if (host._exclusivity)
-                throw new SimpleAstraClient.ConcurrencyException("Multiple readers cannot exist at the same time");
+                throw new AstraClient.ConcurrencyException("Multiple readers cannot exist at the same time");
             host._exclusivity = true;
             _host = host;
         }
@@ -44,7 +44,7 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
     private readonly TcpClient _client;
     private readonly NetworkStream _stream;
     private readonly int _timeout;
-    private readonly SimpleAstraClient.ExclusivityCheck _exclusivityCheck;
+    private readonly AstraClient.ExclusivityCheck _exclusivityCheck;
     private readonly ReadOnlyMemory<uint>? _constraint;
     private bool _exclusivity;
     private int _stage;
@@ -54,9 +54,9 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
 
     public ReadOnlySpan<(uint type, string name)> Columns => new(_array, 0, _columnCount);
 
-    public ResultsSet(SimpleAstraClient client, int timeout, ReadOnlyMemory<uint>? constraintCheck = null)
+    public ResultsSet(AstraClient client, int timeout, ReadOnlyMemory<uint>? constraintCheck = null)
     {
-        var (networkClient, clientStream, reversed) = client.Client ?? throw new SimpleAstraClient.NotConnectedException();
+        var (networkClient, clientStream, reversed) = client.Client ?? throw new AstraClient.NotConnectedException();
         _exclusivityCheck = new(client);
         _constraint = constraintCheck;
         _client = networkClient;
@@ -113,7 +113,7 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
             {
                 case 1:
                 {
-                    var stream = new NetworkStreamWrapper<ForwardStreamWrapper>(new ForwardStreamWrapper(_stream), _client, _timeout);
+                    var stream = new ForwardStreamWrapper(_stream);
                     _columnCount = stream.LoadInt();
                     _array = ArrayPool<(uint, string)>.Shared.Rent(_columnCount);
                     for (var i = 0; i < _columnCount; i++)
@@ -131,7 +131,7 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
                 }
                 case 2:
                 {
-                    var stream = new NetworkStreamWrapper<ForwardStreamWrapper>(new ForwardStreamWrapper(_stream), _client, _timeout);
+                    var stream = new ForwardStreamWrapper(_stream);
                     var value = Activator.CreateInstance<T>();
                     value.DeserializeStream(stream);
                     _current = value;
@@ -141,7 +141,7 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
                 }
                 case 3:
                 {
-                    var stream = new NetworkStreamWrapper<ReverseStreamWrapper>(new ReverseStreamWrapper(_stream), _client, _timeout);
+                    var stream = new ReverseStreamWrapper(_stream);
                     _columnCount = stream.LoadInt();
                     _array = ArrayPool<(uint, string)>.Shared.Rent(_columnCount);
                     for (var i = 0; i < _columnCount; i++)
@@ -159,7 +159,7 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
                 }
                 case 4:
                 {
-                    var stream = new NetworkStreamWrapper<ReverseStreamWrapper>(new ReverseStreamWrapper(_stream), _client, _timeout);
+                    var stream = new ReverseStreamWrapper(_stream);
                     var value = Activator.CreateInstance<T>();
                     value.DeserializeStream(stream);
                     _current = value;

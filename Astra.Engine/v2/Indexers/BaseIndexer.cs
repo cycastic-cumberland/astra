@@ -1,9 +1,7 @@
-using System.Collections;
 using System.Reflection;
 using Astra.Common.Data;
 using Astra.Engine.v2.Data;
 using Astra.TypeErasure.Data;
-using Astra.TypeErasure.Planners;
 using Astra.TypeErasure.Planners.Physical;
 
 namespace Astra.Engine.v2.Indexers;
@@ -11,15 +9,14 @@ namespace Astra.Engine.v2.Indexers;
 public abstract class BaseIndexer(ColumnSchema schema)
 {
     protected readonly ColumnSchema Schema = schema;
-    // private readonly RWLock _rwLock = new();
+    protected internal readonly RWLock Latch = RWLock.Create();
 
     protected abstract IEnumerator<DataRow> GetEnumerator();
     protected abstract bool Contains(DataRow row);
-    protected abstract IEnumerable<DataRow>? Fetch(ref readonly OperationBlueprint blueprint);
-    protected abstract IEnumerable<DataRow>? Fetch(Stream predicateStream);
-    protected abstract IEnumerable<DataRow>? Fetch(uint operation, Stream predicateStream);
+    protected abstract HashSet<DataRow>? Fetch(ref readonly OperationBlueprint blueprint);
+    protected abstract HashSet<DataRow>? Fetch(Stream predicateStream);
+    protected abstract HashSet<DataRow>? Fetch(uint operation, Stream predicateStream);
     protected abstract bool Add(DataRow row);
-    protected abstract IEnumerable<DataRow>? Remove(Stream predicateStream);
     protected abstract bool Remove(DataRow row);
     protected abstract void Clear();
     internal abstract MethodInfo GetFetchImplementation(uint operation);
@@ -29,7 +26,7 @@ public abstract class BaseIndexer(ColumnSchema schema)
     public abstract uint Priority { get; }
     public abstract DataType Type { get; }
 
-    public interface IReadable : IDisposable, IEnumerable<DataRow>
+    public interface IReadable : IDisposable
     {
         public bool Contains(DataRow row);
         public int Count { get; }
@@ -38,26 +35,23 @@ public abstract class BaseIndexer(ColumnSchema schema)
         public IEnumerable<DataRow>? Fetch(uint operation, Stream predicateStream);
         public BaseIndexer Host { get; }
     }
-    
+
     public readonly struct Reader : IReadable
     {
         private readonly BaseIndexer _host;
-        // private readonly RWLock.ReadLockInstance _lock;
 
         public Reader(BaseIndexer host)
         {
             _host = host;
-            // _lock = host._rwLock.Read();
         }
 
         public void Dispose()
         {
-            // _lock.Dispose();
+            
         }
-
+        
+        // ReSharper disable once NotDisposedResourceIsReturned
         public IEnumerator<DataRow> GetEnumerator() => _host.GetEnumerator();
-
-        IEnumerator IEnumerable.GetEnumerator() => _host.GetEnumerator();
 
         public bool Contains(DataRow row) => _host.Contains(row);
 
@@ -74,22 +68,19 @@ public abstract class BaseIndexer(ColumnSchema schema)
     public readonly struct Writer : IReadable
     {
         private readonly BaseIndexer _host;
-        // private readonly RWLock.WriteLockInstance _lock;
 
         public Writer(BaseIndexer host)
         {
             _host = host;
-            // _lock = host._rwLock.Write();
         }
 
         public void Dispose()
         {
-            // _lock.Dispose();
+            
         }
 
+        // ReSharper disable once NotDisposedResourceIsReturned
         public IEnumerator<DataRow> GetEnumerator() => _host.GetEnumerator();
-
-        IEnumerator IEnumerable.GetEnumerator() => _host.GetEnumerator();
 
         public bool Contains(DataRow row) => _host.Contains(row);
         
@@ -102,8 +93,7 @@ public abstract class BaseIndexer(ColumnSchema schema)
         public IEnumerable<DataRow>? Fetch(uint operation, Stream predicateStream) => _host.Fetch(operation, predicateStream);
 
         public bool Add(DataRow row) => _host.Add(row);
-        
-        public IEnumerable<DataRow>? Remove(Stream predicateStream) => _host.Remove(predicateStream);
+
         public void Remove(DataRow predicateStream) => _host.Remove(predicateStream);
         
         public void Clear() => _host.Clear();

@@ -317,7 +317,7 @@ public struct PreparedLocalEnumerator<T> : IEnumerator<T>
     where T : ICellsSerializable
 {
     private readonly HashSet<DataRow>? _result;
-    private IEnumerator<DataRow> _enumerator = null!;
+    private HashSet<DataRow>.Enumerator _enumerator;
     private T _current = default!;
     private int _stage;
 
@@ -329,7 +329,8 @@ public struct PreparedLocalEnumerator<T> : IEnumerator<T>
 
     public void Dispose()
     {
-        _enumerator?.Dispose();
+        if (_stage == 0 || _stage == 1) return;
+        _enumerator.Dispose();
     }
 
     public bool MoveNext()
@@ -355,7 +356,6 @@ public struct PreparedLocalEnumerator<T> : IEnumerator<T>
             case 3:
             {
                 _enumerator.Dispose();
-                _enumerator = null!;
                 goto case -1;
             }
             case -1:

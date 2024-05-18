@@ -45,11 +45,11 @@ public class AggregationTestFixture
             Indexer = IndexerType.BTree,
         },
     ];
-    private SimpleAstraClientConnectionSettings _connectionSettings;
+    private AstraClientConnectionSettings _connectionSettings;
     
     private TcpServer _server = null!;
     private Task _serverTask = null!;
-    private SimpleAstraClient _simpleAstraClient = null!;
+    private AstraClient _astraClient = null!;
     
     [OneTimeSetUp]
     public async Task SetUp()
@@ -73,14 +73,14 @@ public class AggregationTestFixture
         }, AuthenticationHelper.SaltedSha256Authentication(password));
         _serverTask = _server.RunAsync();
         await Task.Delay(100);
-        _simpleAstraClient = new SimpleAstraClient();
-        await _simpleAstraClient.ConnectAsync(_connectionSettings);
+        _astraClient = new AstraClient();
+        await _astraClient.ConnectAsync(_connectionSettings);
     }
     
     [OneTimeTearDown]
     public Task TearDown()
     {
-        _simpleAstraClient.Dispose();
+        _astraClient.Dispose();
         _server.Kill();
         return _serverTask;
     }
@@ -88,14 +88,14 @@ public class AggregationTestFixture
 
     private async Task CleanUp()
     {
-        await _simpleAstraClient.ClearAsync();
-        Assert.That(await _simpleAstraClient.CountAllAsync(), Is.EqualTo(0));
+        await _astraClient.ClearAsync();
+        Assert.That(await _astraClient.CountAllAsync(), Is.EqualTo(0));
     }
     
     [Test]
     public async Task SimpleFetchTest()
     {
-        await _simpleAstraClient.BulkInsertAsync(new SimpleSerializableStruct[]
+        await _astraClient.BulkInsertAsync(new SimpleSerializableStruct[]
         {
             new()
             {
@@ -135,7 +135,7 @@ public class AggregationTestFixture
         });
         Thread.Sleep(500);
         using (var fetch1 = 
-               await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(PhysicalPlanBuilder.Column<int>(0).EqualsTo(2).Build()))
+               await _astraClient.AggregateAsync<SimpleSerializableStruct>(PhysicalPlanBuilder.Column<int>(0).EqualsTo(2).Build()))
         {
             var count1 = 0;
             foreach (var f in fetch1)
@@ -146,7 +146,7 @@ public class AggregationTestFixture
             Assert.That(count1, Is.EqualTo(3));
         }
 
-        using (var fetch2 = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
+        using (var fetch2 = await _astraClient.AggregateAsync<SimpleSerializableStruct>(
                    AstraTable<int, string, string, byte[], float>.Column1.EqualsLiteral(2).And(AstraTable<int, string, string, byte[], float>.Column3.EqualsLiteral("🇵🇱"))))
         {
             var count2 = 0;
@@ -161,7 +161,7 @@ public class AggregationTestFixture
             Assert.That(count2, Is.EqualTo(2));
         }
 
-        using (var fetch3 = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(
+        using (var fetch3 = await _astraClient.AggregateAsync<SimpleSerializableStruct>(
                    AstraTable<int, string, string, byte[], float>.Column1.EqualsLiteral(2).Or(AstraTable<int, string, string, byte[], float>.Column3.EqualsLiteral("🇵🇱"))))
         {
             var count3 = fetch3.Count();
@@ -173,7 +173,7 @@ public class AggregationTestFixture
     [Test]
     public async Task RangeAggregationTest()
     {
-        await _simpleAstraClient.BulkInsertAsync(new SimpleSerializableStruct[]
+        await _astraClient.BulkInsertAsync(new SimpleSerializableStruct[]
         {
             new()
             {
@@ -217,10 +217,10 @@ public class AggregationTestFixture
             },
         });
         
-        Assert.That(await _simpleAstraClient.CountAllAsync(), Is.EqualTo(5));
+        Assert.That(await _astraClient.CountAllAsync(), Is.EqualTo(5));
 
         {
-            using var results = await _simpleAstraClient.AggregateAsync<SimpleSerializableStruct>(PhysicalPlanBuilder
+            using var results = await _astraClient.AggregateAsync<SimpleSerializableStruct>(PhysicalPlanBuilder
                 .Column<float>(4)
                 .LessThan(0)
                 .Build());
@@ -236,7 +236,7 @@ public class AggregationTestFixture
         
         {
             var count = 0;
-            await foreach (var value in from v in _simpleAstraClient.AsQuery<SimpleSerializableStruct>()
+            await foreach (var value in from v in _astraClient.AsQuery<SimpleSerializableStruct>()
                            where v.Value5 >= 1.1f && v.Value5 <= 1.3f
                            select v)
             {
@@ -250,7 +250,7 @@ public class AggregationTestFixture
         
         {
             var count = 0;
-            await foreach (var value in from v in _simpleAstraClient.AsQuery<SimpleSerializableStruct>()
+            await foreach (var value in from v in _astraClient.AsQuery<SimpleSerializableStruct>()
                            where v.Value5 >= 1.3f && v.Value5 <= 1.5f
                            select v)
             {
@@ -264,7 +264,7 @@ public class AggregationTestFixture
         
         {
             var count = 0;
-            await foreach (var value in from v in _simpleAstraClient.AsQuery<SimpleSerializableStruct>()
+            await foreach (var value in from v in _astraClient.AsQuery<SimpleSerializableStruct>()
                            where v.Value5 >= 1.5f && v.Value5 <= 1.9f
                            select v)
             {

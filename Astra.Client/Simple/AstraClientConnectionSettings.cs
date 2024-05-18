@@ -3,7 +3,7 @@ using Newtonsoft.Json;
 
 namespace Astra.Client.Simple;
 
-public struct SimpleAstraClientConnectionSettings
+public struct AstraClientConnectionSettings
 {
     [JsonProperty("address")]
     public string Address { get; set; }

@@ -40,8 +40,8 @@ public class NetworkBulkInsertionBenchmark
 
     private TcpServer _server = null!;
     private TcpServer _newServer = null!;
-    private SimpleAstraClient _client = null!;
-    private SimpleAstraClient _client2 = null!;
+    private AstraClient _client = null!;
+    private AstraClient _client2 = null!;
     private Task _serverTask = Task.CompletedTask;
     private Task _newServerTask = Task.CompletedTask;
     private SimpleSerializableStruct[] _array = null!;

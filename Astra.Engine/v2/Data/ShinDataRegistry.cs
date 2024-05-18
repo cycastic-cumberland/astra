@@ -21,7 +21,6 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
 {
     public readonly struct Readers : IDisposable
     {
-        private readonly RWLock.ReadLockInstance _readLock;
         private readonly BaseIndexer.Reader?[] _readers;
         public readonly BaseIndexer.Reader AutoIndexerLock;
         private readonly int _length;
@@ -30,7 +29,6 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
         
         public Readers(ShinDataRegistry registry)
         {
-            _readLock = registry._globalLock.Read();
             AutoIndexerLock = registry._autoIndexer.Read();
             _length = registry._indexers.Length;
             _readers = ArrayPool<BaseIndexer.Reader?>.Shared.Rent(_length);
@@ -48,13 +46,11 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
             }
             ArrayPool<BaseIndexer.Reader?>.Shared.Return(_readers);
             AutoIndexerLock.Dispose();
-            _readLock.Dispose();
         }
     }
     
     public readonly struct Writers : IDisposable
     {
-        private readonly RWLock.WriteLockInstance _writeLock;
         private readonly BaseIndexer.Writer?[] _writers;
         public readonly BaseIndexer.Writer AutoIndexerLock;
         private readonly int _length;
@@ -63,7 +59,6 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
         
         public Writers(ShinDataRegistry registry)
         {
-            _writeLock = registry._globalLock.Write();
             AutoIndexerLock = registry._autoIndexer.Write();
             _length = registry._indexers.Length;
             _writers = ArrayPool<BaseIndexer.Writer?>.Shared.Rent(_length);
@@ -81,7 +76,6 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
             }
             ArrayPool<BaseIndexer.Writer?>.Shared.Return(_writers);
             AutoIndexerLock.Dispose();
-            _writeLock.Dispose();
         }
     }
 
@@ -128,7 +122,7 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
     public struct Enumerator<T> : IEnumerator<T>
     {
         private readonly ShinDataRegistry _host;
-        private Readers _readers;
+        private RWLock.ReadLockInstance _lock;
         private PreparedLocalEnumerator<FlexWrapper<T>> _enumerator;
         private uint _stage;
 
@@ -148,8 +142,8 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
             {
                 case 0:
                 {
-                    _readers = _host.AcquireReadLocks();
-                    var set = _host._autoIndexer.Probe();
+                    var set = _host._autoIndexer.Data;
+                    _lock = _host._autoIndexer.Latch.Read();
                     _enumerator = new(set);
                     _stage = 1;
                     goto case 1;
@@ -171,8 +165,9 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
         public void Reset()
         {
             if (_stage == 0) return;
-            _readers.Dispose();
             _enumerator.Dispose();
+            _lock.Dispose();
+            _lock = new();
             _stage = 0;
         }
 
@@ -185,7 +180,8 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
     private readonly DatastoreContext _context;
     private readonly BaseIndexer?[] _indexers;
     private readonly AutoIndexer _autoIndexer;
-    private readonly RWLock _globalLock = RWLock.Create();
+    private readonly Writers _writers;
+    private readonly Readers _readers;
     private readonly int _columnCount;
     private readonly int _indexedColumnCount;
 
@@ -234,22 +230,15 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
         }
 
         _indexedColumnCount = indexed;
+        _writers = new(this);
+        _readers = new(this);
     }
-    
-    private Readers AcquireReadLocks()
-    {
-        return new(this);
-    }
-    
-    private Writers AcquireWriteLocks()
-    {
-        return new(this);
-    }
-    
     
     public void Dispose()
     {
         Clear();
+        _writers.Dispose();
+        _readers.Dispose();
     }
 
     public static ShinDataRegistry Fabricate(RegistrySchemaSpecifications tableSpecification, ILoggerFactory? loggerFactory = null,
@@ -261,7 +250,6 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
     public int RowsCount {
         get
         {
-            using var readLock = _globalLock.Read();
             using var dummy = _autoIndexer.Read();
             return dummy.Count;
         }
@@ -271,18 +259,11 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
     {
         try
         {
-            if (!writers.AutoIndexerLock.Add(row))
+            if (!_autoIndexer.SynchronizedInsert(row, writers.WriterLocks))
             {
-                _logger.LogDebug("Row with hash '{}' existed", row.GetHashCode());
-                row.Dispose();
+                _logger.LogDebug("Row with ID '{}' existed", row.GetHashCode());
                 return false;
             }
-
-            foreach (var writer in writers.WriterLocks)
-            {
-                writer?.Add(row);
-            }
-            
             _logger.LogDebug("Row inserted: {}", row.GetHashCode());
             return true;
         }
@@ -323,22 +304,20 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
 
     public PreparedLocalEnumerable<T> AggregateCompat<T>(Stream predicateStream) where T : ICellsSerializable
     {
-        using var readLock = AcquireReadLocks();
-        var span = readLock.ReaderLocks;
+        var span = _readers.ReaderLocks;
         return predicateStream.LocalAggregate<T, BaseIndexer.Reader>(ref span);
     }
     
     public PreparedLocalEnumerable<T> AggregateCompat<T>(ref readonly PhysicalPlan plan) where T : ICellsSerializable
     {
-        using var readLock = AcquireReadLocks();
-        var span = readLock.ReaderLocks;
+        var span = _readers.ReaderLocks;
         return plan.LocalAggregate<T, BaseIndexer.Reader>(ref span);
     }
     
     public PreparedLocalEnumerable<T> AggregateCompat<T>(ref readonly CompiledPhysicalPlan plan) where T : ICellsSerializable
     {
-        using var readLock = AcquireReadLocks();
-        var span = readLock.ReaderLocks;
+        if (plan.Host != this) throw new InvalidOperationException("This physical plan was compiled by a different registry");
+        var span = _readers.ReaderLocks;
         return plan.LocalAggregate<T, BaseIndexer.Reader>(span);
     }
     
@@ -349,8 +328,7 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
         stream.Buffer = predicateStream;
         try
         {
-            using var readLock = AcquireReadLocks();
-            var span = readLock.ReaderLocks;
+            var span = _readers.ReaderLocks;
             return stream.LocalAggregate<T, BaseIndexer.Reader>(ref span);
         }
         finally
@@ -382,24 +360,7 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
         return new(AggregateCompat<FlexWrapper<T>>(predicateStream));
     }
 
-    private static int Delete<T>(T enumerator, ref readonly Writers writerLocks) where T : IEnumerator<DataRow>
-    {
-        var i = 0;
-        while (enumerator.MoveNext())
-        {
-            using var row = enumerator.Current;
-            writerLocks.AutoIndexerLock.Remove(row);
-            foreach (var writer in writerLocks.WriterLocks)
-            {
-                writer?.Remove(row);
-            }
-            i++;
-        }
-
-        return i;
-    }
-
-    private static int Delete(Stream predicateStream, ref readonly Writers writerLocks)
+    private int Delete(Stream predicateStream, ref readonly Writers writerLocks)
     {
         var span = writerLocks.WriterLocks;
         var result = predicateStream.Aggregate(ref span);
@@ -407,42 +368,33 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
         {
             case null:
                 return 0;
-            // Reduce heap allocation
-            case HashSet<DataRow> set:
+            case HashSet<DataRow> set: // Reduce heap allocation
             {
-                using var enumerator = set.GetEnumerator();
-                return Delete(enumerator, in writerLocks);
+                return _autoIndexer.SynchronizedRemove(set.GetEnumerator(), writerLocks.WriterLocks);
             }
             default:
             {
-                using var enumerator = result.GetEnumerator();
-                return Delete(enumerator, in writerLocks);
+                return _autoIndexer.SynchronizedRemove(result.GetEnumerator(), writerLocks.WriterLocks);
             }
         }
     }
     
     public int Delete(Stream predicateStream)
     {
-        using var writerLocks = AcquireWriteLocks();
-        ref readonly var locksRef = ref writerLocks;
-        return Delete(predicateStream, in locksRef);
+        return Delete(predicateStream, in _writers);
     }
 
     public bool InsertCompat<T>(T value) where T : ICellsSerializable
     {
-        using var writerLocks = AcquireWriteLocks();
-        ref readonly var locksRef = ref writerLocks;
-        return InsertOne(value, in locksRef);
+        return InsertOne(value, in _writers);
     }
     
     public int BulkInsertCompat<T>(IEnumerable<T> values) where T : ICellsSerializable
     {
-        using var writerLocks = AcquireWriteLocks();
-        ref readonly var locksRef = ref writerLocks;
         var count = 0;
         foreach (var value in values)
         {
-            if (InsertOne(value, in locksRef)) count++;
+            if (InsertOne(value, in _writers)) count++;
         }
 
         return count;
@@ -455,23 +407,12 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
 
     private int Clear(ref readonly Writers writerLocks)
     {
-        var count = writerLocks.AutoIndexerLock.Count;
-        foreach (var writer in writerLocks.WriterLocks)
-        {
-            writer?.Clear();
-        }
-        foreach (var row in writerLocks.AutoIndexerLock)
-        {
-            row.Dispose();
-        }
-        writerLocks.AutoIndexerLock.Clear();
-        return count;
+        return _autoIndexer.SynchronizedClear(writerLocks.WriterLocks);
     }
     
     public int Clear()
     {
-        using var writerLocks = AcquireWriteLocks();
-        return Clear(in writerLocks);
+        return Clear(in _writers);
     }
 
     IEnumerable<T> IRegistry.Aggregate<T>(ReadOnlyMemory<byte> predicate)
@@ -614,18 +555,14 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
         var (commandCount, enableWrite) = Command.SplitCommandHeader(commandHeader);
         if (enableWrite)
         {
-            using var writerLocks = AcquireWriteLocks();
-            ref readonly var locksRef = ref writerLocks;
             for (var i = 0U; i < commandCount; i++)
-                WriteOnce(dataIn, dataOut, in locksRef);
+                WriteOnce(dataIn, dataOut, in _writers);
             return;
         }
 
         for (var i = 0U; i < commandCount; i++)
         {
-            using var readLocks = AcquireReadLocks();
-            ref readonly var locksRef = ref readLocks;
-            ReadOnce(dataIn, dataOut, in locksRef);
+            ReadOnce(dataIn, dataOut, in _readers);
         }
     }
 

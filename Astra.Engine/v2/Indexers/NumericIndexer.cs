@@ -67,12 +67,14 @@ public class NumericIndexer : BaseIndexer
     
     public HashSet<DataRow>? CollectExact(ref readonly DataCell value)
     {
+        using var latch = Latch.Read();
         _data.TryGetValue(value, out var rows);
         return rows;
     }
 
     protected override IEnumerator<DataRow> GetEnumerator()
     {
+        using var latch = Latch.Read();
         foreach (var (_, rows) in _data)
         {
             foreach (var row in rows)
@@ -84,24 +86,26 @@ public class NumericIndexer : BaseIndexer
 
     protected override bool Contains(DataRow row)
     {
+        using var latch = Latch.Read();
         return _data.TryGetValue(row.Span[Schema.Index], out var set) && set.Contains(row);
     }
 
-    protected override IEnumerable<DataRow>? Fetch(ref readonly OperationBlueprint blueprint)
+    protected override HashSet<DataRow>? Fetch(ref readonly OperationBlueprint blueprint)
     {
+        using var latch = Latch.Read();
         return blueprint.PredicateOperationType switch
         {
-            Operation.Equal => CollectExact(in blueprint),
-            Operation.ClosedBetween => ClosedBetween(in blueprint),
-            Operation.GreaterThan => GreaterThan(in blueprint),
-            Operation.GreaterOrEqualsTo => GreaterThanOrEqualTo(in blueprint),
-            Operation.LesserThan => LessThan(in blueprint),
-            Operation.LesserOrEqualsTo => LessThanOrEqualTo(in blueprint),
+            Operation.Equal => CollectExact(in blueprint)?.ToHashSet(),
+            Operation.ClosedBetween => ClosedBetween(in blueprint).ToHashSetOrNull(),
+            Operation.GreaterThan => GreaterThan(in blueprint).ToHashSetOrNull(),
+            Operation.GreaterOrEqualsTo => GreaterThanOrEqualTo(in blueprint).ToHashSetOrNull(),
+            Operation.LesserThan => LessThan(in blueprint).ToHashSetOrNull(),
+            Operation.LesserOrEqualsTo => LessThanOrEqualTo(in blueprint).ToHashSetOrNull(),
             _ => throw new OperationNotSupported($"Operation not supported: {blueprint.PredicateOperationType}")
         };
     }
 
-    protected override IEnumerable<DataRow>? Fetch(Stream predicateStream)
+    protected override HashSet<DataRow>? Fetch(Stream predicateStream)
     {
         var op = predicateStream.ReadUInt();
         return Fetch(op, predicateStream);
@@ -125,6 +129,7 @@ public class NumericIndexer : BaseIndexer
     
     public IEnumerable<DataRow> ClosedBetween(ref readonly DataCell left, ref readonly DataCell right)
     {
+        using var latch = Latch.Read();
         return ClosedBetween(left, right);
     }
      
@@ -154,6 +159,7 @@ public class NumericIndexer : BaseIndexer
     
     public IEnumerable<DataRow> GreaterThan(ref readonly DataCell value)
     {
+        using var latch = Latch.Read();
         return GreaterThan(value);
     }
     
@@ -164,7 +170,7 @@ public class NumericIndexer : BaseIndexer
         return GreaterThan(left);
     }
 
-    public IEnumerable<DataRow> GreaterThanOrEqualTo(DataCell left)
+    private IEnumerable<DataRow> GreaterThanOrEqualTo(DataCell left)
     {
         foreach (var (_, set) in _data.CollectFrom(left, true))
         {
@@ -182,6 +188,7 @@ public class NumericIndexer : BaseIndexer
     
     public IEnumerable<DataRow> GreaterThanOrEqualTo(ref readonly DataCell value)
     {
+        using var latch = Latch.Read();
         return GreaterThanOrEqualTo(value);
     }
     
@@ -192,7 +199,7 @@ public class NumericIndexer : BaseIndexer
         return GreaterThanOrEqualTo(left);
     }
     
-    public IEnumerable<DataRow> LessThan(DataCell right)
+    private IEnumerable<DataRow> LessThan(DataCell right)
     {
         foreach (var (_, set) in _data.CollectTo(right, false))
         {
@@ -210,6 +217,7 @@ public class NumericIndexer : BaseIndexer
     
     public IEnumerable<DataRow> LessThan(ref readonly DataCell value)
     {
+        using var latch = Latch.Read();
         return LessThan(value);
     }
     
@@ -220,7 +228,7 @@ public class NumericIndexer : BaseIndexer
         return LessThan(right);
     }
     
-    public IEnumerable<DataRow> LessThanOrEqualTo(DataCell right)
+    private IEnumerable<DataRow> LessThanOrEqualTo(DataCell right)
     {
         foreach (var (_, set) in _data.CollectTo(right, true))
         {
@@ -238,6 +246,7 @@ public class NumericIndexer : BaseIndexer
     
     public IEnumerable<DataRow> LessThanOrEqualTo(ref readonly DataCell value)
     {
+        using var latch = Latch.Read();
         return LessThanOrEqualTo(value);
     }
     
@@ -248,43 +257,37 @@ public class NumericIndexer : BaseIndexer
         return LessThanOrEqualTo(right);
     }
 
-    protected override IEnumerable<DataRow>? Fetch(uint operation, Stream predicateStream)
+    protected override HashSet<DataRow>? Fetch(uint operation, Stream predicateStream)
     {
+        using var latch = Latch.Read();
         return operation switch
         {
-            Operation.Equal => CollectExact(predicateStream),
-            Operation.ClosedBetween => ClosedBetween(predicateStream),
-            Operation.GreaterThan => GreaterThan(predicateStream),
-            Operation.GreaterOrEqualsTo => GreaterThanOrEqualTo(predicateStream),
-            Operation.LesserThan => LessThan(predicateStream),
-            Operation.LesserOrEqualsTo => LessThanOrEqualTo(predicateStream),
+            Operation.Equal => CollectExact(predicateStream)?.ToHashSet(),
+            Operation.ClosedBetween => ClosedBetween(predicateStream).ToHashSetOrNull(),
+            Operation.GreaterThan => GreaterThan(predicateStream).ToHashSetOrNull(),
+            Operation.GreaterOrEqualsTo => GreaterThanOrEqualTo(predicateStream).ToHashSetOrNull(),
+            Operation.LesserThan => LessThan(predicateStream).ToHashSetOrNull(),
+            Operation.LesserOrEqualsTo => LessThanOrEqualTo(predicateStream).ToHashSetOrNull(),
             _ => throw new OperationNotSupported($"Operation not supported: {operation}")
         };
     }
 
     protected override bool Add(DataRow row)
     {
+        using var latch = Latch.Write();
         var key = row.Span[Schema.Index];
-        if (!_data.TryGetValue(key, out var list))
+        if (!_data.TryGetValue(key, out var set))
         {
-            list = new();
-            _data[key] = list;
+            set = new();
+            _data[key] = set;
         }
 
-        return list.Add(row);
-    }
-
-    protected override HashSet<DataRow>? Remove(Stream predicateStream)
-    {
-        predicateStream.CheckDataType(Schema.Type);
-        var cond = DataCell.FromStream(Schema.Type.Value, predicateStream);
-        if (_data.TryGetValue(cond, out var set)) return set;
-        _data.Remove(cond);
-        return set;
+        return set.Add(row);
     }
 
     protected override bool Remove(DataRow row)
     {
+        using var latch = Latch.Write();
         ref readonly var cond = ref row.Span[Schema.Index];
         if (!_data.TryGetValue(cond, out var set)) return false;
         return set.Remove(row);
@@ -292,6 +295,7 @@ public class NumericIndexer : BaseIndexer
 
     protected override void Clear()
     {
+        using var latch = Latch.Write();
         _data.Clear();
     }
 
@@ -309,7 +313,7 @@ public class NumericIndexer : BaseIndexer
         };
     }
 
-    protected override int Count => _data.Count;
+    protected override int Count => _data.Count; // Synchronous
 
     public override FeaturesList SupportedReadOperations => NumericFeatures;
     public override FeaturesList SupportedWriteOperations => NumericFeatures;

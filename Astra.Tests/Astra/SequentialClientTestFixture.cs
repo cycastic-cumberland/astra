@@ -44,11 +44,11 @@ public class SequentialClientTestFixture
             Indexer = IndexerType.BTree,
         },
     ];
-    private SimpleAstraClientConnectionSettings _connectionSettings;
+    private AstraClientConnectionSettings _connectionSettings;
     
     private TcpServer _server = null!;
     private Task _serverTask = null!;
-    private SimpleAstraClient _simpleAstraClient = null!;
+    private AstraClient _astraClient = null!;
     
     [OneTimeSetUp]
     public async Task SetUp()
@@ -70,14 +70,14 @@ public class SequentialClientTestFixture
         }, AuthenticationHelper.SaltedSha256Authentication(password));
         _serverTask = _server.RunAsync();
         await Task.Delay(100);
-        _simpleAstraClient = new SimpleAstraClient();
-        await _simpleAstraClient.ConnectAsync(_connectionSettings);
+        _astraClient = new AstraClient();
+        await _astraClient.ConnectAsync(_connectionSettings);
     }
     
     [OneTimeTearDown]
     public Task TearDown()
     {
-        _simpleAstraClient.Dispose();
+        _astraClient.Dispose();
         _server.Kill();
         return _serverTask;
     }
@@ -87,8 +87,8 @@ public class SequentialClientTestFixture
     
     private async Task SimpleValueTypeInsertionTestAsync()
     {
-        var originalAmount = await _simpleAstraClient.CountAllAsync();
-        var inserted = await _simpleAstraClient.BulkInsertSerializableCompatAsync(new SimpleSerializableStruct[]
+        var originalAmount = await _astraClient.CountAllAsync();
+        var inserted = await _astraClient.BulkInsertSerializableCompatAsync(new SimpleSerializableStruct[]
         {
             new()
             {
@@ -112,7 +112,7 @@ public class SequentialClientTestFixture
                 Value4 = new byte[] { 1, 2, 3, 4 }
             },
         });
-        var newAmount = await _simpleAstraClient.CountAllAsync();
+        var newAmount = await _astraClient.CountAllAsync();
         Assert.Multiple(() =>
         {
             Assert.That(inserted, Is.EqualTo(2));
@@ -141,11 +141,11 @@ public class SequentialClientTestFixture
     [Test]
     public async Task ZDataStoreClearTest()
     {
-        var originalAmount = await _simpleAstraClient.CountAllAsync();
+        var originalAmount = await _astraClient.CountAllAsync();
         // Assert.That(originalAmount, Is.Not.Zero);
-        var affected = await _simpleAstraClient.ClearAsync();
+        var affected = await _astraClient.ClearAsync();
         Assert.That(originalAmount, Is.EqualTo(affected));
-        var newAmount = await _simpleAstraClient.CountAllAsync();
+        var newAmount = await _astraClient.CountAllAsync();
         Assert.That(newAmount, Is.Zero);
     }
 }
