@@ -16,7 +16,7 @@ public struct ConnectionFlags
         public const byte AlgorithmMask = byte.MaxValue - StrategyMask;
         public const byte StrategyMask = 192;
         public const byte Fastest = 1 << 7;
-        public const byte SmallestSize = Fastest + 1;
+        public const byte SmallestSize = 1 << 6;
         public const byte Optimal = 0;
     }
 

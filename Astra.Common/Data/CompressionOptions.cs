@@ -1,6 +1,6 @@
 namespace Astra.Common.Data;
 
-public enum CompressionOptions
+public enum CompressionOptions : byte
 {
     None = ConnectionFlags.CompressionOptions.None,
     GZipOptimal = ConnectionFlags.CompressionOptions.GZip | ConnectionFlags.CompressionOptions.Optimal,
