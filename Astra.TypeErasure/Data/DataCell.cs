@@ -453,6 +453,37 @@ public readonly struct DataCell : INumber<DataCell>, IDisposable
         };
     }
 
+    public void WriteFull<T>(T stream) where T : IStreamWrapper
+    {
+        switch (CellType)
+        {
+            case CellTypes.DWord:
+                stream.SaveValue(DataType.DWordMask);
+                stream.SaveValue(DWord);
+                return;
+            case CellTypes.QWord:
+                stream.SaveValue(DataType.QWordMask);
+                stream.SaveValue(QWord);
+                return;
+            case CellTypes.Single:
+                stream.SaveValue(DataType.SingleMask);
+                stream.SaveValue(Single);
+                return;
+            case CellTypes.Double:
+                stream.SaveValue(DataType.DoubleMask);
+                stream.SaveValue(Double);
+                return;
+            case CellTypes.Text:
+                stream.SaveValue(DataType.StringMask);
+                stream.SaveValue(ExtractText());
+                return;
+            case CellTypes.Bytes:
+                stream.SaveValue(DataType.BytesMask);
+                stream.SaveValue(ExtractBytes());
+                return;
+        }
+    }
+    
     public void Write(Stream stream)
     {
         switch (CellType)
@@ -521,6 +552,34 @@ public readonly struct DataCell : INumber<DataCell>, IDisposable
         return !(left == right);
     }
 
+    public static DataCell FromStream<T>(T stream) where T : IStreamWrapper
+    {
+        var typeCode = stream.LoadUInt();
+        switch (typeCode)
+        {
+            case DataType.DWordMask:
+                return new(stream.LoadInt());
+            case DataType.QWordMask:
+                return new(stream.LoadLong());
+            case DataType.SingleMask:
+                return new(stream.LoadSingle());
+            case DataType.DoubleMask:
+                return new(stream.LoadBytes());
+            case DataType.StringMask:
+            {
+                var (length, buffer) = stream.LoadStringToBuffer();
+                return new(length, buffer);
+            }
+            case DataType.BytesMask:
+            {
+                var (length, buffer) = stream.LoadBytesToBuffer();
+                return new(length, buffer);
+            }
+            default:
+                throw new NotSupportedException($"Unsupported type: {typeCode}");
+        }
+    }
+    
     public static DataCell FromStream(uint typeCode, Stream stream)
     {
         switch (typeCode)
@@ -1328,7 +1387,7 @@ public readonly struct DataCell : INumber<DataCell>, IDisposable
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Dispose()
     {
-        switch (unchecked(CellType))
+        switch (CellType)
         {
             case CellTypes.Text:
             {

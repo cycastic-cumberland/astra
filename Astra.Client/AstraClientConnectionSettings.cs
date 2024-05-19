@@ -1,7 +1,6 @@
-using Astra.Common;
 using Newtonsoft.Json;
 
-namespace Astra.Client.Simple;
+namespace Astra.Client;
 
 public struct AstraClientConnectionSettings
 {

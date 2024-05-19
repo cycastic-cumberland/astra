@@ -13,38 +13,29 @@ namespace Astra.Engine.v2.Data;
 
 public static class Aggregator
 {
-    private static readonly ThreadLocal<HashSet<DataRow>?> LocalSet = new();
     private static IEnumerable<DataRow> IntersectInternal(IEnumerable<DataRow> lhs,
         IEnumerable<DataRow> rhs)
     {
-        var set = LocalSet.Value ?? new();
-        LocalSet.Value = null;
-        try
+        var set = new HashSet<DataRow>();
+        foreach (var row in lhs)
         {
-            foreach (var row in lhs)
-            {
-                set.Add(row);
-            }
-
-            foreach (var row in rhs)
-            {
-                if (set.Contains(row))
-                    yield return row;
-            }
+            set.Add(row);
         }
-        finally
+
+        foreach (var row in rhs)
         {
-            if (LocalSet.Value == null)
-            {
-                set.Clear();
-                LocalSet.Value = set;
-            }
+            if (set.Contains(row))
+                yield return row;
         }
     }
     private static IEnumerable<DataRow> IntersectInternal(HashSet<DataRow> set,
         IEnumerable<DataRow> rhs)
     {
-        return rhs.Where(set.Contains);
+        foreach (var row in rhs)
+        {
+            if (set.Contains(row))
+                yield return row;
+        }
     }
     private static IEnumerable<DataRow> Intersect(IEnumerable<DataRow> lhs, IEnumerable<DataRow> rhs)
     {
@@ -57,29 +48,17 @@ public static class Aggregator
 
     private static IEnumerable<DataRow> UnionInternal(IEnumerable<DataRow> lhs, IEnumerable<DataRow> rhs)
     {
-        var set = LocalSet.Value ?? new();
-        LocalSet.Value = null;
-        try
+        var set = new HashSet<DataRow>();
+        foreach (var row in lhs)
         {
-            foreach (var row in lhs)
-            {
-                set.Add(row);
-                yield return row;
-            }
-
-            foreach (var row in rhs)
-            {
-                if (set.Add(row))
-                    yield return row;
-            }
+            set.Add(row);
+            yield return row;
         }
-        finally
+
+        foreach (var row in rhs)
         {
-            if (LocalSet.Value == null)
-            {
-                set.Clear();
-                LocalSet.Value = set;
-            }
+            if (set.Add(row))
+                yield return row;
         }
     }
     
@@ -316,20 +295,20 @@ public static class Aggregator
 public struct PreparedLocalEnumerator<T> : IEnumerator<T>
     where T : ICellsSerializable
 {
-    private readonly HashSet<DataRow>? _result;
-    private HashSet<DataRow>.Enumerator _enumerator;
+    private readonly IEnumerable<DataRow>? _result;
+    private IEnumerator<DataRow> _enumerator = null!;
     private T _current = default!;
-    private int _stage;
+    private uint _stage;
 
-    public PreparedLocalEnumerator(HashSet<DataRow>? result)
+    public PreparedLocalEnumerator(IEnumerable<DataRow>? result)
     {
         _result = result;
-        _stage = 1;
+        _stage = 0;
     }
 
     public void Dispose()
     {
-        if (_stage == 0 || _stage == 1) return;
+        if (_stage is 0 or 3) return;
         _enumerator.Dispose();
     }
 
@@ -337,30 +316,26 @@ public struct PreparedLocalEnumerator<T> : IEnumerator<T>
     {
         switch (_stage)
         {
-            case 1:
+            case 0:
             {
                 if (_result == null) return false;
                 _enumerator = _result.GetEnumerator();
-                _stage = 2;
-                goto case 2;
+                _stage = 1;
+                goto case 1;
             }
-            case 2:
+            case 1:
             {
-                if (!_enumerator.MoveNext()) goto case 3;
+                if (!_enumerator.MoveNext()) goto case 2;
                 var row = _enumerator.Current;
                 var value = Activator.CreateInstance<T>();
                 value.DeserializeFromCells(row.Span);
                 _current = value;
                 return true;
             }
-            case 3:
+            case 2:
             {
-                _enumerator.Dispose();
-                goto case -1;
-            }
-            case -1:
-            {
-                _stage = 0;
+                Dispose();
+                _stage = 3;
                 goto default;
             }
             default:
@@ -376,15 +351,15 @@ public struct PreparedLocalEnumerator<T> : IEnumerator<T>
 
     public T Current => _current;
 
-    object IEnumerator.Current => Current!;
+    object IEnumerator.Current => _current;
 }
 
 public readonly struct PreparedLocalEnumerable<T> : IEnumerable<T> 
     where T : ICellsSerializable
 {
-    private readonly HashSet<DataRow>? _result;
+    private readonly IEnumerable<DataRow>? _result;
     
-    public PreparedLocalEnumerable(HashSet<DataRow>? result) => _result = result;
+    public PreparedLocalEnumerable(IEnumerable<DataRow>? result) => _result = result;
     public PreparedLocalEnumerator<T> GetEnumerator() => new(_result);
     
     IEnumerator<T> IEnumerable<T> .GetEnumerator()
@@ -448,7 +423,7 @@ public static class AggregatorHelper
         where T : ICellsSerializable
         where TReader : struct, BaseIndexer.IReadable
     {
-        var set = predicateStream.Aggregate(in readers)?.ToHashSet();
+        var set = predicateStream.Aggregate(in readers);
         return new(set);
     }
     
@@ -456,7 +431,7 @@ public static class AggregatorHelper
         where T : ICellsSerializable
         where TReader : struct, BaseIndexer.IReadable
     {
-        var set = Aggregator.ApplyPhysicalPlan(in plan, in readers)?.ToHashSet();
+        var set = Aggregator.ApplyPhysicalPlan(in plan, in readers);
         return new(set);
     }
     
@@ -464,7 +439,7 @@ public static class AggregatorHelper
             where T : ICellsSerializable
             where TReader : struct, BaseIndexer.IReadable
     {
-        var set = plan.Executor.Execute(readers)?.ToHashSet();
+        var set = plan.Executor.Execute(readers);
         return new(set);
     }
 }

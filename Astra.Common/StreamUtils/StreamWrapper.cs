@@ -33,7 +33,9 @@ public interface IStreamWrapper
     public float LoadSingle();
     public double LoadDouble();
     public string LoadString();
+    public (int length, char[] buffer) LoadStringToBuffer();
     public byte[] LoadBytes();
+    public (int length, byte[] buffer) LoadBytesToBuffer();
     public void LoadBuffer(Span<byte> span);
     public BytesCluster LoadBytesCluster();
 }

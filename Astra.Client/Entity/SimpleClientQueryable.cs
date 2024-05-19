@@ -1,6 +1,5 @@
 using System.Linq.Expressions;
-using Astra.Client.Simple;
-using Astra.Client.Simple.Aggregator;
+using Astra.Client.Aggregator;
 
 namespace Astra.Client.Entity;
 

@@ -1,9 +1,6 @@
-using System.Runtime.CompilerServices;
-
 namespace Astra.Engine;
 
 
-// Some how ReaderWriterLockSlim does not work with benchmark
 public readonly struct RWLock(ReaderWriterLockSlim rwLock)
 {
     public static RWLock Create() => new(new());

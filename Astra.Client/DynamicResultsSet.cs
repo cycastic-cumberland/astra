@@ -2,7 +2,7 @@ using System.Collections;
 using Astra.Common.Data;
 using Astra.Common.Serializable;
 
-namespace Astra.Client.Simple;
+namespace Astra.Client;
 
 public readonly struct DynamicResultsSet<T> : IEnumerable<T>, IDisposable
 {

@@ -1,5 +1,3 @@
-using Astra.Client.Simple;
-
 namespace Astra.Client.Entity;
 
 public static class ClientHelpers

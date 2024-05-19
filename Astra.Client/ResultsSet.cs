@@ -5,7 +5,7 @@ using Astra.Common.Data;
 using Astra.Common.Protocols;
 using Astra.Common.StreamUtils;
 
-namespace Astra.Client.Simple;
+namespace Astra.Client;
 
 public class ConstraintCheckFailedException(string? msg = null) : Exception(msg);
 
@@ -19,7 +19,7 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
         public Enumerator(ResultsSet<T> host)
         {
             if (host._exclusivity)
-                throw new AstraClient.ConcurrencyException("Multiple readers cannot exist at the same time");
+                throw new Exceptions.ConcurrencyException("Multiple readers cannot exist at the same time");
             host._exclusivity = true;
             _host = host;
         }
@@ -56,13 +56,13 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
 
     public ResultsSet(AstraClient client, int timeout, ReadOnlyMemory<uint>? constraintCheck = null)
     {
-        var (networkClient, clientStream, reversed) = client.Client ?? throw new AstraClient.NotConnectedException();
+        var (networkClient, clientStream, reversed) = client.Client ?? throw new Exceptions.NotConnectedException();
         _exclusivityCheck = new(client);
         _constraint = constraintCheck;
         _client = networkClient;
         _stream = clientStream;
         _timeout = timeout;
-        _array = Array.Empty<(uint, string)>();
+        _array = [];
         _stage = reversed ? 3 : 1;
     }
 

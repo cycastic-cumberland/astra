@@ -151,9 +151,19 @@ public readonly struct ForwardStreamWrapper(Stream stream) : IStreamWrapper
         return stream.ReadString();
     }
 
+    public (int length, char[] buffer) LoadStringToBuffer()
+    {
+        return stream.ReadStringToBuffer();
+    }
+
     public byte[] LoadBytes()
     {
         return stream.ReadSequence();
+    }
+
+    public (int length, byte[] buffer) LoadBytesToBuffer()
+    {
+        return stream.ReadSequenceToBuffer();
     }
 
     public void LoadBuffer(Span<byte> span)

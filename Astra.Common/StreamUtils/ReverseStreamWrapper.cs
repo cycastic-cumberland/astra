@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Text;
 using Astra.Common.Data;
@@ -269,6 +270,25 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
         return Encoding.UTF8.GetString(strBytes.Reader);
     }
 
+    public (int length, char[] buffer) LoadStringToBuffer()
+    {
+        var strLen = LoadInt();
+        using var strBytes = BytesCluster.Rent(strLen);
+        stream.ReadExactly(strBytes.Writer);
+        var charCount = Encoding.UTF8.GetCharCount(strBytes.Reader);
+        var buffer = ArrayPool<char>.Shared.Rent(charCount);
+        try
+        {
+            charCount = Encoding.UTF8.GetChars(strBytes.Reader, buffer.AsSpan()[..charCount]);
+            return (charCount, buffer);
+        }
+        catch
+        {
+            ArrayPool<char>.Shared.Return(buffer);
+            throw;
+        }
+    }
+
     public byte[] LoadBytes()
     {
         var length = LoadLong();
@@ -276,7 +296,23 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
         stream.ReadExactly(array);
         return array;
     }
-    
+
+    public (int length, byte[] buffer) LoadBytesToBuffer()
+    {
+        var length = (int)LoadLong();
+        var array = ArrayPool<byte>.Shared.Rent(length);
+        try
+        {
+            stream.ReadExactly(array.AsSpan()[..length]);
+        }
+        catch
+        {
+            ArrayPool<byte>.Shared.Return(array);
+            throw;
+        }
+        return (length, array);
+    }
+
     public void LoadBuffer(Span<byte> span)
     {
         stream.ReadExactly(span);

@@ -1,6 +1,6 @@
 using System.Collections;
 using System.Linq.Expressions;
-using Astra.Client.Simple.Aggregator;
+using Astra.Client.Aggregator;
 using Astra.Common.Data.Queryable;
 using Astra.Common.StreamUtils;
 

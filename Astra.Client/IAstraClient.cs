@@ -1,6 +1,4 @@
-using Astra.Client.Simple;
-using Astra.Client.Simple.Aggregator;
-using Astra.Common;
+using Astra.Client.Aggregator;
 using Astra.Common.Data;
 
 namespace Astra.Client;

@@ -1,6 +1,5 @@
 using System.Security.Cryptography;
 using Astra.Client;
-using Astra.Client.Simple;
 using Astra.Common;
 using Astra.Common.Data;
 using Astra.Common.Protocols;

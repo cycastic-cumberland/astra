@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
-using Astra.Client.Simple;
-using Astra.Client.Simple.Aggregator;
+using Astra.Client;
+using Astra.Client.Aggregator;
 using Astra.Common.Data;
 using Astra.Server;
 using Astra.Server.Authentication;

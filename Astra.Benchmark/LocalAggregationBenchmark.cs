@@ -1,5 +1,5 @@
 using System.Runtime.CompilerServices;
-using Astra.Client.Simple.Aggregator;
+using Astra.Client.Aggregator;
 using Astra.Common.Data;
 using Astra.Common.Serializable;
 using Astra.Engine.Data;

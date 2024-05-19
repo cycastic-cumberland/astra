@@ -1,61 +1,60 @@
-using Astra.Common;
 using Astra.Common.Data;
 using Astra.Common.Protocols;
 using Astra.Common.StreamUtils;
 
-namespace Astra.Client.Simple.Aggregator;
+namespace Astra.Client.Aggregator;
 
-public class StringColumn(int offset) : IAstraColumnQuery<string>
+public class BytesColumn(int offset) : IAstraColumnQuery<byte[]>
 {
-    public GenericAstraQueryBranch EqualsLiteral(string literal)
+    public GenericAstraQueryBranch EqualsLiteral(byte[] literal)
     {
         using var wrapped = LocalStreamWrapper.Create();
         var stream = wrapped.LocalStream;
         stream.WriteValue(QueryType.FilterMask);
         stream.WriteValue(offset);
         stream.WriteValue(Operation.Equal);
-        stream.WriteValue(DataType.StringMask);
+        stream.WriteValue(DataType.BytesMask);
         stream.WriteValue(literal);
         return new(stream.GetBuffer()[..(int)stream.Length]);
     }
 
-    public GenericAstraQueryBranch NotEqualsLiteral(string literal)
+    public GenericAstraQueryBranch NotEqualsLiteral(byte[] literal)
     {
         using var wrapped = LocalStreamWrapper.Create();
         var stream = wrapped.LocalStream;
         stream.WriteValue(QueryType.FilterMask);
         stream.WriteValue(offset);
         stream.WriteValue(Operation.NotEqual);
-        stream.WriteValue(DataType.StringMask);
+        stream.WriteValue(DataType.BytesMask);
         stream.WriteValue(literal);
         return new(stream.GetBuffer()[..(int)stream.Length]);
     }
-    
-    public GenericAstraQueryBranch Between(string fromBound, string toBound)
+
+    public GenericAstraQueryBranch Between(byte[] fromBound, byte[] toBound)
     {
         nameof(Between).ThrowUnsupportedOperation();
         return new();
     }
 
-    public GenericAstraQueryBranch GreaterThan(string literal)
+    public GenericAstraQueryBranch GreaterThan(byte[] literal)
     {
         nameof(GreaterThan).ThrowUnsupportedOperation();
         return new();
     }
 
-    public GenericAstraQueryBranch GreaterOrEqualsTo(string literal)
+    public GenericAstraQueryBranch GreaterOrEqualsTo(byte[] literal)
     {
         nameof(GreaterOrEqualsTo).ThrowUnsupportedOperation();
         return new();
     }
 
-    public GenericAstraQueryBranch LesserThan(string literal)
+    public GenericAstraQueryBranch LesserThan(byte[] literal)
     {
         nameof(LesserThan).ThrowUnsupportedOperation();
         return new();
     }
 
-    public GenericAstraQueryBranch LesserOrEqualsTo(string literal)
+    public GenericAstraQueryBranch LesserOrEqualsTo(byte[] literal)
     {
         nameof(LesserOrEqualsTo).ThrowUnsupportedOperation();
         return new();

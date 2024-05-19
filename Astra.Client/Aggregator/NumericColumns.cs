@@ -1,10 +1,10 @@
 using System.Numerics;
-using Astra.Common;
+using Astra.Client.Aggregator;
 using Astra.Common.Data;
 using Astra.Common.Protocols;
 using Astra.Common.StreamUtils;
 
-namespace Astra.Client.Simple.Aggregator;
+namespace Astra.Client.Aggregator;
 
 public abstract class NumericColumn<T>(int offset, uint mask) : IAstraColumnQuery<T>
     where T : unmanaged, INumber<T>

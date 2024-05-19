@@ -7,6 +7,7 @@ namespace Astra.Engine.v2.Data;
 
 public class DataRow : IDisposable, IEquatable<DataRow>
 {
+    private static readonly DataCell EmptyCell = new();
     private readonly DatastoreContext _context;
     private readonly DataCell[] _pool;
     private readonly int _length;
@@ -15,7 +16,7 @@ public class DataRow : IDisposable, IEquatable<DataRow>
 
     public ReadOnlySpan<DataCell> Span => new(_pool, 0, _length);
 
-    public DataRow(DataCell[] pool, DatastoreContext context)
+    private DataRow(DataCell[] pool, DatastoreContext context)
     {
         _pool = pool;
         _context = context;
@@ -26,12 +27,13 @@ public class DataRow : IDisposable, IEquatable<DataRow>
     
     public void Dispose()
     {
-        var span = Span;
         for (var i = 0; i < _length; i++)
         {
-            ref readonly var cell = ref span[i];
+            ref var cell = ref _pool[i];
             cell.Dispose();
+            cell = EmptyCell;
         }
+        
         ArrayPool<DataCell>.Shared.Return(_pool);
     }
 
