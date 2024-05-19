@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO.Compression;
 using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
@@ -22,47 +23,122 @@ public class AstraClient : IAstraClient
         TcpClient client,
         NetworkStream clientStream,
         bool reversedOrder,
-        uint connectionFlags) : IDisposable
+        ConnectionFlags connectionFlags) : IDisposable
     {
+        private readonly Stream _reader = GetReader(ref connectionFlags, clientStream);
+        private readonly Stream _writer = GetWriter(ref connectionFlags, clientStream);
         public TcpClient Client
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => client;
         }
-        public NetworkStream ClientStream
+        
+        public Stream Reader
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            get => clientStream;
+            get => _reader;
         }
 
+        public Stream Writer
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => _writer;
+        }
+        
         public bool ShouldReverse
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => reversedOrder;
         }
         
-        public uint ConnectionFlags
+        public ConnectionFlags ConnectionFlags
         {
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
             get => connectionFlags;
         }
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Deconstruct(out TcpClient outClient, out NetworkStream outClientStream, out bool reversed)
+        private static Stream GetReader(ref readonly ConnectionFlags flags, NetworkStream stream)
         {
-            outClient = client;
-            outClientStream = clientStream;
-            reversed = reversedOrder;
+            return flags.CompressionAlgorithmRaw switch
+            {
+                ConnectionFlags.CompressionOptions.GZip => new GZipStream(stream, CompressionMode.Decompress),
+                ConnectionFlags.CompressionOptions.Deflate => new DeflateStream(stream, CompressionMode.Decompress),
+                ConnectionFlags.CompressionOptions.Brotli => new BrotliStream(stream, CompressionMode.Decompress),
+                ConnectionFlags.CompressionOptions.ZLib => new ZLibStream(stream, CompressionMode.Decompress),
+                _ => stream
+            };
         }
-        
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public void Deconstruct(out TcpClient outClient, out NetworkStream outClientStream, out bool reversed, out uint flags)
+
+        private static Stream GetWriter(ref readonly ConnectionFlags flags, NetworkStream stream)
         {
-            outClient = client;
-            outClientStream = clientStream;
-            reversed = reversedOrder;
-            flags = connectionFlags;
+            var strategy = flags.CompressionStrategyRaw;
+            switch (flags.CompressionAlgorithmRaw)
+            {
+                case ConnectionFlags.CompressionOptions.GZip:
+                {
+                    GZipStream writer;
+                    if ((strategy & ConnectionFlags.CompressionOptions.Fastest) > 0)
+                        writer = new GZipStream(stream, CompressionLevel.Fastest);
+                    else if ((strategy & ConnectionFlags.CompressionOptions.SmallestSize) > 0)
+                        writer = new GZipStream(stream, CompressionLevel.Fastest);
+                    else
+                        writer = new GZipStream(stream, CompressionLevel.Optimal);
+                    return writer;
+                }
+                case ConnectionFlags.CompressionOptions.Deflate:
+                {
+                    DeflateStream writer;
+                    if ((strategy & ConnectionFlags.CompressionOptions.Fastest) > 0)
+                        writer = new DeflateStream(stream, CompressionLevel.Fastest);
+                    else if ((strategy & ConnectionFlags.CompressionOptions.SmallestSize) > 0)
+                        writer = new DeflateStream(stream, CompressionLevel.Fastest);
+                    else
+                        writer = new DeflateStream(stream, CompressionLevel.Optimal);
+                    return writer;
+                }
+                case ConnectionFlags.CompressionOptions.Brotli:
+                {
+                    BrotliStream writer;
+                    if ((strategy & ConnectionFlags.CompressionOptions.Fastest) > 0)
+                        writer = new BrotliStream(stream, CompressionLevel.Fastest);
+                    else if ((strategy & ConnectionFlags.CompressionOptions.SmallestSize) > 0)
+                        writer = new BrotliStream(stream, CompressionLevel.Fastest);
+                    else
+                        writer = new BrotliStream(stream, CompressionLevel.Optimal);
+                    return writer;
+                }
+                case ConnectionFlags.CompressionOptions.ZLib:
+                {
+                    ZLibStream writer;
+                    if ((strategy & ConnectionFlags.CompressionOptions.Fastest) > 0)
+                        writer = new ZLibStream(stream, CompressionLevel.Fastest);
+                    else if ((strategy & ConnectionFlags.CompressionOptions.SmallestSize) > 0)
+                        writer = new ZLibStream(stream, CompressionLevel.Fastest);
+                    else
+                        writer = new ZLibStream(stream, CompressionLevel.Optimal);
+                    return writer;
+                }
+                default:
+                    return new WriteForwardBufferedStream(stream);
+            }
         }
+
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        // public void Deconstruct(out TcpClient outClient, out NetworkStream outClientStream, out bool reversed)
+        // {
+        //     outClient = client;
+        //     outClientStream = clientStream;
+        //     reversed = reversedOrder;
+        // }
+        //
+        // [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        // public void Deconstruct(out TcpClient outClient, out NetworkStream outClientStream, out bool reversed, out ConnectionFlags flags)
+        // {
+        //     outClient = client;
+        //     outClientStream = clientStream;
+        //     reversed = reversedOrder;
+        //     flags = connectionFlags;
+        // }
 
         public readonly bool IsConnected = true;
         public void Dispose()
@@ -147,7 +223,7 @@ public class AstraClient : IAstraClient
                 throw new Exceptions.VersionNotSupportedException($"Astra.Server version not supported: {serverVersion.ToAstraCommonVersion()}");
 
             await networkStream.ReadExactlyAsync(outBuffer.WriterMemory[..sizeof(uint)], cancellationToken);
-            var connectionFlags = BitConverter.ToUInt32(outBuffer.Reader[..sizeof(uint)]);
+            var connectionFlags = ConnectionFlags.From(BitConverter.ToUInt32(outBuffer.Reader[..sizeof(uint)]));
             
             await networkStream.WriteValueAsync(CommunicationProtocol.SimpleClientResponse, cancellationToken);
             timer.Restart();
@@ -307,28 +383,28 @@ public class AstraClient : IAstraClient
     private async Task<int> BulkInsertSerializableInternalAsync<T>(IEnumerable<T> values,
         CancellationToken cancellationToken = default) where T : IStreamSerializable
     {
-        var (client, clientStream, reversed) = _client ?? throw new Exceptions.NotConnectedException();
-        FlushStream(client, clientStream);
-        using (var bufferedStream = new WriteForwardBufferedStream(clientStream))
+        if (_client == null) throw new Exceptions.NotConnectedException();
+        var client = _client.GetValueOrDefault();
+        var writer = client.Writer;
+        var reader = client.Reader;
+        var reversed = client.ShouldReverse;
+        await writer.WriteValueAsync(InsertHeaderSize + _inStream.Position, cancellationToken);
+        await writer.WriteValueAsync(Command.CreateWriteHeader(1U), cancellationToken); // 1 command
+        await writer.WriteValueAsync(Command.UnsortedInsert, cancellationToken); // Command type (insert)
+        if (reversed)
         {
-            await bufferedStream.WriteValueAsync(InsertHeaderSize + _inStream.Position, cancellationToken);
-            await bufferedStream.WriteValueAsync(Command.CreateWriteHeader(1U), cancellationToken); // 1 command
-            await bufferedStream.WriteValueAsync(Command.UnsortedInsert, cancellationToken); // Command type (insert)
-            if (reversed)
-            {
-                var wrapped = new ReverseStreamWrapper(bufferedStream);
-                WriteInBulk(values, wrapped);
-            }
-            else
-            {
-                var wrapped = new ForwardStreamWrapper(bufferedStream);
-                WriteInBulk(values, wrapped);
-            }
-            bufferedStream.Flush();
+            var wrapped = new ReverseStreamWrapper(writer);
+            WriteInBulk(values, wrapped);
         }
-        var faulted = (byte)clientStream.ReadByte();
+        else
+        {
+            var wrapped = new ForwardStreamWrapper(writer);
+            WriteInBulk(values, wrapped);
+        }
+        writer.Flush();
+        var faulted = (byte)reader.ReadByte();
         if (faulted != 0) throw new Exceptions.FaultedRequestException();
-        var inserted = clientStream.ReadInt();
+        var inserted = reader.ReadInt();
         return inserted;
     }
     
@@ -353,21 +429,16 @@ public class AstraClient : IAstraClient
     private async ValueTask SendPredicateInternal(ReadOnlyMemory<byte> predicateStream,
         CancellationToken cancellationToken = default)
     {
-        var (_, clientStream, _) = _client ?? throw new Exceptions.NotConnectedException();
-        using (var bufferedStream = new WriteForwardBufferedStream(clientStream, 256))
-        {
-            await bufferedStream.WriteValueAsync(HeaderSize + predicateStream.Length, cancellationToken);
-            await bufferedStream.WriteValueAsync(Command.CreateReadHeader(1U), cancellationToken); // 1 command
-            await bufferedStream.WriteValueAsync(Command.UnsortedAggregate, cancellationToken); // Command type (aggregate)
-            await bufferedStream.WriteAsync(predicateStream, cancellationToken);
-            bufferedStream.Flush();
-        }
-        // await client.WaitForData<TimeoutException>(sizeof(long), ConnectionSettings!.Value.Timeout, cancellationToken: cancellationToken);
-        // var outStreamSize = await clientStream.ReadLongAsync(cancellationToken);
-        // var outCluster = BytesCluster.Rent((int)outStreamSize);
-        // await client.WaitAndRead<TimeoutException>(outCluster.WriterMemory, ConnectionSettings!.Value.Timeout, cancellationToken);
-        // var stream = outCluster.Promote();
-        var faulted = (byte)clientStream.ReadByte();
+        if (_client == null) throw new Exceptions.NotConnectedException();
+        var client = _client.GetValueOrDefault();
+        var writer = client.Writer;
+        var reader = client.Reader;
+        await writer.WriteValueAsync(HeaderSize + predicateStream.Length, cancellationToken);
+        await writer.WriteValueAsync(Command.CreateReadHeader(1U), cancellationToken); // 1 command
+        await writer.WriteValueAsync(Command.UnsortedAggregate, cancellationToken); // Command type (aggregate)
+        await writer.WriteAsync(predicateStream, cancellationToken);
+        writer.Flush();
+        var faulted = (byte)reader.ReadByte();
         if (faulted != 0) throw new Exceptions.FaultedRequestException();
     }
     
@@ -410,26 +481,27 @@ public class AstraClient : IAstraClient
     public async ValueTask<DynamicResultsSet<T>> AggregateAsync<T>(PhysicalPlan builder,
         CancellationToken cancellationToken = default)
     {
-        var (_, clientStream, reversed, flags) = _client ?? throw new Exceptions.NotConnectedException();
-        var planReversed = (flags | CommonProtocol.ConnectionFlags.UseV2) > 0;
-        using (var bufferedStream = new WriteForwardBufferedStream(clientStream, 256))
+        if (_client == null) throw new Exceptions.NotConnectedException();
+        var client = _client.GetValueOrDefault();
+        var writer = client.Writer;
+        var reader = client.Reader;
+        var reversed = client.ShouldReverse;
+        var planReversed = client.ConnectionFlags.IsCellBased;
+        await writer.WriteValueAsync(HeaderSize, cancellationToken);
+        await writer.WriteValueAsync(Command.CreateReadHeader(1U), cancellationToken); // 1 command
+        await writer.WriteValueAsync(planReversed ? Command.ReversedPlanAggregate : Command.UnsortedAggregate, 
+            cancellationToken);
+        if (reversed)
         {
-            await bufferedStream.WriteValueAsync(HeaderSize, cancellationToken);
-            await bufferedStream.WriteValueAsync(Command.CreateReadHeader(1U), cancellationToken); // 1 command
-            await bufferedStream.WriteValueAsync(planReversed ? Command.ReversedPlanAggregate : Command.UnsortedAggregate, 
-                cancellationToken);
-            if (reversed)
-            {
-                builder.ToStream(new ReverseStreamWrapper(bufferedStream), planReversed);
-            }
-            else
-            {
-                builder.ToStream(new ForwardStreamWrapper(bufferedStream), planReversed);
-            }
-            bufferedStream.Flush();
+            builder.ToStream(new ReverseStreamWrapper(writer), planReversed);
         }
+        else
+        {
+            builder.ToStream(new ForwardStreamWrapper(writer), planReversed);
+        }
+        writer.Flush();
 
-        var faulted = (byte)clientStream.ReadByte();
+        var faulted = (byte)reader.ReadByte();
         if (faulted != 0) throw new Exceptions.FaultedRequestException();
         return new(this, ConnectionSettings!.Value.Timeout);
     }
@@ -456,25 +528,33 @@ public class AstraClient : IAstraClient
 
     public async Task<int> CountAllAsync(CancellationToken cancellationToken = default)
     {
-        var (client, clientStream, _) = _client ?? throw new Exceptions.NotConnectedException();
-        await clientStream.WriteValueAsync(HeaderSize, cancellationToken);
-        await clientStream.WriteValueAsync(Command.CreateReadHeader(1U), cancellationToken); // 1 command
-        await clientStream.WriteValueAsync(Command.CountAll, cancellationToken); // Command type (count all)
-        var faulted = (byte)clientStream.ReadByte();
+        if (_client == null) throw new Exceptions.NotConnectedException();
+        var client = _client.GetValueOrDefault();
+        var writer = client.Writer;
+        var reader = client.Reader;
+        await writer.WriteValueAsync(HeaderSize, cancellationToken);
+        await writer.WriteValueAsync(Command.CreateReadHeader(1U), cancellationToken); // 1 command
+        await writer.WriteValueAsync(Command.CountAll, cancellationToken); // Command type (count all)
+        writer.Flush();
+        var faulted = (byte)reader.ReadByte();
         if (faulted != 0) throw new Exceptions.FaultedRequestException();
-        return clientStream.ReadInt();
+        return reader.ReadInt();
     }
 
     private async Task<int> ConditionalCountInternalAsync(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default)
     {
-        var (client, clientStream, _) = _client ?? throw new Exceptions.NotConnectedException();
-        await clientStream.WriteValueAsync(HeaderSize + predicateStream.Length, cancellationToken);
-        await clientStream.WriteValueAsync(Command.CreateReadHeader(1U), cancellationToken); // 1 command
-        await clientStream.WriteValueAsync(Command.ConditionalCount, cancellationToken); // Command type (conditional count)
-        await clientStream.WriteAsync(predicateStream, cancellationToken);
-        var faulted = (byte)clientStream.ReadByte();
+        if (_client == null) throw new Exceptions.NotConnectedException();
+        var client = _client.GetValueOrDefault();
+        var writer = client.Writer;
+        var reader = client.Reader;
+        await writer.WriteValueAsync(HeaderSize + predicateStream.Length, cancellationToken);
+        await writer.WriteValueAsync(Command.CreateReadHeader(1U), cancellationToken); // 1 command
+        await writer.WriteValueAsync(Command.ConditionalCount, cancellationToken); // Command type (conditional count)
+        await writer.WriteAsync(predicateStream, cancellationToken);
+        writer.Flush();
+        var faulted = (byte)reader.ReadByte();
         if (faulted != 0) throw new Exceptions.FaultedRequestException();
-        return clientStream.ReadInt();
+        return reader.ReadInt();
     }
     
     public Task<int> ConditionalCountAsync<TA>(TA predicate, CancellationToken cancellationToken = default) where TA : IAstraQueryBranch
@@ -484,14 +564,18 @@ public class AstraClient : IAstraClient
     
     private async Task<int> ConditionalDeleteInternalAsync(ReadOnlyMemory<byte> predicateStream, CancellationToken cancellationToken = default) 
     {
-        var (client, clientStream, _) = _client ?? throw new Exceptions.NotConnectedException();
-        await clientStream.WriteValueAsync(HeaderSize + predicateStream.Length, cancellationToken);
-        await clientStream.WriteValueAsync(Command.CreateWriteHeader(1U), cancellationToken); // 1 command
-        await clientStream.WriteValueAsync(Command.ConditionalDelete, cancellationToken); // Command type (conditional count)
-        await clientStream.WriteAsync(predicateStream, cancellationToken);
-        var faulted = (byte)clientStream.ReadByte();
+        if (_client == null) throw new Exceptions.NotConnectedException();
+        var client = _client.GetValueOrDefault();
+        var writer = client.Writer;
+        var reader = client.Reader;
+        await writer.WriteValueAsync(HeaderSize + predicateStream.Length, cancellationToken);
+        await writer.WriteValueAsync(Command.CreateWriteHeader(1U), cancellationToken); // 1 command
+        await writer.WriteValueAsync(Command.ConditionalDelete, cancellationToken); // Command type (conditional count)
+        await writer.WriteAsync(predicateStream, cancellationToken);
+        writer.Flush();
+        var faulted = (byte)reader.ReadByte();
         if (faulted != 0) throw new Exceptions.FaultedRequestException();
-        return clientStream.ReadInt();
+        return reader.ReadInt();
     }
 
     public Task<int> ConditionalDeleteAsync<TA>(TA predicate, CancellationToken cancellationToken = default) where TA : IAstraQueryBranch
@@ -501,12 +585,16 @@ public class AstraClient : IAstraClient
 
     public async Task<int> ClearAsync(CancellationToken cancellationToken = default)
     {
-        var (client, clientStream, _) = _client ?? throw new Exceptions.NotConnectedException();
-        await clientStream.WriteValueAsync(HeaderSize, cancellationToken);
-        await clientStream.WriteValueAsync(Command.CreateWriteHeader(1U), cancellationToken); // 1 command
-        await clientStream.WriteValueAsync(Command.Clear, cancellationToken); // Command type (count all)
-        var faulted = (byte)clientStream.ReadByte();
+        if (_client == null) throw new Exceptions.NotConnectedException();
+        var client = _client.GetValueOrDefault();
+        var writer = client.Writer;
+        var reader = client.Reader;
+        await writer.WriteValueAsync(HeaderSize, cancellationToken);
+        await writer.WriteValueAsync(Command.CreateWriteHeader(1U), cancellationToken); // 1 command
+        await writer.WriteValueAsync(Command.Clear, cancellationToken); // Command type (count all)
+        writer.Flush();
+        var faulted = (byte)reader.ReadByte();
         if (faulted != 0) throw new Exceptions.FaultedRequestException();
-        return clientStream.ReadInt();
+        return reader.ReadInt();
     }
 }

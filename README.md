@@ -100,6 +100,7 @@ There are currently 3 supported data types, with more on the way:
 - [x] Supports for qword, single and double
 - [x] Ranged query
 - [x] Strict schema check
+- [x] Stream compression
 - [ ] TLS support
 
 ## Benchmark results

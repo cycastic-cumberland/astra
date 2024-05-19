@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using System.IO.Compression;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
@@ -59,6 +60,7 @@ public class TcpServer : IDisposable
     private readonly CancellationTokenSource _cancellationTokenSource = new();
     private readonly Func<IAuthenticationHandler> _authenticationSpawner;
     private readonly int _timeout;
+    private readonly ConnectionFlags _standardConnFlags;
 
     public int Port => _port;
 
@@ -86,6 +88,11 @@ public class TcpServer : IDisposable
         _logger = GetLogger<TcpServer>();
         _port = settings.Port ?? DefaultPort;
         _listener = new(Address, _port);
+        _standardConnFlags = new()
+        {
+            IsCellBased = settings.UseCellBasedDataStore,
+            Compression = settings.CompressionOption
+        };
         Console.CancelKeyPress += delegate(object? _, ConsoleCancelEventArgs e)
         {
             e.Cancel = true;
@@ -99,6 +106,64 @@ public class TcpServer : IDisposable
                 nameof(settings.Timeout), TimeSpan.FromMilliseconds(_timeout));
     }
 
+    private (Stream reader, Stream writer) CreateStreamPair(Stream inStream)
+    {
+        var strategy = _standardConnFlags.CompressionStrategyRaw;
+        switch (_standardConnFlags.CompressionAlgorithmRaw)
+        {
+            case ConnectionFlags.CompressionOptions.GZip:
+            {
+                GZipStream writer;
+                if ((strategy & ConnectionFlags.CompressionOptions.Fastest) > 0)
+                    writer = new GZipStream(inStream, CompressionLevel.Fastest);
+                else if ((strategy & ConnectionFlags.CompressionOptions.SmallestSize) > 0)
+                    writer = new GZipStream(inStream, CompressionLevel.Fastest);
+                else
+                    writer = new GZipStream(inStream, CompressionLevel.Optimal);
+                return (new GZipStream(inStream, CompressionMode.Decompress),
+                    writer);
+            }
+            case ConnectionFlags.CompressionOptions.Deflate:
+            {
+                DeflateStream writer;
+                if ((strategy & ConnectionFlags.CompressionOptions.Fastest) > 0)
+                    writer = new DeflateStream(inStream, CompressionLevel.Fastest);
+                else if ((strategy & ConnectionFlags.CompressionOptions.SmallestSize) > 0)
+                    writer = new DeflateStream(inStream, CompressionLevel.Fastest);
+                else
+                    writer = new DeflateStream(inStream, CompressionLevel.Optimal);
+                return (new DeflateStream(inStream, CompressionMode.Decompress),
+                    writer);
+            }
+            case ConnectionFlags.CompressionOptions.Brotli:
+            {
+                BrotliStream writer;
+                if ((strategy & ConnectionFlags.CompressionOptions.Fastest) > 0)
+                    writer = new BrotliStream(inStream, CompressionLevel.Fastest);
+                else if ((strategy & ConnectionFlags.CompressionOptions.SmallestSize) > 0)
+                    writer = new BrotliStream(inStream, CompressionLevel.Fastest);
+                else
+                    writer = new BrotliStream(inStream, CompressionLevel.Optimal);
+                return (new BrotliStream(inStream, CompressionMode.Decompress),
+                    writer);
+            }
+            case ConnectionFlags.CompressionOptions.ZLib:
+            {
+                ZLibStream writer;
+                if ((strategy & ConnectionFlags.CompressionOptions.Fastest) > 0)
+                    writer = new ZLibStream(inStream, CompressionLevel.Fastest);
+                else if ((strategy & ConnectionFlags.CompressionOptions.SmallestSize) > 0)
+                    writer = new ZLibStream(inStream, CompressionLevel.Fastest);
+                else
+                    writer = new ZLibStream(inStream, CompressionLevel.Optimal);
+                return (new ZLibStream(inStream, CompressionMode.Decompress),
+                    writer);
+            }
+            default:
+                return (inStream, new WriteForwardBufferedStream(inStream));
+        }
+    }
+    
     public static async Task<TcpServer?> Initialize()
     {
         SpringBootLoggerClone.PrintBanner();
@@ -218,12 +283,10 @@ public class TcpServer : IDisposable
     }
 
 
-    private async Task ResolveClientAsync(TcpClient client)
+    private async Task ResolveClientAsync(TcpClient client, Stream inStream, Stream outStream)
     {
         var cancellationToken = _cancellationTokenSource.Token;
-        var stream = client.GetStream();
         client.NoDelay = true;
-        using var bufferedStream = new WriteForwardBufferedStream(stream);
         var stopwatch = new Stopwatch();
         var threshold = (long)sizeof(long);
         var waiting = true;
@@ -253,7 +316,7 @@ public class TcpServer : IDisposable
             }
             if (waiting)
             {
-                _ = await stream.ReadLongAsync(cancellationToken);
+                _ = await inStream.ReadLongAsync(cancellationToken);
                 threshold = 0;
                 waiting = false;
                 timer.Restart();
@@ -263,7 +326,7 @@ public class TcpServer : IDisposable
             stopwatch.Start();
             try
             {
-                _registry.ConsumeStream(stream, bufferedStream);
+                _registry.ConsumeStream(inStream, outStream);
             }
             catch (Exception e)
             {
@@ -275,7 +338,7 @@ public class TcpServer : IDisposable
             {
                 stopwatch.Stop();
                 _logger.LogDebug("Request resolved after {} us", stopwatch.Elapsed.TotalMicroseconds);
-                bufferedStream.Flush();
+                await outStream.FlushAsync(cancellationToken);
                 stopwatch.Reset();
             }
             threshold = sizeof(long);
@@ -300,10 +363,7 @@ public class TcpServer : IDisposable
             await stream.WriteValueAsync(1, cancellationToken);
             await stream.WriteValueAsync(CommunicationProtocol.ServerIdentification, cancellationToken);
             await stream.WriteValueAsync(CommonProtocol.AstraCommonVersion, token: cancellationToken);
-            if (_registry is ShinDataRegistry)
-                await stream.WriteValueAsync(CommonProtocol.ConnectionFlags.UseV2, token: cancellationToken);
-            else
-                await stream.WriteValueAsync(CommonProtocol.ConnectionFlags.None, token: cancellationToken);
+            await stream.WriteValueAsync(_standardConnFlags.Raw, cancellationToken);
             var timer = Stopwatch.StartNew();
             while (client.Available < sizeof(ulong))
             {
@@ -348,7 +408,8 @@ public class TcpServer : IDisposable
         }
         _logger.LogDebug("Authentication completed, {} is allowed to connect", address);
         await stream.WriteValueAsync(CommunicationProtocol.AllowedConnection, token: cancellationToken);
-        await ResolveClientAsync(client);
+        var (inStream, outStream) = CreateStreamPair(client.GetStream());
+        await ResolveClientAsync(client, inStream, outStream);
     }
     
     private async Task ResolveClientWrappedAsync(TcpClient client)

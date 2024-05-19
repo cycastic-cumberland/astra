@@ -6,14 +6,9 @@ namespace Astra.Common.Protocols;
 
 public static class CommonProtocol
 {
-    public static class ConnectionFlags
-    {
-        public const uint None = 0;
-        public const uint UseV2 = 1 << 0;
-    }
     public const int SignatureSizeBit = 2048;
     public const int SignatureSize = 2048 / 8;
-    public const uint AstraCommonVersion = 0x00020100U;
+    public const uint AstraCommonVersion = 0x00020200U;
     public const int LongStringThreshold = 96;
     public const uint PublicKeyChallengeLength = 64;
     public const int SaltLength = 16;

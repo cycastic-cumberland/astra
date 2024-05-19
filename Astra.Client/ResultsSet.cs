@@ -41,9 +41,7 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
         object IEnumerator.Current => Current;
     }
     
-    private readonly TcpClient _client;
-    private readonly NetworkStream _stream;
-    private readonly int _timeout;
+    private readonly Stream _stream;
     private readonly AstraClient.ExclusivityCheck _exclusivityCheck;
     private readonly ReadOnlyMemory<uint>? _constraint;
     private bool _exclusivity;
@@ -54,14 +52,15 @@ public class ResultsSet<T> : IEnumerable<T>, IDisposable
 
     public ReadOnlySpan<(uint type, string name)> Columns => new(_array, 0, _columnCount);
 
-    public ResultsSet(AstraClient client, int timeout, ReadOnlyMemory<uint>? constraintCheck = null)
+    public ResultsSet(AstraClient astraClient, int timeout, ReadOnlyMemory<uint>? constraintCheck = null)
     {
-        var (networkClient, clientStream, reversed) = client.Client ?? throw new Exceptions.NotConnectedException();
-        _exclusivityCheck = new(client);
+        if (astraClient.Client == null) throw new Exceptions.NotConnectedException();
+        var client = astraClient.Client.GetValueOrDefault();
+        var reader = client.Reader;
+        var reversed = client.ShouldReverse;
+        _exclusivityCheck = new(astraClient);
         _constraint = constraintCheck;
-        _client = networkClient;
-        _stream = clientStream;
-        _timeout = timeout;
+        _stream = reader;
         _array = [];
         _stage = reversed ? 3 : 1;
     }
