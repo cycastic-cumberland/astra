@@ -63,7 +63,7 @@ public struct ConnectionFlags
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => (Data.CompressionOptions)CompressionFlags;
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        set => CompressionFlags = unchecked((byte)value);
+        set => CompressionFlags = (byte)value;
     }
     
     public bool IsCellBased

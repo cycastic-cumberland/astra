@@ -1,16 +1,17 @@
-using System.Security.Cryptography;
+using System.Runtime.CompilerServices;
 using Astra.Client;
+using Astra.Client.Aggregator;
 using Astra.Common.Data;
-using Astra.Common.Hashes;
 using Astra.Server;
 using Astra.Server.Authentication;
+using Astra.TypeErasure.Planners.Physical;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
 namespace Astra.Benchmark;
 
 [SimpleJob(RuntimeMoniker.Net80)]
-public class CompressedBulkInsertionBenchmark
+public class CompressedAggregationBenchmark
 {
     public enum CompressionAlgorithms
     {
@@ -25,10 +26,21 @@ public class CompressedBulkInsertionBenchmark
         Fastest,
         SmallestSize,
     }
+    [Params(100, 1_000, 10_000)]
+    public uint AggregatedRows;
+    
+    [Params(CompressionAlgorithms.GZip, CompressionAlgorithms.Deflate, CompressionAlgorithms.Brotli, CompressionAlgorithms.ZLib)]
+    public CompressionAlgorithms Algorithm;
+    
+    [Params(CompressionStrategies.Optimal, CompressionStrategies.Fastest, CompressionStrategies.SmallestSize)]
+    public CompressionStrategies Strategy;
+    private uint GibberishRows => AggregatedRows / 2;
+    
+    
     private static readonly RegistrySchemaSpecifications Schema = new()
     {
-        Columns =
-        [
+        Columns = new ColumnSchemaSpecifications[] 
+        {
             new()
             {
                 Name = "col1",
@@ -47,26 +59,13 @@ public class CompressedBulkInsertionBenchmark
                 DataType = DataType.StringMask,
                 Indexer = IndexerType.Generic,
             }
-        ]
+        }
     };
 
-    private TcpServer _newServer = null!;
-    private AstraClient _client2 = null!;
-    private Task _newServerTask = Task.CompletedTask;
-    private SimpleSerializableStruct[] _array = null!;
-    private const uint MaxBulkInsertAmount = 10_000;
+    private Dictionary<CompressionOptions, (TcpServer, Task, AstraClient)> _lookupTable = null!;
+    private PhysicalPlan _plan;
+    private const int Index = 1;
     
-    [Params(1_000, MaxBulkInsertAmount)]
-    public uint BulkInsertAmount;
-
-    [Params(CompressionAlgorithms.GZip, CompressionAlgorithms.Deflate, CompressionAlgorithms.Brotli, CompressionAlgorithms.ZLib)]
-    public CompressionAlgorithms Algorithm;
-    
-    [Params(CompressionStrategies.Optimal, CompressionStrategies.Fastest, CompressionStrategies.SmallestSize)]
-    public CompressionStrategies Strategy;
-
-    private uint _stuff;
-
     private CompressionOptions SelectCompressionOption()
     {
         return (CompressionOptions)(Algorithm switch
@@ -114,63 +113,119 @@ public class CompressedBulkInsertionBenchmark
             _ => throw new ArgumentOutOfRangeException()
         });
     }
-    
-    private async Task SetUpAsync()
+
+    private static async Task<Dictionary<CompressionOptions, (TcpServer, Task, AstraClient)>> CreateTable()
     {
-        _newServer = new(new()
+        var table = new Dictionary<CompressionOptions, (TcpServer, Task, AstraClient)>();
+        var port = TcpServer.DefaultPort;
+        foreach (var option in Enum.GetValues(typeof(CompressionOptions)).Cast<CompressionOptions>())
         {
-            Port = TcpServer.DefaultPort + 1,
-            LogLevel = "Critical",
-            UseCellBasedDataStore = true,
-            Schema = Schema with { BinaryTreeDegree = (int)(BulkInsertAmount / 10) },
-            CompressionOption = SelectCompressionOption()
-        }, AuthenticationHelper.NoAuthentication());
-        _newServerTask = _newServer.RunAsync();
-        await Task.Delay(100);
-        _client2 = new();
+            if (option == CompressionOptions.None) continue;
+            var currPort = port++;
+            var server = new TcpServer(new()
+            {
+                Port = currPort,
+                LogLevel = "Critical",
+                UseCellBasedDataStore = true,
+                Schema = Schema with { BinaryTreeDegree = 1_000 },
+                CompressionOption = option
+            }, AuthenticationHelper.NoAuthentication());
+            var serverTask = server.RunAsync();
+            await Task.Delay(5);
+            var client = new AstraClient();
+            await client.ConnectAsync(new()
+            {
+                Address = "127.0.0.1",
+                Port = currPort,
+            });
+            table[option] = (server, serverTask, client);
+        }
+
+        return table;
+    }
+
+    private async Task GlobalSetUpAsync()
+    {
+        _lookupTable = await CreateTable();
+        _plan = PhysicalPlanBuilder.Column<int>(0).EqualsTo(Index).Build();
+    }
+
+    private async Task GlobalCleanUpAsync()
+    {
+        foreach (var (_, (server, task, client)) in _lookupTable)
+        {
+            client.Dispose();
+            server.Kill();
+            await task;
+            server.Dispose();
+        }
+
+        _lookupTable = null!;
         
-        await _client2.ConnectAsync(new()
+    }
+
+    [GlobalSetup]
+    public void GlobalSetUp() => GlobalSetUpAsync().Wait();
+
+    [GlobalCleanup]
+    public void GlobalCleanUp() => GlobalCleanUpAsync().Wait();
+    
+    private async Task IterationSetupAsync()
+    {
+        var (_, _, client) = _lookupTable[SelectCompressionOption()];
+        var data = new SimpleSerializableStruct[AggregatedRows + GibberishRows];
+        for (var i = 0; i < AggregatedRows; i++)
         {
-            Address = "127.0.0.1",
-            Port = TcpServer.DefaultPort + 1,
-        });
+            data[i] = new()
+            {
+                Value1 = Index, // 4 bytes
+                Value2 = "test", // 4 + 4 bytes
+                Value3 = i.ToString() // 4 + (<= 4) bytes
+            };
+        }
+        
+        for (var i = AggregatedRows; i < AggregatedRows + GibberishRows; i++)
+        {
+            data[i] = new()
+            {
+                Value1 = Index + unchecked((int)i),
+                Value2 = "test",
+                Value3 = i.ToString()
+            };
+        }
+
+        await client.BulkInsertSerializableCompatAsync(data);
     }
     
     [IterationSetup]
-    public void Setup()
+    public void IterationSetUp()
     {
-        SetUpAsync().Wait();
-        var stuff = Interlocked.Increment(ref _stuff);
-        _array = new SimpleSerializableStruct[BulkInsertAmount];
-        for (var i = 0U; i < BulkInsertAmount; i++)
-        {
-            _array[i] = new()
-            {
-                Value1 = unchecked((int)stuff),
-                Value2 = "test",
-                Value3 = Hash128.CreateUnsafe(RandomNumberGenerator.GetBytes(Hash128.Size)).ToStringUpperCase()
-            };
-        }
-    }
-
-    private Task CleanUpAsync()
-    {
-        _client2.Dispose();
-        _newServer.Kill();
-        _newServer = null!;
-        return _newServerTask;
+        IterationSetupAsync().Wait();
     }
 
     [IterationCleanup]
-    public void CleanUp()
+    public void IterationCleanup()
     {
-        CleanUpAsync().Wait();
-        _array = null!;
+        var (server, _, _) = _lookupTable[SelectCompressionOption()];
+        server.GetRegistry().Clear();
+    }
+    
+    [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]
+    private static void ProfessionalTimeWaster<T>(T _) {  }
+    
+    private async Task SimpleAggregationAndAutoDeserializationBenchmarkNewAsync()
+    {
+        var (_, _, client) = _lookupTable[SelectCompressionOption()];
+        using var fetched = await client.AggregateAsync<SimpleSerializableStruct>(_plan);
+        foreach (var f in fetched)
+        {
+            ProfessionalTimeWaster(f.Value1);
+        }
     }
     
     [Benchmark]
-    public void AutoSerializationNew()
-    { 
-        _client2.BulkInsertAsync(_array).Wait();
+    public void AutoDeserializationNew()
+    {
+        SimpleAggregationAndAutoDeserializationBenchmarkNewAsync().Wait();
     }
 }
