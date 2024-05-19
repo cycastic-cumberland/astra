@@ -11,4 +11,8 @@
       <ProjectReference Include="..\Astra.TypeErasure\Astra.TypeErasure.csproj" />
     </ItemGroup>
 
+    <ItemGroup>
+      <PackageReference Include="lz4net" Version="1.0.15.93" />
+    </ItemGroup>
+
 </Project>

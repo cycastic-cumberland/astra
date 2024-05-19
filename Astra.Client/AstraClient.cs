@@ -11,6 +11,7 @@ using Astra.Common.Protocols;
 using Astra.Common.Serializable;
 using Astra.Common.StreamUtils;
 using Astra.TypeErasure.Planners.Physical;
+using LZ4;
 using Microsoft.IO;
 
 namespace Astra.Client;
@@ -65,6 +66,7 @@ public class AstraClient : IAstraClient
                 ConnectionFlags.CompressionOptions.Deflate => new DeflateStream(stream, CompressionMode.Decompress),
                 ConnectionFlags.CompressionOptions.Brotli => new BrotliStream(stream, CompressionMode.Decompress),
                 ConnectionFlags.CompressionOptions.ZLib => new ZLibStream(stream, CompressionMode.Decompress),
+                ConnectionFlags.CompressionOptions.LZ4 => new LZ4Stream(stream, LZ4StreamMode.Decompress),
                 _ => stream
             };
         }
@@ -116,6 +118,15 @@ public class AstraClient : IAstraClient
                         writer = new ZLibStream(stream, CompressionLevel.Fastest);
                     else
                         writer = new ZLibStream(stream, CompressionLevel.Optimal);
+                    return writer;
+                }
+                case ConnectionFlags.CompressionOptions.LZ4:
+                {
+                    LZ4Stream writer;
+                    if ((strategy & ConnectionFlags.CompressionOptions.SmallestSize) > 0)
+                        writer = new(stream, LZ4StreamMode.Compress, LZ4StreamFlags.HighCompression);
+                    else 
+                        writer = new(stream, LZ4StreamMode.Compress, LZ4StreamFlags.Default);
                     return writer;
                 }
                 default:

@@ -12,6 +12,7 @@ using Astra.Engine;
 using Astra.Engine.Data;
 using Astra.Engine.v2.Data;
 using Astra.Server.Authentication;
+using LZ4;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 
@@ -158,6 +159,15 @@ public class TcpServer : IDisposable
                     writer = new ZLibStream(inStream, CompressionLevel.Optimal);
                 return (new ZLibStream(inStream, CompressionMode.Decompress),
                     writer);
+            }
+            case ConnectionFlags.CompressionOptions.LZ4:
+            {
+                LZ4Stream writer;
+                if ((strategy & ConnectionFlags.CompressionOptions.SmallestSize) > 0)
+                    writer = new(inStream, LZ4StreamMode.Compress, LZ4StreamFlags.HighCompression);
+                else 
+                    writer = new(inStream, LZ4StreamMode.Compress, LZ4StreamFlags.Default);
+                return (new LZ4Stream(inStream, LZ4StreamMode.Decompress), writer);
             }
             default:
                 return (inStream, new WriteForwardBufferedStream(inStream));

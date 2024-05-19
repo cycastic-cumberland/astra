@@ -70,7 +70,7 @@ public class AggregationTestFixture
             },
             Port = TcpServer.DefaultPort + 1,
             UseCellBasedDataStore = true,
-            CompressionOption = CompressionOptions.GZipSmallestSize,
+            CompressionOption = CompressionOptions.LZ4SmallestSize,
         }, AuthenticationHelper.SaltedSha256Authentication(password));
         _serverTask = _server.RunAsync();
         await Task.Delay(100);

@@ -18,7 +18,8 @@ public class CompressedAggregationBenchmark
         GZip,
         Deflate,
         Brotli,
-        ZLib
+        ZLib,
+        LZ4
     }
     public enum CompressionStrategies
     {
@@ -29,7 +30,7 @@ public class CompressedAggregationBenchmark
     [Params(100, 1_000, 10_000)]
     public uint AggregatedRows;
     
-    [Params(CompressionAlgorithms.GZip, CompressionAlgorithms.Deflate, CompressionAlgorithms.Brotli, CompressionAlgorithms.ZLib)]
+    [Params(CompressionAlgorithms.GZip, CompressionAlgorithms.Deflate, CompressionAlgorithms.Brotli, CompressionAlgorithms.ZLib, CompressionAlgorithms.LZ4)]
     public CompressionAlgorithms Algorithm;
     
     [Params(CompressionStrategies.Optimal, CompressionStrategies.Fastest, CompressionStrategies.SmallestSize)]
@@ -107,6 +108,16 @@ public class CompressedAggregationBenchmark
                 CompressionStrategies.Fastest => ConnectionFlags.CompressionOptions.ZLib |
                                                  ConnectionFlags.CompressionOptions.Fastest,
                 CompressionStrategies.SmallestSize => ConnectionFlags.CompressionOptions.ZLib |
+                                                      ConnectionFlags.CompressionOptions.SmallestSize,
+                _ => throw new ArgumentOutOfRangeException()
+            },
+            CompressionAlgorithms.LZ4 => Strategy switch
+            {
+                CompressionStrategies.Optimal => ConnectionFlags.CompressionOptions.LZ4 |
+                                                 ConnectionFlags.CompressionOptions.Optimal,
+                CompressionStrategies.Fastest => ConnectionFlags.CompressionOptions.LZ4 |
+                                                 ConnectionFlags.CompressionOptions.Fastest,
+                CompressionStrategies.SmallestSize => ConnectionFlags.CompressionOptions.LZ4 |
                                                       ConnectionFlags.CompressionOptions.SmallestSize,
                 _ => throw new ArgumentOutOfRangeException()
             },

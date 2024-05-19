@@ -12,7 +12,8 @@ public struct ConnectionFlags
         public const byte GZip = 1;
         public const byte Deflate = 2;
         public const byte Brotli = 3;
-        public const byte ZLib = 4;
+        public const byte LZ4 = 4;
+        public const byte ZLib = 5;
         public const byte AlgorithmMask = byte.MaxValue - StrategyMask;
         public const byte StrategyMask = 192;
         public const byte Fastest = 1 << 7;

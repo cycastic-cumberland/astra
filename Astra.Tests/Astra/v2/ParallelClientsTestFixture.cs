@@ -72,6 +72,7 @@ public class ParallelClientsTestFixture
                 Columns = _columns
             },
             UseCellBasedDataStore = true,
+            CompressionOption = CompressionOptions.GZipSmallestSize,
         }, AuthenticationHelper.RSA(publicKey));
         _serverTask = _server.RunAsync();
         return Task.Delay(100);
