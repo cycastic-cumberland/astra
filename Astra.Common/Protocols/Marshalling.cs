@@ -6,15 +6,20 @@ namespace Astra.Common.Protocols;
 public static class Marshalling
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static T MarshalTo<T>(this ReadOnlySpan<byte> bytes) where T : unmanaged
+    public static ref T ToRef<T>(this Span<byte> bytes) where T : unmanaged
     {
-        return Unsafe.As<byte, T>(ref Unsafe.AsRef(in bytes[0]));
+        return ref Unsafe.As<byte, T>(ref bytes[0]);
     }
     
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void ToBytes<T>(this T value, Span<byte> toSpan) where T : unmanaged
+    public static ref readonly T ToReadOnlyRef<T>(this ReadOnlySpan<byte> bytes) where T : unmanaged
     {
-        var fromSpan = MemoryMarshal.CreateSpan(ref Unsafe.As<T, byte>(ref value), Unsafe.SizeOf<T>());
-        fromSpan.CopyTo(toSpan);
+        return ref Unsafe.As<byte, T>(ref Unsafe.AsRef(in bytes[0]));
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static Span<byte> ToBytesSpan<T>(this ref T value) where T : unmanaged
+    {
+        return MemoryMarshal.CreateSpan(ref Unsafe.As<T, byte>(ref value), Unsafe.SizeOf<T>());
     }
 }

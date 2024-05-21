@@ -49,7 +49,7 @@ public readonly struct Hash256 : IEquatable<Hash256>
     
     private static void CreateUnsafe(ReadOnlySpan<byte> array, out Hash256 hash)
     {
-        hash = array.MarshalTo<Hash256>();
+        hash = array.ToReadOnlyRef<Hash256>();
     }
     
     public static Hash256 Create(ReadOnlySpan<byte> array)
@@ -76,7 +76,7 @@ public readonly struct Hash256 : IEquatable<Hash256>
     public void CopyTo(Span<byte> buffer)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(buffer.Length, Size);
-        this.ToBytes(buffer);
+        Unsafe.AsRef(in this).ToBytesSpan().CopyTo(buffer);
     }
     
     public bool Equals(Hash256 other)
@@ -112,8 +112,6 @@ public readonly struct Hash256 : IEquatable<Hash256>
 
     public override string ToString()
     {
-        Span<byte> span = stackalloc byte[Size];
-        this.ToBytes(span);
-        return ((ReadOnlySpan<byte>)span).ToHexString();
+        return ((ReadOnlySpan<byte>)Unsafe.AsRef(in this).ToBytesSpan()).ToHexString();
     }
 }

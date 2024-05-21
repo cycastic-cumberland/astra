@@ -3,6 +3,7 @@ using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 using Astra.Common.Data;
+using Astra.Common.Protocols;
 
 namespace Astra.Common.StreamUtils;
 
@@ -18,8 +19,8 @@ public static class StreamReadAddons
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static T ReadUnmanagedStruct<T>(this Stream reader) where T : unmanaged
     {
-        var value = new T();
-        reader.ReadExactly(MemoryMarshal.CreateSpan(ref Unsafe.As<T, byte>(ref value), Unsafe.SizeOf<T>()));
+        T value = default;
+        reader.ReadExactly(value.ToBytesSpan());
         return value;
     }
     

@@ -67,7 +67,7 @@ public readonly struct Hash512 : IEquatable<Hash512>
     
     private static void CreateUnsafe(ReadOnlySpan<byte> span, out Hash512 hash)
     {
-        hash = span.MarshalTo<Hash512>();
+        hash = span.ToReadOnlyRef<Hash512>();
     }
 
     public static Hash512 Create(ReadOnlySpan<byte> span)
@@ -139,8 +139,6 @@ public readonly struct Hash512 : IEquatable<Hash512>
     
     public override string ToString()
     {
-        Span<byte> span = stackalloc byte[Size];
-        this.ToBytes(span);
-        return ((ReadOnlySpan<byte>)span).ToHexString();
+        return ((ReadOnlySpan<byte>)Unsafe.AsRef(in this).ToBytesSpan()).ToHexString();
     }
 }

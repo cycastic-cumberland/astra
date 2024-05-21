@@ -37,8 +37,7 @@ public sealed class BytesColumnResolver(string columnName, int offset, int index
         var cluster = BytesCluster.Rent((int)(length + sizeof(long)));
         try
         {
-            Span<byte> lengthSpan = stackalloc byte[sizeof(long)];
-            length.ToSpan(lengthSpan);
+            var lengthSpan = length.ToBytesSpan();
             lengthSpan.CopyTo(cluster.Writer[..sizeof(long)]);
             reader.ReadExactly(cluster.Writer[sizeof(long)..]);
             row.SetPeripheral(index, cluster);

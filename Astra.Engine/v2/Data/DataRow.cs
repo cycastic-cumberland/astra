@@ -48,10 +48,11 @@ public class DataRow : IDisposable, IEquatable<DataRow>
         var mySpan = Span;
         var theirSpan = other.Span;
         if (mySpan.Length != theirSpan.Length) return false;
+        ref var arrRef = ref MemoryMarshal.GetArrayDataReference(other._pool);
         for (var i = 0; i < _length; i++)
         {
             ref readonly var lhs = ref mySpan[i];
-            if (!lhs.Equals(ref Unsafe.Add(ref MemoryMarshal.GetArrayDataReference(other._pool), (nint)i))) 
+            if (!lhs.Equals(ref Unsafe.Add(ref arrRef, (nint)i))) 
                 return false;
         }
 

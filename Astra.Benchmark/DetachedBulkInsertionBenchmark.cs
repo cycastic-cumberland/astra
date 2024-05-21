@@ -10,27 +10,32 @@ namespace Astra.Benchmark;
 public class DetachedBulkInsertionBenchmark
 {
     public const int Port = 8499;
-    private AstraClient _client2 = null!;
+    private AstraClient _client = null!;
     private SimpleSerializableStruct[] _array = null!;
     
-    [Params(1_000, 10_000)]
+    [Params(1_000, 10_000, 100_000)]
     public uint BulkInsertAmount;
 
     private int _id;
 
-    [IterationSetup]
-    public void Setup()
+    [GlobalSetup]
+    public void GlobalSetup()
     {
         Task.Run(async () =>
         {
-            _client2 = new();
+            _client = new();
         
-            await _client2.ConnectAsync(new()
+            await _client.ConnectAsync(new()
             {
                 Address = "127.0.0.1",
                 Port = Port,
             });
         }).Wait();
+    }
+    
+    [IterationSetup]
+    public void Setup()
+    {
         var stuff = Interlocked.Increment(ref _id);
         _array = new SimpleSerializableStruct[BulkInsertAmount];
         for (var i = 0U; i < BulkInsertAmount; i++)
@@ -45,15 +50,22 @@ public class DetachedBulkInsertionBenchmark
     }
 
     [IterationCleanup]
-    public void CleanUp()
+    public void IterationCleanup()
     {
-        _client2.Dispose();
+        _client.ClearAsync().Wait();
         _array = null!;
+    }
+
+    [GlobalCleanup]
+    public void GlobalCleanup()
+    {
+        _client.Dispose();
+        _client = null!;
     }
     
     [Benchmark]
     public void AutoSerializationNew()
     { 
-        _client2.BulkInsertAsync(_array).Wait();
+        _client.BulkInsertAsync(_array).Wait();
     }
 }

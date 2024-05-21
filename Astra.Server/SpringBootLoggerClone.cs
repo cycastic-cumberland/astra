@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Reflection;
 using System.Runtime.Versioning;
 using Astra.Common;
 using Astra.Common.Protocols;
@@ -32,6 +33,9 @@ public sealed class SpringBootLoggerClone(
     Func<SpringBootLoggerCloneConfiguration> getCurrentConfig)
     : ILogger
 {
+    private static readonly DateTime BuildDate = File.GetCreationTime(Assembly.GetExecutingAssembly().Location);
+    
+    
     private static readonly object Lock = new();
 
     private const string Banner = 
@@ -58,7 +62,7 @@ public sealed class SpringBootLoggerClone(
         Console.Write("  :: Astra.Server ::");
         Console.ForegroundColor = originalColor;
         Console.Write("                                ");
-        Console.WriteLine($"(v{CommonProtocol.GetCommonVersionString()})");
+        Console.WriteLine($"(v{CommonProtocol.GetCommonVersionString()}, compiled at: {BuildDate})");
     }
 
     public IDisposable BeginScope<TState>(TState state) where TState : notnull => default!;

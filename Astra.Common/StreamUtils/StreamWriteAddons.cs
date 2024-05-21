@@ -18,7 +18,7 @@ public static class StreamWriteAddons
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void WriteUnmanagedValue<T>(this Stream writer, T value) where T : unmanaged
     {
-        writer.Write(MemoryMarshal.CreateSpan(ref Unsafe.As<T, byte>(ref value), Unsafe.SizeOf<T>()));
+        writer.Write(value.ToBytesSpan());
     }
 
     public static void WriteWildcard(this Stream writer, object? obj)

@@ -22,10 +22,8 @@ public static class CommonProtocol
     public static string ToAstraCommonVersion(this uint value)
     {
         var version = ReverseStreamWrapper.ReverseEndianness(value);
-        Span<byte> span = stackalloc byte[sizeof(uint)];
-        version.ToBytes(span);
 
-        return ((ReadOnlySpan<byte>)span).ToHexStringUpperSeparated();
+        return ((ReadOnlySpan<byte>)version.ToBytesSpan()).ToHexStringUpperSeparated();
     }
     public static string GetCommonVersionString()
     {

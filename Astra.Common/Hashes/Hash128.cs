@@ -18,7 +18,7 @@ public readonly struct Hash128 : IEquatable<Hash128>
     public static Hash128 CreateUnsafe(ReadOnlySpan<byte> array)
     {
         if (array.Length != 16) throw new ArgumentException(nameof(array));
-        return array.MarshalTo<Hash128>();
+        return array.ToReadOnlyRef<Hash128>();
     }
     public static Hash128 Create(UInt128 i128)
     {
@@ -49,9 +49,7 @@ public readonly struct Hash128 : IEquatable<Hash128>
     
     public void CopyTo(Stream stream)
     {
-        Span<byte> span = stackalloc byte[Size];
-        this.ToBytes(span);
-        stream.Write(span);
+        stream.Write(Unsafe.AsRef(in this).ToBytesSpan());
     }
     
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -82,16 +80,12 @@ public readonly struct Hash128 : IEquatable<Hash128>
 
     public string ToStringUpperCase()
     {
-        Span<byte> span = stackalloc byte[Size];
-        this.ToBytes(span);
-        return ((ReadOnlySpan<byte>)span).ToHexStringUpper();
+        return ((ReadOnlySpan<byte>)Unsafe.AsRef(in this).ToBytesSpan()).ToHexStringUpper();
     }
     
     public string ToStringLowerCase()
     {
-        Span<byte> span = stackalloc byte[Size];
-        this.ToBytes(span);
-        return ((ReadOnlySpan<byte>)span).ToHexStringLower();
+        return ((ReadOnlySpan<byte>)Unsafe.AsRef(in this).ToBytesSpan()).ToHexStringLower();
     }
 
     public override string ToString() => ToStringUpperCase();

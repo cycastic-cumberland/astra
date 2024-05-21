@@ -34,12 +34,12 @@ public abstract class UnmanagedColumnResolver<TD>(string columnName, int offset,
 
     public TD Dump<TR>(TR row) where TR : struct, IImmutableDataRow
     {
-        return row.Read[offset..(offset + Occupying)].MarshalTo<TD>();
+        return row.Read[offset..(offset + Occupying)].ToReadOnlyRef<TD>();
     }
 
     public void Enroll<TR>(TD value, TR row) where TR : struct, IDataRow
     {
-        value.ToBytes(row.Write[offset..(offset + Occupying)]);
+        row.Write[offset..(offset + Occupying)].ToRef<TD>() = value;
     }
 
     public void Serialize<T>(Stream writer, T row) where T : struct, IImmutableDataRow

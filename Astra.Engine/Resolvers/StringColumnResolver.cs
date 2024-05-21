@@ -40,8 +40,7 @@ public sealed class StringColumnResolver(string columnName, int offset, int inde
         try
         {
             reader.ReadExactly(cluster.Writer[HeaderSize..(HeaderSize + length)]);
-            Span<byte> lengthSpan = stackalloc byte[sizeof(int)];
-            length.ToSpan(lengthSpan);
+            var lengthSpan = length.ToBytesSpan();
             lengthSpan.CopyTo(cluster.Writer[..SizeOffsetEnd]);
             row.SetPeripheral(index, cluster);
         }

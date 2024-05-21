@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Text;
 using Astra.Common.Data;
 using Astra.Common.Protocols;
@@ -21,16 +20,14 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void WriteDWordUnmanaged<T>(Stream writer, T value) where T : unmanaged
     {
-        const int size = sizeof(uint);
         var bytes = ReverseEndianness(Unsafe.As<T, uint>(ref value));
-        writer.Write(MemoryMarshal.CreateSpan(ref Unsafe.As<uint, byte>(ref bytes), size));
+        writer.Write(bytes.ToBytesSpan());
     }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static uint ReadDWordUnmanaged(Stream reader)
     {
-        const int size = sizeof(uint);
         var bytes = 0U;
-        reader.ReadExactly(MemoryMarshal.CreateSpan(ref Unsafe.As<uint, byte>(ref bytes), size));
+        reader.ReadExactly(bytes.ToBytesSpan());
         return ReverseEndianness(bytes);
     }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -48,16 +45,14 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static void WriteQWordUnsafe<T>(Stream writer, T value) where T : unmanaged
     {
-        const int size = sizeof(ulong);
         var bytes = ReverseEndianness(Unsafe.As<T, ulong>(ref value));
-        writer.Write(MemoryMarshal.CreateSpan(ref Unsafe.As<ulong, byte>(ref bytes), size));
+        writer.Write(bytes.ToBytesSpan());
     }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong ReadQWordUnsafe(Stream reader)
     {
-        const int size = sizeof(ulong);
         var bytes = 0UL;
-        reader.ReadExactly(MemoryMarshal.CreateSpan(ref Unsafe.As<ulong, byte>(ref bytes), size));
+        reader.ReadExactly(bytes.ToBytesSpan());
         return ReverseEndianness(bytes);
     }
     
