@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using Astra.Common.Data;
 using Astra.Common.Hashes;
@@ -15,9 +16,9 @@ public static class StreamWriteAddons
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static unsafe void WriteUnmanagedValue<T>(this Stream writer, T value) where T : unmanaged
+    public static void WriteUnmanagedValue<T>(this Stream writer, T value) where T : unmanaged
     {
-        writer.Write(new ReadOnlySpan<byte>(&value, sizeof(T)));
+        writer.Write(MemoryMarshal.CreateSpan(ref Unsafe.As<T, byte>(ref value), Unsafe.SizeOf<T>()));
     }
 
     public static void WriteWildcard(this Stream writer, object? obj)

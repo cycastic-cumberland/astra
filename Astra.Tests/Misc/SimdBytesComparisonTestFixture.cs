@@ -18,7 +18,7 @@ public class SimdBytesComparisonTestFixture
         using var secureRandom = RandomNumberGenerator.Create();
         secureRandom.GetBytes(left);
         Array.Copy(left, right, left.Length);
-        var result = BytesComparisonHelper.Equals(left, right);
+        var result = BytesComparisonHelper.Equals(left.AsSpan(), right.AsSpan());
         Assert.That(result, Is.True);
     }
     
@@ -33,7 +33,7 @@ public class SimdBytesComparisonTestFixture
         Array.Copy(left, right, left.Length);
         var idx = Rng.Next(0, right.Length);
         right[idx] = unchecked((byte)(right[idx] + 1));
-        var result = BytesComparisonHelper.Equals(left, right);
+        var result = BytesComparisonHelper.Equals(left.AsSpan(), right.AsSpan());
         Assert.That(result, Is.False);
     }
 }

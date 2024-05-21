@@ -76,6 +76,7 @@ public struct RepresentableAstraLaunchSettings
             Port = Port,
             CompressionOption = (CompressionOptions)compressionStrategy,
             Schema = Schema.ToInternal(),
+            Port = Port,
             LogLevel = LogLevel,
             Timeout = Timeout,
             AuthenticationMethod = method,

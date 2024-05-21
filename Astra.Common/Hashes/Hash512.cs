@@ -20,18 +20,18 @@ file static class Hash512Helpers
             && lhs.Element3.Equals(rhs.Element3);
     }
 
-    public static unsafe bool YmmCompare(Hash512 lhs, Hash512 rhs)
+    public static bool YmmCompare(Hash512 lhs, Hash512 rhs)
     {
-        var left = (Vector256<ulong>*)&lhs;
-        var right = (Vector256<ulong>*)&rhs;
+        var left = MemoryMarshal.CreateSpan(ref Unsafe.As<Hash512, Vector256<ulong>>(ref lhs), 2);
+        var right = MemoryMarshal.CreateSpan(ref Unsafe.As<Hash512, Vector256<ulong>>(ref rhs), 2);
         return left[0].Equals(right[0])
                && left[1].Equals(right[1]);
     }
 
-    public static unsafe bool ZmmCompare(Hash512 lhs, Hash512 rhs)
+    public static bool ZmmCompare(Hash512 lhs, Hash512 rhs)
     {
-        var left = Unsafe.ReadUnaligned<Vector512<ulong>>(&lhs);
-        var right = Unsafe.ReadUnaligned<Vector512<ulong>>(&rhs);
+        ref var left = ref Unsafe.As<Hash512, Vector512<ulong>>(ref lhs);
+        ref var right = ref Unsafe.As<Hash512, Vector512<ulong>>(ref rhs);
         return left.Equals(right);
     }
 
@@ -58,9 +58,9 @@ public readonly struct Hash512 : IEquatable<Hash512>
     [FieldOffset(3 * Hash128.Size)]
     internal readonly Vector128<ulong> Element3;
 
-    private static unsafe Hash512 ToHash512<T>(Vector512<T> vector)
+    private static Hash512 ToHash512<T>(Vector512<T> vector)
     {
-        return Unsafe.ReadUnaligned<Hash512>(&vector);
+        return Unsafe.As<Vector512<T>, Hash512>(ref vector);
     }
 
     public static readonly Hash512 Zero = ToHash512(Vector512<ulong>.Zero);

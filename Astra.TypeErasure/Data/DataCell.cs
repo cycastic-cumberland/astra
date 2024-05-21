@@ -118,13 +118,7 @@ public readonly struct DataCell : INumber<DataCell>, IDisposable
         var length = value.Length;
         try
         {
-            unsafe
-            {
-                fixed (void* dest = buffer, source = value)
-                {
-                    Buffer.MemoryCopy(source, dest, buffer.Length * sizeof(char), length * sizeof(char));
-                }
-            }
+            value.CopyTo(buffer);
         }
         catch
         {
@@ -150,13 +144,7 @@ public readonly struct DataCell : INumber<DataCell>, IDisposable
         var length = value.Length;
         try
         {
-            unsafe
-            {
-                fixed (void* dest = buffer, source = value)
-                {
-                    Buffer.MemoryCopy(source, dest, buffer.Length * sizeof(byte), length * sizeof(char));
-                }
-            }
+            value.CopyTo(buffer);
         }
         catch
         {
@@ -423,11 +411,12 @@ public readonly struct DataCell : INumber<DataCell>, IDisposable
 
     public static DataCell operator %(DataCell left, DataCell right)
     {
-        if (left.CellType != right.CellType) throw new MismatchedDataTypeException();
         return left.CellType switch
         {
-            CellTypes.DWord => new DataCell(left.DWord % right.DWord),
-            CellTypes.QWord => new DataCell(left.QWord % right.QWord),
+            CellTypes.DWord => ModuloDWord(left.DWord, ref right),
+            CellTypes.QWord => ModuloQWord(left.QWord, ref right),
+            CellTypes.Single => ModuloSingle(left.Single, ref right),
+            CellTypes.Double => ModuloDouble(left.Double, ref right),
             _ => throw new UnreachableException($"Unsupported cell type: {left.CellType}")
         };
     }
@@ -873,6 +862,62 @@ public readonly struct DataCell : INumber<DataCell>, IDisposable
             CellTypes.QWord => new DataCell(lhs / rhs.QWord),
             CellTypes.Single => new DataCell(lhs / rhs.Single),
             CellTypes.Double => new DataCell(lhs / rhs.Double),
+            CellTypes.Text => throw new NotSupportedException(),
+            CellTypes.Bytes => throw new NotSupportedException(),
+            _ => throw new UnreachableException($"Unsupported cell type: {rhs.CellType}")
+        };
+    }
+    
+    private static DataCell ModuloDWord(int lhs, ref readonly DataCell rhs)
+    {
+        return rhs.CellType switch
+        {
+            CellTypes.DWord => new DataCell(lhs % rhs.DWord),
+            CellTypes.QWord => new DataCell(lhs % rhs.QWord),
+            CellTypes.Single => new DataCell(lhs % rhs.Single),
+            CellTypes.Double => new DataCell(lhs % rhs.Double),
+            CellTypes.Text => throw new NotSupportedException(),
+            CellTypes.Bytes => throw new NotSupportedException(),
+            _ => throw new UnreachableException($"Unsupported cell type: {rhs.CellType}")
+        };
+    }
+    
+    private static DataCell ModuloQWord(long lhs, ref readonly DataCell rhs)
+    {
+        return rhs.CellType switch
+        {
+            CellTypes.DWord => new DataCell(lhs % rhs.DWord),
+            CellTypes.QWord => new DataCell(lhs % rhs.QWord),
+            CellTypes.Single => new DataCell(lhs % rhs.Single),
+            CellTypes.Double => new DataCell(lhs % rhs.Double),
+            CellTypes.Text => throw new NotSupportedException(),
+            CellTypes.Bytes => throw new NotSupportedException(),
+            _ => throw new UnreachableException($"Unsupported cell type: {rhs.CellType}")
+        };
+    }
+    
+    private static DataCell ModuloSingle(float lhs, ref readonly DataCell rhs)
+    {
+        return rhs.CellType switch
+        {
+            CellTypes.DWord => new DataCell(lhs % rhs.DWord),
+            CellTypes.QWord => new DataCell(lhs % rhs.QWord),
+            CellTypes.Single => new DataCell(lhs % rhs.Single),
+            CellTypes.Double => new DataCell(lhs % rhs.Double),
+            CellTypes.Text => throw new NotSupportedException(),
+            CellTypes.Bytes => throw new NotSupportedException(),
+            _ => throw new UnreachableException($"Unsupported cell type: {rhs.CellType}")
+        };
+    }
+    
+    private static DataCell ModuloDouble(double lhs, ref readonly DataCell rhs)
+    {
+        return rhs.CellType switch
+        {
+            CellTypes.DWord => new DataCell(lhs % rhs.DWord),
+            CellTypes.QWord => new DataCell(lhs % rhs.QWord),
+            CellTypes.Single => new DataCell(lhs % rhs.Single),
+            CellTypes.Double => new DataCell(lhs % rhs.Double),
             CellTypes.Text => throw new NotSupportedException(),
             CellTypes.Bytes => throw new NotSupportedException(),
             _ => throw new UnreachableException($"Unsupported cell type: {rhs.CellType}")

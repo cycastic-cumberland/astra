@@ -3,7 +3,7 @@ namespace Astra.Common.Protocols;
 public static class CommunicationProtocol
 {
     public const ulong ServerIdentification         = 0x415354525341UL;
-    public const ulong SimpleClientResponse         = 0x53494D50UL;
+    public const ulong ClientResponse         = 0x53494D50UL;
 
     public const uint NoAuthentication              = 0x4E4FU;
     public const uint SaltedPasswordAuthentication  = 0x53414C54;

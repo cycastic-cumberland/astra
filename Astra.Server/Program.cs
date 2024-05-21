@@ -16,6 +16,11 @@ public class Program
         }
 
         var initTime = timer.ElapsedMilliseconds;
+        Console.CancelKeyPress += delegate(object? _, ConsoleCancelEventArgs e)
+        {
+            e.Cancel = true;
+            server.Kill();
+        };
         server.GetLogger<Program>().LogDebug("Initialization finished after {} ms", initTime);
         await server.RunAsync();
     }

@@ -236,7 +236,7 @@ public class AstraClient : IAstraClient
             await networkStream.ReadExactlyAsync(outBuffer.WriterMemory[..sizeof(uint)], cancellationToken);
             var connectionFlags = ConnectionFlags.From(BitConverter.ToUInt32(outBuffer.Reader[..sizeof(uint)]));
             
-            await networkStream.WriteValueAsync(CommunicationProtocol.SimpleClientResponse, cancellationToken);
+            await networkStream.WriteValueAsync(CommunicationProtocol.ClientResponse, cancellationToken);
             timer.Restart();
             while (networkClient.Available < sizeof(uint))
             {

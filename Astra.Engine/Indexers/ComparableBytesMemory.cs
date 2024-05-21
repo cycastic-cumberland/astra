@@ -20,7 +20,7 @@ public readonly struct ComparableBytesMemory : IEquatable<ComparableBytesMemory>
     
     public bool Equals(ComparableBytesMemory other)
     {
-        return BytesComparisonHelper.Equals(_bytes, other._bytes);
+        return BytesComparisonHelper.Equals(_bytes.Span, other._bytes.Span);
     }
 
     public ListEnumerator<byte, ComparableBytesMemory> GetEnumerator() =>

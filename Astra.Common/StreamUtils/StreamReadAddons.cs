@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using Astra.Common.Data;
 
@@ -15,12 +16,11 @@ public static class StreamReadAddons
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static unsafe T ReadUnmanagedStruct<T>(this Stream reader) where T : unmanaged
+    public static T ReadUnmanagedStruct<T>(this Stream reader) where T : unmanaged
     {
-        void* ptr = stackalloc byte[sizeof(T)];
-        reader.ReadExactly(new Span<byte>(ptr, sizeof(T)));
-        // Type punning magic
-        return *(T*)ptr;
+        var value = new T();
+        reader.ReadExactly(MemoryMarshal.CreateSpan(ref Unsafe.As<T, byte>(ref value), Unsafe.SizeOf<T>()));
+        return value;
     }
     
     public static int ReadInt(this Stream reader)

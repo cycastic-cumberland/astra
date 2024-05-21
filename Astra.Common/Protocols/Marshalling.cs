@@ -8,16 +8,13 @@ public static class Marshalling
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static T MarshalTo<T>(this ReadOnlySpan<byte> bytes) where T : unmanaged
     {
-        return Unsafe.ReadUnaligned<T>(ref MemoryMarshal.GetReference(bytes));
+        return Unsafe.As<byte, T>(ref Unsafe.AsRef(in bytes[0]));
     }
     
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void ToBytes<T>(this T value, Span<byte> toSpan) where T : unmanaged
     {
-        unsafe
-        {
-            var fromSpan = new Span<byte>(&value, sizeof(T));
-            fromSpan.CopyTo(toSpan);
-        }
+        var fromSpan = MemoryMarshal.CreateSpan(ref Unsafe.As<T, byte>(ref value), Unsafe.SizeOf<T>());
+        fromSpan.CopyTo(toSpan);
     }
 }
