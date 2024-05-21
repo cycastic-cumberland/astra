@@ -41,7 +41,7 @@ public class NetworkAggregationBenchmark
     };
     
     private TcpServer _server = null!;
-    private TcpServer _newServer = null!;
+    // private TcpServer _newServer = null!;
     private AstraClient _client = null!;
     private AstraClient _client2 = null!;
     private Task _serverTask = Task.CompletedTask;
@@ -60,15 +60,15 @@ public class NetworkAggregationBenchmark
             UseCellBasedDataStore = false,
             Schema = Schema with { BinaryTreeDegree = 1_000 }
         }, AuthenticationHelper.NoAuthentication());
-        _newServer = new(new()
-        {
-            Port = TcpServer.DefaultPort + 1,
-            LogLevel = "Critical",
-            UseCellBasedDataStore = true,
-            Schema = Schema with { BinaryTreeDegree = 1_000 }
-        }, AuthenticationHelper.NoAuthentication());
+        // _newServer = new(new()
+        // {
+        //     Port = TcpServer.DefaultPort + 1,
+        //     LogLevel = "Critical",
+        //     UseCellBasedDataStore = true,
+        //     Schema = Schema with { BinaryTreeDegree = 1_000 }
+        // }, AuthenticationHelper.NoAuthentication());
         _serverTask = _server.RunAsync();
-        _newServerTask = _newServer.RunAsync();
+        // _newServerTask = _newServer.RunAsync();
         await Task.Delay(100);
         _client = new();
         await _client.ConnectAsync(new()
@@ -94,8 +94,8 @@ public class NetworkAggregationBenchmark
         _client2.Dispose();
         _server.Kill();
         _server = null!;
-        _newServer.Kill();
-        _newServer = null!;
+        // _newServer.Kill();
+        // _newServer = null!;
         return Task.WhenAll(_serverTask, _newServerTask);
     }
     
@@ -152,7 +152,8 @@ public class NetworkAggregationBenchmark
     public void IterationCleanup()
     {
         _server.GetRegistry().Clear();
-        _newServer.GetRegistry().Clear();
+        _client2.ClearAsync().Wait();
+        // _newServer.GetRegistry().Clear();
     }
 
     [MethodImpl(MethodImplOptions.NoInlining | MethodImplOptions.NoOptimization)]

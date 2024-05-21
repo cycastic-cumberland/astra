@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
 using Astra.Common.Data;
 using Astra.Common.Protocols;
@@ -18,18 +19,18 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
                 ((value << 24) & 0xFF000000U);
     }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe void WriteDWordUnsafe<T>(Stream writer, T value) where T : unmanaged
+    private static void WriteDWordUnmanaged<T>(Stream writer, T value) where T : unmanaged
     {
         const int size = sizeof(uint);
-        var bytes = ReverseEndianness(*(uint*)&value);
-        writer.Write(new ReadOnlySpan<byte>(&bytes, size));
+        var bytes = ReverseEndianness(Unsafe.As<T, uint>(ref value));
+        writer.Write(MemoryMarshal.CreateSpan(ref Unsafe.As<uint, byte>(ref bytes), size));
     }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe uint ReadDWordUnsafe(Stream reader)
+    private static uint ReadDWordUnmanaged(Stream reader)
     {
         const int size = sizeof(uint);
-        uint bytes;
-        reader.ReadExactly(new Span<byte>(&bytes, size));
+        var bytes = 0U;
+        reader.ReadExactly(MemoryMarshal.CreateSpan(ref Unsafe.As<uint, byte>(ref bytes), size));
         return ReverseEndianness(bytes);
     }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -45,18 +46,18 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
                 ((value << 56) & 0xFF00000000000000UL);
     }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe void WriteQWordUnsafe<T>(Stream writer, T value) where T : unmanaged
+    private static void WriteQWordUnsafe<T>(Stream writer, T value) where T : unmanaged
     {
         const int size = sizeof(ulong);
-        var bytes = ReverseEndianness(*(ulong*)&value);
-        writer.Write(new ReadOnlySpan<byte>(&bytes, size));
+        var bytes = ReverseEndianness(Unsafe.As<T, ulong>(ref value));
+        writer.Write(MemoryMarshal.CreateSpan(ref Unsafe.As<ulong, byte>(ref bytes), size));
     }
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static unsafe ulong ReadQWordUnsafe(Stream reader)
+    private static ulong ReadQWordUnsafe(Stream reader)
     {
         const int size = sizeof(ulong);
-        ulong bytes;
-        reader.ReadExactly(new Span<byte>(&bytes, size));
+        var bytes = 0UL;
+        reader.ReadExactly(MemoryMarshal.CreateSpan(ref Unsafe.As<ulong, byte>(ref bytes), size));
         return ReverseEndianness(bytes);
     }
     
@@ -67,7 +68,7 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
     
     public void SaveValue(int value)
     {
-        WriteDWordUnsafe(stream, value);
+        WriteDWordUnmanaged(stream, value);
     }
 
     public ValueTask SaveValueAsync(int value, CancellationToken cancellationToken = default)
@@ -81,7 +82,7 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
 
     public void SaveValue(uint value)
     {
-        WriteDWordUnsafe(stream, value);
+        WriteDWordUnmanaged(stream, value);
     }
 
     public ValueTask SaveValueAsync(uint value, CancellationToken cancellationToken = default)
@@ -123,7 +124,7 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
 
     public void SaveValue(float value)
     {
-        WriteDWordUnsafe(stream, value);
+        WriteDWordUnmanaged(stream, value);
     }
 
     public ValueTask SaveValueAsync(float value, CancellationToken cancellationToken = default)
@@ -226,12 +227,12 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
 
     public int LoadInt()
     {
-        return unchecked((int)ReadDWordUnsafe(stream));
+        return unchecked((int)ReadDWordUnmanaged(stream));
     }
 
     public uint LoadUInt()
     {
-        return ReadDWordUnsafe(stream);
+        return ReadDWordUnmanaged(stream);
     }
 
     public long LoadLong()
@@ -246,20 +247,14 @@ public readonly struct ReverseStreamWrapper(Stream stream) : IStreamWrapper
 
     public float LoadSingle()
     {
-        unsafe
-        {
-            var value = ReadDWordUnsafe(stream);
-            return *(float*)&value;
-        }
+        var value = ReadDWordUnmanaged(stream);
+        return Unsafe.As<uint, float>(ref value);
     }
 
     public double LoadDouble()
     {
-        unsafe
-        {
-            var value = ReadQWordUnsafe(stream);
-            return *(double*)&value;
-        }
+        var value = ReadQWordUnsafe(stream);
+        return Unsafe.As<ulong, double>(ref value);
     }
 
     public string LoadString()

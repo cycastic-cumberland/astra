@@ -85,6 +85,12 @@ public readonly ref struct StringRef
             MemoryMarshal.Cast<char, byte>(right._chars));
     }
 
+    public int CompareTo(StringRef other)
+    {
+        return BytesComparisonHelper.CompareBetween(MemoryMarshal.Cast<char, byte>(_chars),
+            MemoryMarshal.Cast<char, byte>(other._chars));
+    }
+
     public static bool operator !=(StringRef left, StringRef right)
     {
         return !(left == right);

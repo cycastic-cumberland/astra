@@ -15,10 +15,10 @@ file static class Hash256Helpers
         return lhs.Element0.Equals(rhs.Element0) && lhs.Element1.Equals(rhs.Element1);
     }
     
-    public static unsafe bool YmmCompare(Hash256 lhs, Hash256 rhs)
+    public static bool YmmCompare(Hash256 lhs, Hash256 rhs)
     {
-        var left = Unsafe.ReadUnaligned<Vector256<ulong>>(&lhs);
-        var right = Unsafe.ReadUnaligned<Vector256<ulong>>(&rhs);
+        ref var left = ref Unsafe.As<Hash256, Vector256<ulong>>(ref lhs);
+        ref var right = ref Unsafe.As<Hash256, Vector256<ulong>>(ref rhs);
         return left.Equals(right);
     }
 
@@ -40,9 +40,9 @@ public readonly struct Hash256 : IEquatable<Hash256>
     [FieldOffset(1 * Hash128.Size)]
     internal readonly Vector128<ulong> Element1;
 
-    private static unsafe Hash256 ToHash512<T>(Vector256<T> vector)
+    private static Hash256 ToHash512<T>(Vector256<T> vector)
     {
-        return Unsafe.ReadUnaligned<Hash256>(&vector);
+        return Unsafe.As<Vector256<T>, Hash256>(ref vector);
     }
 
     public static readonly Hash256 Zero = ToHash512(Vector256<ulong>.Zero);

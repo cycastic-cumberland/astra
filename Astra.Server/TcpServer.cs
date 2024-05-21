@@ -4,7 +4,6 @@ using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Security.Cryptography;
-using Astra.Common;
 using Astra.Common.Data;
 using Astra.Common.Protocols;
 using Astra.Common.StreamUtils;
@@ -94,17 +93,13 @@ public class TcpServer : IDisposable
             IsCellBased = settings.UseCellBasedDataStore,
             Compression = settings.CompressionOption
         };
-        Console.CancelKeyPress += delegate(object? _, ConsoleCancelEventArgs e)
-        {
-            e.Cancel = true;
-            Kill();
-        };
-        _logger.LogInformation("Initialization completed: {} = {}, {} = {}, {} = {}, {} = {}, {} = {})",
+        _logger.LogInformation("Initialization completed: {} = {}, {} = {}, {} = {}, {} = {}, {} = {}, {} = {}",
                 nameof(settings.LogLevel), logLevel.ToString(), 
                 nameof(_registry.ColumnCount), _registry.ColumnCount, 
                 nameof(_registry.IndexedColumnCount), _registry.IndexedColumnCount, 
                 nameof(settings.AuthenticationMethod), settings.AuthenticationMethod,
-                nameof(settings.Timeout), TimeSpan.FromMilliseconds(_timeout));
+                nameof(settings.Timeout), TimeSpan.FromMilliseconds(_timeout),
+                nameof(settings.CompressionOption), settings.CompressionOption.ToString());
     }
 
     private (Stream reader, Stream writer) CreateStreamPair(Stream inStream)
@@ -364,7 +359,7 @@ public class TcpServer : IDisposable
     // 4. Wait for the client to send back another corresponding 64-bit integer to complete handshake
     // 5. If the integer does not match, stop communication
     // 6. Send authentication instruction and continue
-    private async Task AuthenticateClient(TcpClient client, IPAddress address)
+    private async Task AuthenticateClient(TcpClient client, IPAddress address, ushort port)
     {
         var cancellationToken = _cancellationTokenSource.Token;
         var stream = client.GetStream();
@@ -383,13 +378,13 @@ public class TcpServer : IDisposable
                 Thread.Yield();
 #endif
                 if (timer.ElapsedMilliseconds <= _timeout) continue;
-                _logger.LogInformation("Client {} failed handshake attempt: timed out", address);
+                _logger.LogInformation("Client {}:{} failed handshake attempt: timed out", address, port);
                 client.Close();
                 return;
             }
 
             var handshakeAttempt = await stream.ReadULongAsync(token: cancellationToken);
-            if (handshakeAttempt != CommunicationProtocol.SimpleClientResponse)
+            if (handshakeAttempt != CommunicationProtocol.ClientResponse)
             {
                 _logger.LogDebug("Client {} failed handshake attempt: incorrect message", address);
                 client.Close();
@@ -425,23 +420,22 @@ public class TcpServer : IDisposable
     private async Task ResolveClientWrappedAsync(TcpClient client)
     {
         var addr = Address;
-        int port = ushort.MaxValue;
+        var port = ushort.MaxValue;
         if (client.Client.RemoteEndPoint != null)
         {
             addr = ((IPEndPoint)client.Client.RemoteEndPoint).Address;
-            port = ((IPEndPoint)client.Client.RemoteEndPoint).Port;
+            port = (ushort)((IPEndPoint)client.Client.RemoteEndPoint).Port;
         }
 
         try
         {
-            _logger.LogDebug("Connection from {}:{} opened", addr, port);
-            // await ResolveClientAsync(client);
-            await AuthenticateClient(client, addr);
-            _logger.LogDebug("Connection from {}:{} closed", addr, port);
+            _logger.LogInformation("Connection from {}:{} opened", addr, port);
+            await AuthenticateClient(client, addr, port);
+            _logger.LogInformation("Connection from {}:{} closed", addr, port);
         }
         catch (SocketException)
         {
-            _logger.LogDebug("Connection from {}:{} closed disruptively", addr, port);
+            _logger.LogInformation("Connection from {}:{} closed disruptively", addr, port);
         }
         catch (TaskCanceledException)
         {
@@ -496,7 +490,6 @@ public class TcpServer : IDisposable
 
     public void Dispose()
     {
-        _listener.Stop();
         _listener.Dispose();
         _loggerFactory.Dispose();
     }

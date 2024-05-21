@@ -38,10 +38,7 @@ public struct ConnectionFlags
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ConnectionFlags From(uint value)
     {
-        unsafe
-        {
-            return *(ConnectionFlags*)&value;
-        }
+        return Unsafe.As<uint, ConnectionFlags>(ref value);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -78,13 +75,6 @@ public struct ConnectionFlags
     public uint Raw
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get
-        {
-            unsafe
-            {
-                var self = this;
-                return *(uint*)&self;
-            }
-        }
+        get => Unsafe.As<ConnectionFlags, uint>(ref this);
     }
 }

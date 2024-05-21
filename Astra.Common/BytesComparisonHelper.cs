@@ -5,113 +5,154 @@ namespace Astra.Common;
 
 file static class IntrinsicsBytesComparer
 {
-    private static unsafe bool Equals(byte* l, byte* r, long length)
+    private static bool Equals(ref readonly byte l, ref readonly byte r, long length)
     {
+        const int v128Length = sizeof(long) * 2;
+        const int v256Length = v128Length * 2;
+        const int v512Length = v256Length * 2;
         while (length > 0)
         {
             bool result;
             int processed;
             switch (length)
             {
-                case >= 64 when Vector128.IsHardwareAccelerated:
+                case >= v512Length when Vector512.IsHardwareAccelerated:
                 {
-                    var left = *(Vector512<ulong>*)l;
-                    var right = *(Vector512<ulong>*)r;
-                    (result, processed) = (left == right, sizeof(ulong) * sizeof(ulong));
+                    ref var left = ref Unsafe.As<byte, Vector512<ulong>>(ref Unsafe.AsRef(in l));
+                    ref var right = ref Unsafe.As<byte, Vector512<ulong>>(ref Unsafe.AsRef(in r));
+                    (result, processed) = (left == right, v512Length);
                     break;
                 }
-                case >= 32 when Vector128.IsHardwareAccelerated:
+                case >= v256Length when Vector256.IsHardwareAccelerated:
                 {
-                    var left = *(Vector256<ulong>*)l;
-                    var right = *(Vector256<ulong>*)r;
-                    (result, processed) = (left == right, sizeof(ulong) * sizeof(uint));
+                    ref var left = ref Unsafe.As<byte, Vector256<ulong>>(ref Unsafe.AsRef(in l));
+                    ref var right = ref Unsafe.As<byte, Vector256<ulong>>(ref Unsafe.AsRef(in r));
+                    (result, processed) = (left == right, v256Length);
                     break;
                 }
-                case >= 16 when Vector128.IsHardwareAccelerated:
+                case >= v128Length when Vector128.IsHardwareAccelerated:
                 {
-                    var left = *(Vector128<ulong>*)l;
-                    var right = *(Vector128<ulong>*)r;
-                    (result, processed) = (left == right, sizeof(ulong) * sizeof(ushort));
+                    ref var left = ref Unsafe.As<byte, Vector128<ulong>>(ref Unsafe.AsRef(in l));
+                    ref var right = ref Unsafe.As<byte, Vector128<ulong>>(ref Unsafe.AsRef(in r));
+                    (result, processed) = (left == right, v128Length);
                     break;
                 }
                 case >= sizeof(ulong):
                 {
-                    var left = *(ulong*)l;
-                    var right = *(ulong*)r;
+                    ref var left = ref Unsafe.As<byte, ulong>(ref Unsafe.AsRef(in l));
+                    ref var right = ref Unsafe.As<byte, ulong>(ref Unsafe.AsRef(in r));
                     (result, processed) = (left == right, sizeof(ulong));
                     break;
                 }
                 case >= sizeof(uint):
                 {
-                    var left = *(uint*)l;
-                    var right = *(uint*)r;
+                    ref var left = ref Unsafe.As<byte, uint>(ref Unsafe.AsRef(in l));
+                    ref var right = ref Unsafe.As<byte, uint>(ref Unsafe.AsRef(in r));
                     (result, processed) = (left == right, sizeof(uint));
                     break;
                 }
                 case >= sizeof(ushort):
                 {
-                    var left = *(ushort*)l;
-                    var right = *(ushort*)r;
+                    ref var left = ref Unsafe.As<byte, ushort>(ref Unsafe.AsRef(in l));
+                    ref var right = ref Unsafe.As<byte, ushort>(ref Unsafe.AsRef(in r));
                     (result, processed) = (left == right, sizeof(ushort));
                     break;
                 }
                 default:
                 {
-                    (result, processed) = (*l == *r, 1);
+                    ref var left = ref Unsafe.AsRef(in l);
+                    ref var right = ref Unsafe.AsRef(in r);
+                    (result, processed) = (left == right, 1);
                     break;
                 }
             }
             if (!result) return false;
-            l = &l[processed];
-            r = &r[processed];
+            l = ref Unsafe.Add(ref Unsafe.AsRef(in l), (nint)processed);
+            r = ref Unsafe.Add(ref Unsafe.AsRef(in r), (nint)processed);
             length -= processed;
         }
 
         return true;
     }
-    public static unsafe bool Compare(byte[] lhs, byte[] rhs)
+    
+    private static int CompareBetween(ref readonly byte l, ref readonly byte r, long length)
     {
-        if (lhs.LongLength != rhs.LongLength) return false;
-        if (lhs.Length == 0) return true;
-        fixed (byte* l = &lhs[0], r = &rhs[0])
+        const int v128Length = sizeof(long) * 2;
+        while (length > 0)
         {
-            return Equals(l, r, lhs.LongLength);
+            int result;
+            int processed;
+            switch (length)
+            {
+                case >= v128Length:
+                {
+                    ref var left = ref Unsafe.As<byte, UInt128>(ref Unsafe.AsRef(in l));
+                    ref var right = ref Unsafe.As<byte, UInt128>(ref Unsafe.AsRef(in r));
+                    (result, processed) = (left.CompareTo(right), v128Length);
+                    break;
+                }
+                case >= sizeof(ulong):
+                {
+                    ref var left = ref Unsafe.As<byte, ulong>(ref Unsafe.AsRef(in l));
+                    ref var right = ref Unsafe.As<byte, ulong>(ref Unsafe.AsRef(in r));
+                    (result, processed) = (left.CompareTo(right), sizeof(ulong));
+                    break;
+                }
+                case >= sizeof(uint):
+                {
+                    ref var left = ref Unsafe.As<byte, uint>(ref Unsafe.AsRef(in l));
+                    ref var right = ref Unsafe.As<byte, uint>(ref Unsafe.AsRef(in r));
+                    (result, processed) = (left.CompareTo(right), sizeof(uint));
+                    break;
+                }
+                case >= sizeof(ushort):
+                {
+                    ref var left = ref Unsafe.As<byte, ushort>(ref Unsafe.AsRef(in l));
+                    ref var right = ref Unsafe.As<byte, ushort>(ref Unsafe.AsRef(in r));
+                    (result, processed) = (left.CompareTo(right), sizeof(ushort));
+                    break;
+                }
+                default:
+                {
+                    ref var left = ref Unsafe.AsRef(in l);
+                    ref var right = ref Unsafe.AsRef(in r);
+                    (result, processed) = (left.CompareTo(right), 1);
+                    break;
+                }
+            }
+            if (result != 0) return result;
+            l = ref Unsafe.Add(ref Unsafe.AsRef(in l), (nint)processed);
+            r = ref Unsafe.Add(ref Unsafe.AsRef(in r), (nint)processed);
+            length -= processed;
         }
+
+        return 0;
     }
-    public static unsafe bool Compare(ReadOnlySpan<byte> lhs, ReadOnlySpan<byte> rhs)
+
+    public static bool Equals(ReadOnlySpan<byte> lhs, ReadOnlySpan<byte> rhs)
     {
         if (lhs.Length != rhs.Length) return false;
-        if (lhs.Length == 0) return true;
-        fixed (byte* l = &lhs[0], r = &rhs[0])
-        {
-            return Equals(l, r, lhs.Length);
-        }
+        return lhs.Length == 0 || Equals(in lhs[0], in rhs[0], lhs.Length);
     }
-    
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool Compare(ReadOnlyMemory<byte> lhs, ReadOnlyMemory<byte> rhs)
+
+    public static int CompareBetween(ReadOnlySpan<byte> lhs, ReadOnlySpan<byte> rhs)
     {
-        return Compare(lhs.Span, rhs.Span);
+        if (lhs.Length < rhs.Length) return -1;
+        if (lhs.Length > rhs.Length) return 1;
+        return lhs.Length == 0 ? 0 : CompareBetween(in lhs[0], in rhs[0], lhs.Length);
     }
 }
 
 
 public static class BytesComparisonHelper
 {
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool Equals(byte[] lhs, byte[] rhs)
-    {
-        return lhs == rhs || IntrinsicsBytesComparer.Compare(lhs, rhs);
-    }
-    
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static bool Equals(ReadOnlyMemory<byte> lhs, ReadOnlyMemory<byte> rhs)
-    {
-        return lhs.Equals(rhs) || IntrinsicsBytesComparer.Compare(lhs, rhs);
-    }
-
     public static bool Equals(ReadOnlySpan<byte> lhs, ReadOnlySpan<byte> rhs)
     {
-        return lhs == rhs || IntrinsicsBytesComparer.Compare(lhs, rhs);
+        return lhs == rhs || IntrinsicsBytesComparer.Equals(lhs, rhs);
+    }
+
+    public static int CompareBetween(ReadOnlySpan<byte> lhs, ReadOnlySpan<byte> rhs)
+    {
+        return IntrinsicsBytesComparer.CompareBetween(lhs, rhs);
     }
 }

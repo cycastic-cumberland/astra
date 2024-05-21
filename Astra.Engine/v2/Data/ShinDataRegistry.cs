@@ -226,7 +226,7 @@ public class ShinDataRegistry : IRegistry<ShinDataRegistry>
                 _ => throw new ArgumentOutOfRangeException()
             };
             _logger.LogDebug("Column {}: found type: {}, indexer: {}, should be hashed: {}",
-                i, specification.DataType, specification.Indexer.Type, shouldBeHashed);
+                i, specification.DataType.AstraDataType(), specification.Indexer.Type, shouldBeHashed);
         }
 
         _indexedColumnCount = indexed;
