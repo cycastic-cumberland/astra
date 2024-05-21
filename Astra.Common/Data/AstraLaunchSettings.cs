@@ -65,11 +65,15 @@ public struct RepresentableAstraLaunchSettings
             "zlib" => ConnectionFlags.CompressionOptions.ZLib | ConnectionFlags.CompressionOptions.Optimal,
             "zlib+speed" => ConnectionFlags.CompressionOptions.ZLib |  ConnectionFlags.CompressionOptions.Fastest,
             "zlib+size" => ConnectionFlags.CompressionOptions.ZLib |  ConnectionFlags.CompressionOptions.SmallestSize,
+            "lz4" => ConnectionFlags.CompressionOptions.LZ4 | ConnectionFlags.CompressionOptions.Optimal,
+            "lz4+speed" => ConnectionFlags.CompressionOptions.LZ4 |  ConnectionFlags.CompressionOptions.Fastest,
+            "lz4+size" => ConnectionFlags.CompressionOptions.LZ4 |  ConnectionFlags.CompressionOptions.SmallestSize,
             _ => ConnectionFlags.CompressionOptions.None,
         };
         return new()
         {
             UseCellBasedDataStore = UseCellBasedDataStore ?? false,
+            Port = Port,
             CompressionOption = (CompressionOptions)compressionStrategy,
             Schema = Schema.ToInternal(),
             LogLevel = LogLevel,

@@ -152,6 +152,7 @@ public class NetworkAggregationBenchmark
     public void IterationCleanup()
     {
         _server.GetRegistry().Clear();
+        // _client2.ClearAsync().Wait();
         _newServer.GetRegistry().Clear();
     }
 
