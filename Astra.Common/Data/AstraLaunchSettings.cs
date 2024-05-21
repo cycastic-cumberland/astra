@@ -73,7 +73,6 @@ public struct RepresentableAstraLaunchSettings
         return new()
         {
             UseCellBasedDataStore = UseCellBasedDataStore ?? false,
-            Port = Port,
             CompressionOption = (CompressionOptions)compressionStrategy,
             Schema = Schema.ToInternal(),
             Port = Port,
